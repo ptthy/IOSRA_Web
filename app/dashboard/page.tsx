@@ -130,7 +130,7 @@ export default function DashboardAnalytics() {
             </div>
 
            <div className="flex items-center gap-3">
-  <Select value={reportPeriod} onValueChange={(v) => setReportPeriod(v as any)}>
+<Select value={reportPeriod} onValueChange={(v: any) => setReportPeriod(v)}>
     <SelectTrigger
       className="w-40 bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)]"
     >

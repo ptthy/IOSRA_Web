@@ -1,5 +1,5 @@
 "use client"
-
+import Image from "next/image";
 import { useState } from "react"
 import {
   Card,
@@ -210,7 +210,7 @@ export default function EventManagement() {
                 className="border border-[var(--border)] bg-[var(--card)] shadow-sm hover:shadow-md transition-shadow"
               >
                 <div className="relative h-48 overflow-hidden bg-[var(--muted)]">
-                  <img
+                  <Image 
                     src={event.imageUrl}
                     alt={event.title}
                     className="w-full h-full object-cover"
