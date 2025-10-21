@@ -1,5 +1,6 @@
-import { IconTrendingDown, IconTrendingUp } from "@tabler/icons-react"
+"use client"
 
+import { IconTrendingDown, IconTrendingUp } from "@tabler/icons-react"
 import { Badge } from "@/components/ui/badge"
 import {
   Card,
@@ -11,92 +12,97 @@ import {
 } from "@/components/ui/card"
 
 export function SectionCards() {
+  const cards = [
+    {
+      title: "Doanh thu hôm nay",
+      value: "10.500.000₫",
+      trend: "+12.5%",
+      desc: "Doanh thu tăng so với hôm qua",
+      icon: <IconTrendingUp className="size-4 text-green-600" />,
+      trendColor: "text-green-600 border-green-600/30",
+      direction: "up",
+    },
+    {
+      title: "User mới",
+      value: "276",
+      trend: "-20%",
+      desc: "Giảm so với hôm qua",
+      icon: <IconTrendingDown className="size-4 text-red-600" />,
+      trendColor: "text-red-600 border-red-600/30",
+      direction: "down",
+    },
+    {
+      title: "Active Users",
+      value: "8.432",
+      trend: "+7.8%",
+      desc: "Tăng trưởng ổn định",
+      icon: <IconTrendingUp className="size-4 text-green-600" />,
+      trendColor: "text-green-600 border-green-600/30",
+      direction: "up",
+    },
+    {
+      title: "Sponsored Authors",
+      value: "89",
+      trend: "+4.5%",
+      desc: "Hiệu suất tài trợ tăng nhẹ",
+      icon: <IconTrendingUp className="size-4 text-green-600" />,
+      trendColor: "text-green-600 border-green-600/30",
+      direction: "up",
+    },
+  ]
+
   return (
-    <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>Doanh thu hôm nay </CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            $1,250.00
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <IconTrendingUp />
-              +12.5%
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Trending up this month <IconTrendingUp className="size-4" />
-          </div>
-          <div className="text-muted-foreground">
-            Visitors for the last 6 months
-          </div>
-        </CardFooter>
-      </Card>
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>User mới</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            1,234
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <IconTrendingDown />
-              -20%
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Down 20% this period <IconTrendingDown className="size-4" />
-          </div>
-          <div className="text-muted-foreground">
-            Acquisition needs attention
-          </div>
-        </CardFooter>
-      </Card>
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>Active Users</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            45,678
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <IconTrendingUp />
-              +12.5%
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Strong user retention <IconTrendingUp className="size-4" />
-          </div>
-          <div className="text-muted-foreground">Engagement exceed targets</div>
-        </CardFooter>
-      </Card>
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>Sponsored Authors</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            4.5%
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <IconTrendingUp />
-              +4.5%
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Steady performance increase <IconTrendingUp className="size-4" />
-          </div>
-          <div className="text-muted-foreground">Meets growth projections</div>
-        </CardFooter>
-      </Card>
+    <div
+      className="
+        grid grid-cols-1 gap-6 px-4 lg:px-6
+        @xl/main:grid-cols-2 @5xl/main:grid-cols-4
+        *:data-[slot=card]:rounded-xl 
+        *:data-[slot=card]:shadow-sm
+        *:data-[slot=card]:transition-all
+        *:data-[slot=card]:duration-300
+        *:data-[slot=card]:hover:shadow-md
+        *:data-[slot=card]:hover:-translate-y-1
+        *:data-[slot=card]:bg-card 
+        dark:*:data-[slot=card]:bg-card/90
+        *:data-[slot=card]:border
+        *:data-[slot=card]:border-border
+      "
+    >
+      {cards.map((card, i) => (
+        <Card key={i} className="@container/card">
+          <CardHeader>
+            <CardDescription className="text-muted-foreground">
+              {card.title}
+            </CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl text-card-foreground">
+              {card.value}
+            </CardTitle>
+            <CardAction>
+              <Badge
+                variant="outline"
+                className={`flex items-center gap-1 px-2 py-1 text-sm rounded-md ${card.trendColor}`}
+              >
+                {card.icon}
+                {card.trend}
+              </Badge>
+            </CardAction>
+          </CardHeader>
+
+          <CardFooter className="flex-col items-start gap-1.5 text-sm">
+            <div className="flex items-center gap-2 font-medium text-card-foreground">
+              {card.desc}{" "}
+              {card.direction === "up" ? (
+                <IconTrendingUp className="size-4 text-green-600" />
+              ) : (
+                <IconTrendingDown className="size-4 text-red-600" />
+              )}
+            </div>
+            <div className="text-muted-foreground">
+              Cập nhật theo kỳ báo cáo mới nhất
+            </div>
+          </CardFooter>
+        </Card>
+      ))}
     </div>
   )
 }

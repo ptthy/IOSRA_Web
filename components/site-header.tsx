@@ -1,6 +1,6 @@
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { ThemeSelector } from "./theme-selector";
+
 import { ModeSwitcher } from "./mode-switcher";
 
 export function SiteHeader() {
@@ -12,9 +12,14 @@ export function SiteHeader() {
           orientation="vertical"
           className="mx-2 data-[orientation=vertical]:h-4"
         />
-        <h1 className="text-base font-medium">Dashboard Analytics</h1>
+        
+        {/* Sửa phần này */}
+        <div className="flex flex-col">
+          <h1 className="text-base font-medium">Dashboard Analytics</h1>
+          <p className="text-sm text-muted-foreground">Thống kê thời gian thực</p>
+        </div>
+        
         <div className="ml-auto flex items-center gap-2">
-          <ThemeSelector />
           <ModeSwitcher />
         </div>
       </div>
