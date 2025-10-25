@@ -28,106 +28,260 @@
   --font-sans: var(--font-poppins), sans-serif;
 
   /* Core colors */
-  --background: #F0EAD6;           /* Eggshell */
-  --foreground: #1E2A35;           /* Indigo Dye for text */
+  --background: #f0ead6; /* Eggshell */
+  --foreground: #1e2a35; /* Indigo Dye for text */
 
   /* Surfaces */
-  --card: #FFFFFF;                 /* White card */
-  --card-foreground: #1E2A35;
-  --popover: #FFFFFF;
-  --popover-foreground: #1E2A35;
+  --card: #ffffff; /* White card */
+  --card-foreground: #1e2a35;
+  --popover: #ffffff;
+  --popover-foreground: #1e2a35;
 
   /* Primary / secondary */
-  --primary: #00416A;              /* Indigo Dye */
-  --primary-foreground: #F0EAD6;
-  --secondary: #D1B280;            /* Warm beige tone */
-  --secondary-foreground: #1E2A35;
+  --primary: #00416a; /* Indigo Dye */
+  --primary-foreground: #f0ead6;
+  --secondary: #d1b280; /* Warm beige tone */
+  --secondary-foreground: #1e2a35;
 
   /* Accent */
-  --accent: #C87B33;               /* Burnt orange accent */
-  --accent-foreground: #FFFFFF;
+  --accent: #c87b33; /* Burnt orange accent */
+  --accent-foreground: #ffffff;
 
   /* Border / ring */
-  --border: #D8CFC0;               /* Soft warm border */
-  --input: #FFFFFF;
-  --ring: #00416A;
+  --border: #d8cfc0; /* Soft warm border */
+  --input: #ffffff;
+  --ring: #00416a;
 
   /* Muted */
-  --muted: #E6E0CE;                /* Slightly darker Eggshell */
-  --muted-foreground: #6E6E6E;
+  --muted: #e6e0ce; /* Slightly darker Eggshell */
+  --muted-foreground: #6e6e6e;
 
   /* Destructive */
-  --destructive: #A83C3C;
-  --destructive-foreground: #FFFFFF;
+  --destructive: #a83c3c;
+  --destructive-foreground: #ffffff;
 
   /* Charts (thematic variations) */
-  --chart-1: #00416A;
-  --chart-2: #D1B280;
-  --chart-3: #C87B33;
-  --chart-4: #F0EAD6;
-  --chart-5: #6E6E6E;
+  --chart-1: #00416a;
+  --chart-2: #d1b280;
+  --chart-3: #c87b33;
+  --chart-4: #f0ead6;
+  --chart-5: #6e6e6e;
 
   /* Sidebar */
-  --sidebar: #3A506B;              /* Deep slate blue */
-  --sidebar-foreground: #F0EAD6;
-  --sidebar-primary: #00416A;
-  --sidebar-primary-foreground: #F0EAD6;
-  --sidebar-accent: #C87B33;
-  --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: #D8CFC0;
-  --sidebar-ring: #00416A;
+  --sidebar: #3a506b; /* Deep slate blue */
+  --sidebar-foreground: #f0ead6;
+  --sidebar-primary: #00416a;
+  --sidebar-primary-foreground: #f0ead6;
+  --sidebar-accent: #c87b33;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #d8cfc0;
+  --sidebar-ring: #00416a;
 }
 
 /* ✅ Dark mode variables */
 .dark {
-  --background: #1E2A35;           /* Deep Indigo Dye background */
-  --foreground: #F0EAD6;           /* Eggshell text */
+  --background: #1e2a35; /* Deep Indigo Dye background */
+  --foreground: #f0ead6; /* Eggshell text */
 
   /* Surfaces */
-  --card: #2C3E50;
-  --card-foreground: #F0EAD6;
-  --popover: #2C3E50;
-  --popover-foreground: #F0EAD6;
+  --card: #2c3e50;
+  --card-foreground: #f0ead6;
+  --popover: #2c3e50;
+  --popover-foreground: #f0ead6;
 
   /* Primary / secondary */
-  --primary: #D1B280;
-  --primary-foreground: #1E2A35;
-  --secondary: #C87B33;
-  --secondary-foreground: #1E2A35;
+  --primary: #d1b280;
+  --primary-foreground: #1e2a35;
+  --secondary: #c87b33;
+  --secondary-foreground: #1e2a35;
 
   /* Accent */
-  --accent: #E3B97E;
-  --accent-foreground: #1E2A35;
+  --accent: #e3b97e;
+  --accent-foreground: #1e2a35;
 
   /* Border / ring */
-  --border: #3A506B;
-  --input: #2C3E50;
-  --ring: #D1B280;
+  --border: #3a506b;
+  --input: #2c3e50;
+  --ring: #d1b280;
 
   /* Muted */
-  --muted: #2E3B45;
-  --muted-foreground: #C8C2B2;
+  --muted: #2e3b45;
+  --muted-foreground: #c8c2b2;
 
   /* Destructive */
-  --destructive: #C85C5C;
-  --destructive-foreground: #F0EAD6;
+  --destructive: #c85c5c;
+  --destructive-foreground: #f0ead6;
 
   /* Charts */
-  --chart-1: #D1B280;
-  --chart-2: #C87B33;
-  --chart-3: #E3B97E;
-  --chart-4: #3A506B;
-  --chart-5: #6E6E6E;
+  --chart-1: #d1b280;
+  --chart-2: #c87b33;
+  --chart-3: #e3b97e;
+  --chart-4: #3a506b;
+  --chart-5: #6e6e6e;
 
   /* Sidebar */
-  --sidebar: #2C3E50;
-  --sidebar-foreground: #F0EAD6;
-  --sidebar-primary: #D1B280;
-  --sidebar-primary-foreground: #1E2A35;
-  --sidebar-accent: #C87B33;
-  --sidebar-accent-foreground: #F0EAD6;
-  --sidebar-border: #3A506B;
-  --sidebar-ring: #D1B280;
+  --sidebar: #2c3e50;
+  --sidebar-foreground: #f0ead6;
+  --sidebar-primary: #d1b280;
+  --sidebar-primary-foreground: #1e2a35;
+  --sidebar-accent: #c87b33;
+  --sidebar-accent-foreground: #f0ead6;
+  --sidebar-border: #3a506b;
+  --sidebar-ring: #d1b280;
+}
+
+/* ✅ Base styles */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground overscroll-none;
+    font-family: "Poppins", sans-serif;
+  }
+}
+
+/* ✅ Base setup */
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Poppins", sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ✅ Light mode variables (Retro Academic) */
+:root {
+  --radius: 0.625rem;
+
+  /* Font */
+  --font-sans: "Poppins", sans-serif;
+
+  /* Core colors - Chủ đạo #00416A và #F0EAD6 */
+  --background: #f0ead6; /* Eggshell - Màu nền chính */
+  --foreground: #00416a; /* Indigo Dye - Màu chữ chính */
+
+  /* Surfaces */
+  --card: #ffffff; /* White card để nổi bật trên nền */
+  --card-foreground: #00416a;
+  --popover: #ffffff;
+  --popover-foreground: #00416a;
+
+  /* Primary / secondary - Sử dụng 2 màu chủ đạo */
+  --primary: #00416a; /* Màu chính - Indigo Dye */
+  --primary-foreground: #f0ead6; /* Chữ trên nền primary */
+  --secondary: #f0ead6; /* Màu phụ - Eggshell */
+  --secondary-foreground: #00416a; /* Chữ trên nền secondary */
+
+  /* Accent - Biến thể của màu chính */
+  --accent: #00416a; /* Dùng màu chính cho accent */
+  --accent-foreground: #f0ead6;
+
+  /* Border / ring */
+  --border: #d8cfc0; /* Border nhẹ */
+  --input: #ffffff;
+  --ring: #00416a; /* Ring focus dùng màu chính */
+
+  /* Muted */
+  --muted: #e6e0ce; /* Phiên bản tối hơn của Eggshell */
+  --muted-foreground: #5a7a92; /* Phiên bản nhạt hơn của Indigo */
+
+  /* Destructive */
+  --destructive: #a83c3c;
+  --destructive-foreground: #f0ead6;
+
+  /* Charts - Sử dụng các biến thể của 2 màu chính */
+  --chart-1: #00416a;
+  --chart-2: #2c5f8d;
+  --chart-3: #5a7a92;
+  --chart-4: #f0ead6;
+  --chart-5: #e6e0ce;
+
+  /* Sidebar */
+  --sidebar: #00416a; /* Dùng màu chính */
+  --sidebar-foreground: #f0ead6;
+  --sidebar-primary: #00416a;
+  --sidebar-primary-foreground: #f0ead6;
+  --sidebar-accent: #2c5f8d; /* Biến thể sáng hơn của màu chính */
+  --sidebar-accent-foreground: #f0ead6;
+  --sidebar-border: #5a7a92;
+  --sidebar-ring: #f0ead6;
+}
+
+/* ✅ Dark mode variables */
+.dark {
+  --background: #00416a; /* Indigo Dye - Đảo màu làm nền tối */
+  --foreground: #f0ead6; /* Eggshell - Chữ sáng */
+
+  /* Surfaces */
+  --card: #003454; /* Tối hơn background một chút */
+  --card-foreground: #f0ead6;
+  --popover: #003454;
+  --popover-foreground: #f0ead6;
+
+  /* Primary / secondary - Đảo ngược */
+  --primary: #f0ead6; /* Eggshell làm màu chính trong dark mode */
+  --primary-foreground: #00416a; /* Indigo làm chữ */
+  --secondary: #00416a; /* Indigo làm phụ */
+  --secondary-foreground: #f0ead6; /* Eggshell làm chữ */
+
+  /* Accent */
+  --accent: #f0ead6;
+  --accent-foreground: #00416a;
+
+  /* Border / ring */
+  --border: #2c5f8d; /* Biến thể sáng hơn của Indigo */
+  --input: #003454;
+  --ring: #f0ead6;
+
+  /* Muted */
+  --muted: #2c5f8d;
+  --muted-foreground: #d8cfc0; /* Phiên bản tối hơn của Eggshell */
+
+  /* Destructive */
+  --destructive: #c85c5c;
+  --destructive-foreground: #f0ead6;
+
+  /* Charts */
+  --chart-1: #f0ead6;
+  --chart-2: #d8cfc0;
+  --chart-3: #5a7a92;
+  --chart-4: #00416a;
+  --chart-5: #2c5f8d;
+
+  /* Sidebar */
+  --sidebar: #003454; /* Tối hơn background */
+  --sidebar-foreground: #f0ead6;
+  --sidebar-primary: #f0ead6;
+  --sidebar-primary-foreground: #00416a;
+  --sidebar-accent: #5a7a92;
+  --sidebar-accent-foreground: #f0ead6;
+  --sidebar-border: #2c5f8d;
+  --sidebar-ring: #f0ead6;
 }
 
 /* ✅ Base styles */
