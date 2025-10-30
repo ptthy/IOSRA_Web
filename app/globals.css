@@ -1,149 +1,7 @@
+/* ✅ Dòng này BẮT BUỘC cho Tailwind v4 */
 @import "tailwindcss";
-@import "tw-animate-css";
 
-/* ✅ Base setup */
-@custom-variant dark (&:is(.dark *));
-
-@theme inline {
-  --font-sans: var(--font-poppins), sans-serif;
-  --font-mono: var(--font-geist-mono);
-
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-}
-
-/* ✅ Light mode variables (Retro Academic) */
-:root {
-  --radius: 0.625rem;
-
-  /* Font */
-  --font-sans: var(--font-poppins), sans-serif;
-
-  /* Core colors */
-  --background: #f0ead6; /* Eggshell */
-  --foreground: #1e2a35; /* Indigo Dye for text */
-
-  /* Surfaces */
-  --card: #ffffff; /* White card */
-  --card-foreground: #1e2a35;
-  --popover: #ffffff;
-  --popover-foreground: #1e2a35;
-
-  /* Primary / secondary */
-  --primary: #00416a; /* Indigo Dye */
-  --primary-foreground: #f0ead6;
-  --secondary: #d1b280; /* Warm beige tone */
-  --secondary-foreground: #1e2a35;
-
-  /* Accent */
-  --accent: #c87b33; /* Burnt orange accent */
-  --accent-foreground: #ffffff;
-
-  /* Border / ring */
-  --border: #d8cfc0; /* Soft warm border */
-  --input: #ffffff;
-  --ring: #00416a;
-
-  /* Muted */
-  --muted: #e6e0ce; /* Slightly darker Eggshell */
-  --muted-foreground: #6e6e6e;
-
-  /* Destructive */
-  --destructive: #a83c3c;
-  --destructive-foreground: #ffffff;
-
-  /* Charts (thematic variations) */
-  --chart-1: #00416a;
-  --chart-2: #d1b280;
-  --chart-3: #c87b33;
-  --chart-4: #f0ead6;
-  --chart-5: #6e6e6e;
-
-  /* Sidebar */
-  --sidebar: #3a506b; /* Deep slate blue */
-  --sidebar-foreground: #f0ead6;
-  --sidebar-primary: #00416a;
-  --sidebar-primary-foreground: #f0ead6;
-  --sidebar-accent: #c87b33;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #d8cfc0;
-  --sidebar-ring: #00416a;
-}
-
-/* ✅ Dark mode variables */
-.dark {
-  --background: #1e2a35; /* Deep Indigo Dye background */
-  --foreground: #f0ead6; /* Eggshell text */
-
-  /* Surfaces */
-  --card: #2c3e50;
-  --card-foreground: #f0ead6;
-  --popover: #2c3e50;
-  --popover-foreground: #f0ead6;
-
-  /* Primary / secondary */
-  --primary: #d1b280;
-  --primary-foreground: #1e2a35;
-  --secondary: #c87b33;
-  --secondary-foreground: #1e2a35;
-
-  /* Accent */
-  --accent: #e3b97e;
-  --accent-foreground: #1e2a35;
-
-  /* Border / ring */
-  --border: #3a506b;
-  --input: #2c3e50;
-  --ring: #d1b280;
-
-  /* Muted */
-  --muted: #2e3b45;
-  --muted-foreground: #c8c2b2;
-
-  /* Destructive */
-  --destructive: #c85c5c;
-  --destructive-foreground: #f0ead6;
-
-  /* Charts */
-  --chart-1: #d1b280;
-  --chart-2: #c87b33;
-  --chart-3: #e3b97e;
-  --chart-4: #3a506b;
-  --chart-5: #6e6e6e;
-
-  /* Sidebar */
-  --sidebar: #2c3e50;
-  --sidebar-foreground: #f0ead6;
-  --sidebar-primary: #d1b280;
-  --sidebar-primary-foreground: #1e2a35;
-  --sidebar-accent: #c87b33;
-  --sidebar-accent-foreground: #f0ead6;
-  --sidebar-border: #3a506b;
-  --sidebar-ring: #d1b280;
-}
-
-/* ✅ Base styles */
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground overscroll-none;
-    font-family: "Poppins", sans-serif;
-  }
-}
-
-/* ✅ Base setup */
-@custom-variant dark (&:is(.dark *));
-
+/* ✅ Định nghĩa theme cho Tailwind v4 */
 @theme inline {
   --font-sans: "Poppins", sans-serif;
 
@@ -172,49 +30,51 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Thêm các biến CSS của bạn nếu cần (ví dụ: sidebar) */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Thêm các biến charts của bạn */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
 }
 
-/* ✅ Light mode variables (Retro Academic) */
+/* ✅ Light mode variables (Theme #00416A / #F0EAD6) */
 :root {
   --radius: 0.625rem;
-
-  /* Font */
   --font-sans: "Poppins", sans-serif;
 
-  /* Core colors - Chủ đạo #00416A và #F0EAD6 */
-  --background: #f0ead6; /* Eggshell - Màu nền chính */
-  --foreground: #00416a; /* Indigo Dye - Màu chữ chính */
-
-  /* Surfaces */
-  --card: #ffffff; /* White card để nổi bật trên nền */
+  --background: #f0ead6;
+  --foreground: #00416a;
+  --card: #ffffff;
   --card-foreground: #00416a;
   --popover: #ffffff;
   --popover-foreground: #00416a;
-
-  /* Primary / secondary - Sử dụng 2 màu chủ đạo */
-  --primary: #00416a; /* Màu chính - Indigo Dye */
-  --primary-foreground: #f0ead6; /* Chữ trên nền primary */
-  --secondary: #f0ead6; /* Màu phụ - Eggshell */
-  --secondary-foreground: #00416a; /* Chữ trên nền secondary */
-
-  /* Accent - Biến thể của màu chính */
-  --accent: #00416a; /* Dùng màu chính cho accent */
+  --primary: #00416a;
+  --primary-foreground: #f0ead6;
+  --secondary: #f0ead6;
+  --secondary-foreground: #00416a;
+  --accent: #00416a;
   --accent-foreground: #f0ead6;
-
-  /* Border / ring */
-  --border: #d8cfc0; /* Border nhẹ */
+  --border: #d8cfc0;
   --input: #ffffff;
-  --ring: #00416a; /* Ring focus dùng màu chính */
-
-  /* Muted */
-  --muted: #e6e0ce; /* Phiên bản tối hơn của Eggshell */
-  --muted-foreground: #5a7a92; /* Phiên bản nhạt hơn của Indigo */
-
-  /* Destructive */
+  --ring: #00416a;
+  --muted: #e6e0ce;
+  --muted-foreground: #5a7a92;
   --destructive: #a83c3c;
   --destructive-foreground: #f0ead6;
 
-  /* Charts - Sử dụng các biến thể của 2 màu chính */
+  /* Charts */
   --chart-1: #00416a;
   --chart-2: #2c5f8d;
   --chart-3: #5a7a92;
@@ -222,11 +82,11 @@
   --chart-5: #e6e0ce;
 
   /* Sidebar */
-  --sidebar: #00416a; /* Dùng màu chính */
+  --sidebar: #00416a;
   --sidebar-foreground: #f0ead6;
   --sidebar-primary: #00416a;
   --sidebar-primary-foreground: #f0ead6;
-  --sidebar-accent: #2c5f8d; /* Biến thể sáng hơn của màu chính */
+  --sidebar-accent: #2c5f8d;
   --sidebar-accent-foreground: #f0ead6;
   --sidebar-border: #5a7a92;
   --sidebar-ring: #f0ead6;
@@ -234,35 +94,23 @@
 
 /* ✅ Dark mode variables */
 .dark {
-  --background: #00416a; /* Indigo Dye - Đảo màu làm nền tối */
-  --foreground: #f0ead6; /* Eggshell - Chữ sáng */
-
-  /* Surfaces */
-  --card: #003454; /* Tối hơn background một chút */
+  --background: #00416a;
+  --foreground: #f0ead6;
+  --card: #003454;
   --card-foreground: #f0ead6;
   --popover: #003454;
   --popover-foreground: #f0ead6;
-
-  /* Primary / secondary - Đảo ngược */
-  --primary: #f0ead6; /* Eggshell làm màu chính trong dark mode */
-  --primary-foreground: #00416a; /* Indigo làm chữ */
-  --secondary: #00416a; /* Indigo làm phụ */
-  --secondary-foreground: #f0ead6; /* Eggshell làm chữ */
-
-  /* Accent */
+  --primary: #f0ead6;
+  --primary-foreground: #00416a;
+  --secondary: #00416a;
+  --secondary-foreground: #f0ead6;
   --accent: #f0ead6;
   --accent-foreground: #00416a;
-
-  /* Border / ring */
-  --border: #2c5f8d; /* Biến thể sáng hơn của Indigo */
+  --border: #2c5f8d;
   --input: #003454;
   --ring: #f0ead6;
-
-  /* Muted */
   --muted: #2c5f8d;
-  --muted-foreground: #d8cfc0; /* Phiên bản tối hơn của Eggshell */
-
-  /* Destructive */
+  --muted-foreground: #d8cfc0;
   --destructive: #c85c5c;
   --destructive-foreground: #f0ead6;
 
@@ -274,7 +122,7 @@
   --chart-5: #2c5f8d;
 
   /* Sidebar */
-  --sidebar: #003454; /* Tối hơn background */
+  --sidebar: #003454;
   --sidebar-foreground: #f0ead6;
   --sidebar-primary: #f0ead6;
   --sidebar-primary-foreground: #00416a;
@@ -293,4 +141,9 @@
     @apply bg-background text-foreground overscroll-none;
     font-family: "Poppins", sans-serif;
   }
+}
+
+/* Fix z-index cho Dropdown */
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
 }

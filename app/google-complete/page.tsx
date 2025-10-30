@@ -1,6 +1,5 @@
 "use client";
 
-// --- 1: GỘP TẤT CẢ IMPORTS ---
 import React, { useState, useEffect, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +18,6 @@ import { useAuth } from "@/context/AuthContext";
 import { authService } from "@/services/authService";
 import { toast } from "sonner";
 
-// ---  2: GIỮ NGUYÊN PHẦN SUSPENSE VÀ ROUTE CHÍNH ---
 export default function GoogleCompleteRoute() {
   return (
     <Suspense
@@ -34,7 +32,6 @@ export default function GoogleCompleteRoute() {
   );
 }
 
-// --- 3: GỘP TẤT CẢ LOGIC, STATE VÀ UI VÀO GOOGLECOMPLETECONTENT ---
 function GoogleCompleteContent() {
   // Logic từ route
   const router = useRouter();
@@ -115,7 +112,6 @@ function GoogleCompleteContent() {
   const ERROR_IMG_SRC =
     "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==";
 
-  // ---  4: GỘP JSX TỪ UI COMPONENT VÀO ĐÂY ---
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Visual */}

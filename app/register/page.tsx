@@ -15,32 +15,25 @@ import {
   // AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
-// Sửa lại đường dẫn thành tương đối
+
 import { authService } from "../../services/authService";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-// Sửa lại đường dẫn thành tương đối
 import { useAuth } from "../../context/AuthContext";
-
-// Imports cho Firebase & JWT
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-// Sửa lại đường dẫn thành tương đối
 import { auth } from "../../lib/firebase";
 import { jwtDecode } from "jwt-decode";
 
-// Bỏ import { RegisterPage } from "@/components/pages/register-page";
-
-// Đổi tên component "Page" thành "RegisterRoute" và export default
 export default function RegisterRoute() {
-  // --- Toàn bộ logic từ RegisterPage được chuyển vào đây ---
   const router = useRouter();
-  // Vẫn cần setAuthData để lưu thông tin đăng nhập khi Google Login thành công
+  //  setAuthData để lưu thông tin đăng nhập khi Google Login thành công
   const { setAuthData } = useAuth();
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPasswords, setShowPasswords] = useState(false);
   const [error, setError] = useState("");
   const [imageError, setImageError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,9 +46,18 @@ export default function RegisterRoute() {
       setError("Mật khẩu phải có ít nhất 6 ký tự");
       return;
     }
+    if (password !== confirmPassword) {
+      setError("Mật khẩu và mật khẩu xác nhận không khớp");
+      return;
+    }
     setIsLoading(true);
     try {
-      await authService.register({ username, email, password });
+      await authService.register({
+        username,
+        email,
+        password,
+        confirmPassword,
+      });
       toast.success("Đăng ký thành công! Vui lòng kiểm tra email để xác thực.");
       router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
     } catch (err: any) {
@@ -274,7 +276,7 @@ export default function RegisterRoute() {
                 <div className="relative">
                   <Input
                     id="password"
-                    type={showPassword ? "text" : "password"}
+                    type={showPasswords ? "text" : "password"}
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -284,12 +286,12 @@ export default function RegisterRoute() {
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={() => setShowPasswords(!showPasswords)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    aria-label={showPasswords ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                     disabled={isLoading}
                   >
-                    {showPassword ? (
+                    {showPasswords ? (
                       <EyeOff className="h-4 w-4" />
                     ) : (
                       <Eye className="h-4 w-4" />
@@ -299,6 +301,35 @@ export default function RegisterRoute() {
                 <p className="text-xs text-muted-foreground">
                   Mật khẩu phải có ít nhất 6 ký tự
                 </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Xác nhận mật khẩu</Label>
+                <div className="relative">
+                  <Input
+                    id="confirm-password"
+                    type={showPasswords ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                    className="h-11 pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords(!showPasswords)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label={showPasswords ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    disabled={isLoading}
+                  >
+                    {showPasswords ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               {error && (

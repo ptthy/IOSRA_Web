@@ -5,30 +5,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  // Imports cho Left side (lấy từ layout verify-otp/reset-pass)
   Mail,
   ShieldCheck,
   Clock,
-  // Imports cho Right side (của trang forgot-pass)
   ArrowLeft,
   RefreshCw,
-  Send, // Đổi KeyRound thành Send
+  Send,
 } from "lucide-react";
 import { authService } from "@/services/authService";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-// Component này làm Bước 1: Gửi email
 export default function ForgotPasswordPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Thêm state imageError để khớp với Left Side
   const [imageError, setImageError] = useState(false);
 
-  // Thêm ERROR_IMG_SRC để khớp với Left Side
   const ERROR_IMG_SRC =
     "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==";
 
@@ -38,14 +33,12 @@ export default function ForgotPasswordPage() {
     setIsLoading(true);
 
     try {
-      // 1. GỌI API BƯỚC 1: Yêu cầu gửi email
       await authService.forgotPassword({ email });
 
       toast.success(
         "Đã gửi mã OTP thành công. Vui lòng kiểm tra email của bạn."
       );
 
-      // 2. CHUYỂN HƯỚNG SANG BƯỚC 2:
       router.push(`/reset-password?email=${email}`);
     } catch (err: any) {
       const errMsg =
@@ -59,7 +52,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen flex">
-      {/* --- LEFT SIDE (ĐÃ COPY TỪ TRANG RESET-PASSWORD) --- */}
+      {/* --- LEFT SIDE  --- */}
       <div
         className="hidden md:flex md:w-1/2 relative overflow-hidden"
         style={{ backgroundColor: "#00416A" }} // Màu nền tối
@@ -149,7 +142,6 @@ export default function ForgotPasswordPage() {
           {/* Back Button */}
           <button
             onClick={() => router.back()}
-            // Dùng class của shadcn (giống trang reset-pass)
             className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
             disabled={isLoading}
           >
@@ -197,7 +189,6 @@ export default function ForgotPasswordPage() {
             {error && (
               <div
                 className="rounded-lg p-3 text-sm"
-                // Giữ style error này vì nó chuẩn rồi
                 style={{
                   backgroundColor: "rgba(239, 68, 68, 0.1)",
                   color: "#dc2626",
@@ -212,7 +203,6 @@ export default function ForgotPasswordPage() {
             <Button
               type="submit"
               className="w-full h-12 hover:opacity-90 gap-2"
-              // Dùng style button y hệt trang reset-pass
               style={{ backgroundColor: "#F0EAD6", color: "#00416A" }}
               disabled={!email || isLoading}
             >
@@ -230,7 +220,7 @@ export default function ForgotPasswordPage() {
             </Button>
           </form>
 
-          {/* Info Box (Copy từ reset-pass nhưng thay đổi text) */}
+          {/* Info Box  */}
           <div className="rounded-lg p-4 space-y-2 bg-muted border">
             <p className="text-sm font-medium text-primary">Lưu ý:</p>
             <ul className="text-sm text-muted-foreground space-y-1">

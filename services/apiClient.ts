@@ -19,12 +19,10 @@ const apiClient = axios.create({
 // 3. Cấu hình Interceptor (Tự động đính kèm token)
 apiClient.interceptors.request.use(
   (config) => {
-    // --- SỬA Ở ĐÂY ---
     // Đảm bảo config.headers tồn tại trước khi thêm Authorization
     if (!config.headers) {
       config.headers = {} as AxiosRequestHeaders; // Khởi tạo nếu chưa có
     }
-    // --- KẾT THÚC SỬA ---
 
     // Chỉ chạy ở trình duyệt (client-side)
     if (typeof window !== "undefined") {
