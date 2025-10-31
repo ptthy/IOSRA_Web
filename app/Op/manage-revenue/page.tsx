@@ -34,7 +34,7 @@ import {
 import { DollarSign, TrendingUp, Download, FileText } from "lucide-react";
 import { toast } from "sonner";
 
-import { AppSidebar } from "@/components/app-sidebar";
+import { AppSidebar } from "@/components/op-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
