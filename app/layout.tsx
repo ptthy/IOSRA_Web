@@ -1,14 +1,11 @@
 import { cookies } from "next/headers";
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
-
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { Navbar } from "@/components/navbar";
 import { AppProviders } from "@/components/providers/app-providers";
-
-// ------------------------------------------
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -16,6 +13,7 @@ const poppins = Poppins({
   variable: "--font-poppins",
   display: "swap",
 });
+// Dòng này để test save
 
 // --- Metadata ---
 export const metadata: Metadata = {
