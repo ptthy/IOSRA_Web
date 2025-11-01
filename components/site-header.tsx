@@ -15,8 +15,8 @@ export function SiteHeader() {
         
         {/* Sửa phần này */}
         <div className="flex flex-col">
-          <h1 className="text-base font-medium">Dashboard Analytics</h1>
-          <p className="text-sm text-muted-foreground">Thống kê thời gian thực</p>
+          {/* <h1 className="text-base font-medium">Dashboard Analytics</h1>
+          <p className="text-sm text-muted-foreground">Thống kê thời gian thực</p> */}
         </div>
         
         <div className="ml-auto flex items-center gap-2">

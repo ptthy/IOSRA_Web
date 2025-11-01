@@ -1,6 +1,7 @@
 "use client";
-
-import React, { useState } from "react";
+import { useState } from "react"; // Thêm useState
+import Link from "next/link";
+import { Layout } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -109,7 +110,7 @@ export default function Page() {
   // Logic từ file route gốc
   const handleNavigate = (page: string) => {
     // Điều hướng tạm thời (sau này có thể dùng router.push)
-    alert(`Đi đến trang: ${page}`);
+    console.log(`Đi đến trang: ${page}`); // Thay alert bằng console.log hoặc modal
   };
   const isLoggedIn = false;
 
