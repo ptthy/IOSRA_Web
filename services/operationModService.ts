@@ -7,12 +7,14 @@ export async function getUpgradeRequests(status?: string) {
   return res.data;
 }
 
-export async function approveRequest(requestId: number) {
+
+export async function approveRequest(requestId: string) {
   const res = await apiClient.post(`/OperationMod/requests/${requestId}/approve`);
   return res.data;
 }
 
-export async function rejectRequest(requestId: number, reason: string) {
+
+export async function rejectRequest(requestId: string, reason: string) {
   const res = await apiClient.post(`/OperationMod/requests/${requestId}/reject`, {
     reason,
   });
