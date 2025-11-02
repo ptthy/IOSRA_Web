@@ -1,6 +1,5 @@
 "use client";
 
-// Imports từ components/pages/login-page.tsx
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,8 +21,6 @@ import { authService } from "@/services/authService";
 import { jwtDecode } from "jwt-decode";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-
-// Bỏ import { LoginPage } from "@/components/pages/login-page";
 
 // Đổi tên component thành LoginRoute và export default
 export default function LoginRoute() {
