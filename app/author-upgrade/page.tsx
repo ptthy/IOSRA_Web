@@ -244,8 +244,16 @@ export default function AuthorUpgradePage() {
       // để UI tự động chuyển sang "Đang chờ duyệt"
       await fetchUpgradeStatus();
     } catch (error) {
-      console.error("Lỗi khi gửi yêu cầu:", error);
-      toast.error("Có lỗi xảy ra khi gửi yêu cầu. Vui lòng thử lại.");
+      //   console.error("Lỗi khi gửi yêu cầu:", error);
+      const axiosError = error as AxiosError; // Khai báo rõ ràng
+
+      if (axiosError.response?.status === 429) {
+        toast.error(
+          "Bạn đã gửi yêu cầu quá nhiều lần. Vui lòng **chờ vài phút** rồi thử lại."
+        );
+      } else {
+        toast.error("Có lỗi xảy ra khi gửi yêu cầu. Vui lòng thử lại.");
+      }
     } finally {
       setIsSubmitting(false);
     }
