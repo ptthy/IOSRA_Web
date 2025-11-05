@@ -14,12 +14,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Search, Eye, CheckCircle, XCircle, Crown, UserCheck, Clock, History, Loader2, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-// API Service
+// API Service (Dùng cho Luồng 2: User -> Author)
 import { getUpgradeRequests, approveRequest, rejectRequest } from '@/services/operationModService';
 
-// --- Interface & Data cho Luồng 1: Author (Mock) ---
+// --- Interface & Data cho Luồng 1: Author ---
 interface Author {
-  id: number | string; // ✅ SỬA 1: ID có thể là số (từ mock) hoặc chuỗi (từ API)
+  id: number | string; 
   name: string;
   email: string;
   stories: number;
@@ -27,10 +27,7 @@ interface Author {
   status: 'active' | 'suspended' | 'sponsored';
   revenue: number;
 }
-const mockAuthors: Author[] = [
-  { id: 1, name: 'Nguyễn Văn A', email: 'vana@example.com', stories: 15, views: 125000, status: 'sponsored', revenue: 8500000 },
-  { id: 2, name: 'Trần Thị B', email: 'thib@example.com', stories: 8, views: 45000, status: 'active', revenue: 0 },
-];
+// (Đã xóa mockAuthors)
 // --------------------------------------------------------
 
 // --- Interface & Data cho Luồng 1: Sponsored (Mock) ---
@@ -53,20 +50,23 @@ const mockSponsorRequests: SponsorRequest[] = [
 
 // --- Interface cho Luồng 2: User -> Author (Khớp với API) ---
 interface AuthorUpgradeRequest {
-  requestId: string; // ✅ SỬA 2: Đổi sang string
-  requesterId: string; // ✅ SỬA 2: Đổi sang string
+  requestId: string;
+  requesterId: string;
   status: 'pending' | 'approved' | 'rejected';
   content: string; 
   createdAt: string;
   assignedOmodId: number | null;
   
-  userName?: string; 
-  email?: string; 
+  requesterUsername?: string; 
+  requesterEmail?: string; 
 }
 
 export default function AuthorManagement() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [authors, setAuthors] = useState<Author[]>(mockAuthors);
+  
+  const [authors, setAuthors] = useState<Author[]>([]);
+  // ✅ SỬA 1: Thêm state loading cho Tab 1
+  const [isLoadingAuthors, setIsLoadingAuthors] = useState(true);
 
   // --- State cho Luồng 1 (Sponsored) ---
   const [sponsorRequests, setSponsorRequests] = useState<SponsorRequest[]>([]); 
@@ -85,6 +85,7 @@ export default function AuthorManagement() {
   const [isSubmittingReject, setIsSubmittingReject] = useState(false);
   
   // --- Logic cho Luồng 1 (Sponsored) ---
+  // (Giữ nguyên, dùng mockSponsorRequests)
   useEffect(() => {
     setIsLoadingSponsorRequests(true);
     const timer = setTimeout(() => {
@@ -125,22 +126,46 @@ export default function AuthorManagement() {
   };
 
   
+  // ✅ SỬA 2: Thêm useEffect mới để tải danh sách Authors (Tab 1)
+  useEffect(() => {
+    async function fetchApprovedAuthors() {
+      try {
+        setIsLoadingAuthors(true);
+        // Gọi API lấy các request đã "approved"
+        const data: AuthorUpgradeRequest[] = await getUpgradeRequests('APPROVED');
+        
+        // Chuyển đổi dữ liệu request sang dữ liệu Author
+        const approvedAuthors: Author[] = data.map(req => ({
+          id: req.requesterId,
+          name: req.requesterUsername || `User ID: ${req.requesterId}`,
+          email: req.requesterEmail || '(Chưa có email)',
+          stories: 0, // (Backend chưa trả về)
+          views: 0, // (Backend chưa trả về)
+          status: 'active', // (Backend chưa trả về)
+          revenue: 0 // (Backend chưa trả về)
+        }));
+        
+        setAuthors(approvedAuthors);
+      } catch (error) {
+        toast.error("Không thể tải danh sách Authors đã duyệt.");
+        console.error("Failed to fetch approved authors:", error);
+      } finally {
+        setIsLoadingAuthors(false);
+      }
+    }
+    fetchApprovedAuthors();
+  }, []); // Chỉ chạy 1 lần khi tải trang
+
+
   // --- Logic cho Luồng 2 (Author Upgrade) ---
+  // (Giữ nguyên, dùng API thật, polling)
   useEffect(() => {
     
     async function fetchAuthorUpgradeRequests() {
       try {
+        // Chỉ lấy PENDING
         const data: AuthorUpgradeRequest[] = await getUpgradeRequests('PENDING'); 
-        
-        // Gán tên và email (Ưu tiên API, nếu không có thì dùng tạm)
-        const dataWithNames = data.map(req => ({
-          ...req,
-          // VẪN CẦN BACKEND TRẢ VỀ userName và email
-          userName: req.userName || `User ID: ${req.requesterId}`, 
-          email: req.email || `(Chưa có email)` 
-        }));
-        
-        setAuthorUpgradeRequests(dataWithNames);
+        setAuthorUpgradeRequests(data);
       } catch (error) {
         console.error("Failed to poll author upgrade requests:", error);
       } finally {
@@ -148,17 +173,14 @@ export default function AuthorManagement() {
       }
     }
 
-    // 1. Set loading và gọi ngay lần đầu tiên
     setIsLoadingAuthorRequests(true);
     fetchAuthorUpgradeRequests();
 
-    // 2. Cài đặt interval để tự động gọi lại mỗi 30 giây
-    const intervalId = setInterval(fetchAuthorUpgradeRequests, 30000); // 30,000ms
+    const intervalId = setInterval(fetchAuthorUpgradeRequests, 30000); 
 
-    // 3. Dọn dẹp
     return () => clearInterval(intervalId);
 
-  }, []); // Mảng rỗng là đúng
+  }, []); 
 
   const handleOpenAuthorRejectModal = (request: AuthorUpgradeRequest) => {
     setSelectedAuthorRequest(request);
@@ -167,19 +189,21 @@ export default function AuthorManagement() {
   };
 
   const handleApproveAuthorRequest = async (request: AuthorUpgradeRequest) => {
+    const requestName = request.requesterUsername || `User ID: ${request.requesterId}`;
+    
     toast.promise(
       async () => {
-        await approveRequest(request.requestId); // requestId giờ là string, khớp với service
+        await approveRequest(request.requestId); 
         
         setAuthorUpgradeRequests(prev => 
           prev.filter(r => r.requestId !== request.requestId)
         );
 
-        // Logic thêm Author mới vào Tab 1
+        // ✅ SỬA 3: Cập nhật Email thật khi duyệt
         const newAuthor: Author = {
-          id: request.requesterId, // requesterId giờ là string, khớp với interface Author
-          name: request.userName || `User ID: ${request.requesterId}`, 
-          email: request.email || `(Chưa có email)`, 
+          id: request.requesterId, 
+          name: request.requesterUsername || `User ID: ${request.requesterId}`, 
+          email: request.requesterEmail || `(Chưa có email)`, 
           stories: 0, 
           views: 0, 
           status: 'active', 
@@ -188,8 +212,8 @@ export default function AuthorManagement() {
         setAuthors(prevAuthors => [newAuthor, ...prevAuthors]); 
       },
       {
-        loading: `Đang duyệt cho ${request.userName}...`,
-        success: `Đã duyệt ${request.userName} thành công!`,
+        loading: `Đang duyệt cho ${requestName}...`,
+        success: `Đã duyệt ${requestName} thành công!`,
         error: "Duyệt thất bại. Vui lòng thử lại.",
       }
     );
@@ -200,19 +224,22 @@ export default function AuthorManagement() {
       toast.error("Vui lòng nhập lý do từ chối.");
       return;
     }
+    
+    const requestName = selectedAuthorRequest.requesterUsername || `User ID: ${selectedAuthorRequest.requesterId}`;
+    
     setIsSubmittingReject(true);
     toast.promise(
       async () => {
-        await rejectRequest(selectedAuthorRequest.requestId, authorRejectReason); // requestId giờ là string
+        await rejectRequest(selectedAuthorRequest.requestId, authorRejectReason); 
         setAuthorUpgradeRequests(prev => 
           prev.filter(r => r.requestId !== selectedAuthorRequest.requestId)
         );
       },
       {
-        loading: `Đang từ chối ${selectedAuthorRequest.userName}...`,
+        loading: `Đang từ chối ${requestName}...`,
         success: () => {
           setShowAuthorRejectDialog(false);
-          return `Đã từ chối ${selectedAuthorRequest.userName}.`;
+          return `Đã từ chối ${requestName}.`;
         },
         error: "Từ chối thất bại. Vui lòng thử lại.",
         finally: () => {
@@ -246,8 +273,8 @@ export default function AuthorManagement() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-[var(--foreground)]">Tên User (ID)</TableHead>
-                <TableHead className="text-[var(--foreground)]">Email (Tạm)</TableHead>
+                <TableHead className="text-[var(--foreground)]">Tên User</TableHead>
+                <TableHead className="text-[var(--foreground)]">Email</TableHead>
                 <TableHead className="text-[var(--foreground)]">Ngày gửi</TableHead>
                 <TableHead className="text-[var(--foreground)]">Trạng thái</TableHead>
                 <TableHead className="text-[var(--foreground)] text-right">Hành động</TableHead>
@@ -263,8 +290,9 @@ export default function AuthorManagement() {
               ) : requests.length > 0 ? (
                 requests.map((req) => (
                   <TableRow key={req.requestId}>
-                    <TableCell className="text-[var(--foreground)] font-medium">{req.userName}</TableCell>
-                    <TableCell className="text-[var(--muted-foreground)]">{req.email}</TableCell>
+                    {/* ✅ SỬA 4: Hiển thị email thật (nếu có) */}
+                    <TableCell className="text-[var(--foreground)] font-medium">{req.requesterUsername || `User ID: ${req.requesterId}`}</TableCell>
+                    <TableCell className="text-[var(--muted-foreground)]">{req.requesterEmail || `(Chưa có email)`}</TableCell>
                     <TableCell className="text-[var(--muted-foreground)]">{new Date(req.createdAt).toLocaleDateString('vi-VN')}</TableCell>
                     <TableCell>{getAuthorUpgradeStatusBadge(req.status)}</TableCell>
                     <TableCell className="text-right">
@@ -291,7 +319,7 @@ export default function AuthorManagement() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center h-24 text-[var(--muted-foreground)]">
-                 
+                   {'Không có yêu cầu (User -> Author) nào'}
                   </TableCell>
                 </TableRow>
               )}
@@ -351,7 +379,7 @@ export default function AuthorManagement() {
               </TabsTrigger>
             </TabsList>
 
-            {/* Tab 1: Danh sách Authors (Mock + Tự cập nhật) */}
+            {/* Tab 1: Danh sách Authors (Tải từ API) */}
             <TabsContent value="authors" className="space-y-4">
               <Card className="border border-[var(--border)] bg-[var(--card)] shadow-sm">
                 <CardHeader>
@@ -382,21 +410,36 @@ export default function AuthorManagement() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredAuthors.map((author) => (
-                        <TableRow key={author.id}>
-                          <TableCell>{author.name}</TableCell>
-                          <TableCell>{author.email}</TableCell>
-                          <TableCell>{author.stories}</TableCell>
-                          <TableCell>{author.views.toLocaleString()}</TableCell>
-                          <TableCell>{author.revenue > 0 ? `${author.revenue.toLocaleString()}₫` : '-'}</TableCell>
-                          <TableCell>{getStatusBadge(author.status)}</TableCell>
-                          <TableCell>
-                            <Button size="sm" variant="outline" onClick={() => setSelectedAuthor(author)}>
-                              <Eye className="w-4 h-4" />
-                            </Button>
+                      {/* ✅ SỬA 5: Thêm state loading cho Tab 1 */}
+                      {isLoadingAuthors ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center h-24 text-[var(--muted-foreground)]">
+                            <Loader2 className="w-6 h-6 mx-auto animate-spin" />
                           </TableCell>
                         </TableRow>
-                      ))}
+                      ) : authors.length > 0 ? (
+                        filteredAuthors.map((author) => (
+                          <TableRow key={author.id}>
+                            <TableCell>{author.name}</TableCell>
+                            <TableCell>{author.email}</TableCell>
+                            <TableCell>{author.stories}</TableCell>
+                            <TableCell>{author.views.toLocaleString()}</TableCell>
+                            <TableCell>{author.revenue > 0 ? `${author.revenue.toLocaleString()}₫` : '-'}</TableCell>
+                            <TableCell>{getStatusBadge(author.status)}</TableCell>
+                            <TableCell>
+                              <Button size="sm" variant="outline" onClick={() => setSelectedAuthor(author)}>
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center h-24 text-[var(--muted-foreground)]">
+                            Không có Author nào.
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -527,7 +570,7 @@ export default function AuthorManagement() {
                 <DialogTitle className="text-[var(--primary)]">Từ chối yêu cầu lên Author</DialogTitle>
                 <DialogDescription>
                   Bạn có chắc chắn muốn từ chối yêu cầu của 
-                  <strong className="text-[var(--foreground)]"> {selectedAuthorRequest?.userName}</strong>?
+                  <strong className="text-[var(--foreground)]"> {selectedAuthorRequest?.requesterUsername || selectedAuthorRequest?.requesterId}</strong>?
                 </DialogDescription>
               </DialogHeader>
               <Textarea
