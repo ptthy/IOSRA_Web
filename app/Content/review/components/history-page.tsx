@@ -1,9 +1,23 @@
-import { Search, Download, Filter, Clock, CheckCircle2, XCircle, AlertCircle, User } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
-import { motion } from 'framer-motion';
+// File: review/components/history-page.tsx
+"use client";
+
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  Search,
+  Download,
+  Filter,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  User,
+  Loader2,
+} from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { motion } from "framer-motion";
 import {
   Table,
   TableBody,
@@ -11,334 +25,219 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import moment from "moment";
+import "moment/locale/vi";
+import { getModerationStories } from "@/services/moderationApi";
+
+moment.locale("vi");
+
+interface StoryFromAPI {
+  reviewId: string;
+  storyId: string;
+  title: string;
+  authorUsername: string;
+  status: "pending" | "published" | "rejected";
+  submittedAt: string;
+  pendingNote?: string;
+  aiResult: string;
+}
 
 export function HistoryPage() {
-  const stats = [
-    { label: 'Tổng số', value: '8', color: 'text-[var(--foreground)]' },
-    { label: 'Đã duyệt', value: '3', color: 'text-[var(--secondary)]' },
-    { label: 'Từ chối', value: '1', color: 'text-[var(--destructive)]' },
-    { label: 'Cờ đã gắn', value: '3', color: 'text-[var(--accent)]' },
-    { label: 'Thời gian TB', value: '9 phút', color: 'text-[var(--foreground)]' },
-  ];
+  const [historyData, setHistoryData] = useState<StoryFromAPI[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const historyData = [
-    {
-      id: 1,
-      time: '2025-10-12 14:30',
-      type: 'Truyện',
-      typeColor: 'bg-[var(--primary)]/10 text-[var(--primary)]',
-      title: 'Hành trình isekai',
-      author: 'NguyenVanA',
-      action: 'Đã duyệt',
-      actionColor: 'bg-[var(--secondary)]/20 text-[var(--secondary)]',
-      details: 'AI Voice: VI, EN',
-      detailsBadges: ['VI', 'EN'],
-      processingTime: '7 phút',
-    },
-    {
-      id: 2,
-      time: '2025-10-12 13:45',
-      type: 'Chương',
-      typeColor: 'bg-[var(--secondary)]/20 text-[var(--secondary)]',
-      title: 'Chương 15 - Bí mật',
-      author: 'TranThiB',
-      action: 'Từ chối',
-      actionColor: 'bg-[var(--destructive)]/10 text-[var(--destructive)]',
-      details: 'Lý do: Nội dung vi phạm tiêu chuẩn',
-      detailsText: 'Lý do: Nội dung vi phạm tiêu chuẩn',
-      detailsBadge: 'Đã thông báo tác giả',
-      processingTime: '12 phút',
-    },
-    {
-      id: 3,
-      time: '2025-10-12 11:20',
-      type: 'Bình luận',
-      typeColor: 'bg-[var(--primary)]/10 text-[var(--primary)]',
-      title: 'Bình luận spam',
-      author: 'Spammer001',
-      action: 'Gỡ nội dung',
-      actionColor: 'bg-[var(--accent)]/10 text-[var(--accent)]',
-      details: '+1 cảnh báo',
-      detailsText: '+1 cảnh báo',
-      processingTime: '3 phút',
-    },
-    {
-      id: 4,
-      time: '2025-10-12 10:15',
-      type: 'Truyện',
-      typeColor: 'bg-[var(--primary)]/10 text-[var(--primary)]',
-      title: 'Vô thuật đỉnh cao',
-      author: 'LeVanC',
-      action: 'Đã duyệt',
-      actionColor: 'bg-[var(--secondary)]/20 text-[var(--secondary)]',
-      details: 'AI Voice: VI, EN, JA',
-      detailsBadges: ['VI', 'EN', 'JA'],
-      processingTime: '9 phút',
-    },
-    {
-      id: 5,
-      time: '2025-10-12 09:30',
-      type: 'Báo cáo',
-      typeColor: 'bg-[var(--destructive)]/10 text-[var(--destructive)]',
-      title: 'Báo cáo quấy rối',
-      author: 'BadUser123',
-      action: 'Cảnh báo',
-      actionColor: 'bg-[var(--accent)]/10 text-[var(--accent)]',
-      details: '+1 cảnh báo',
-      detailsText: '+1 cảnh báo',
-      processingTime: '15 phút',
-    },
-    {
-      id: 6,
-      time: '2025-10-11 16:45',
-      type: 'Chương',
-      typeColor: 'bg-[var(--secondary)]/20 text-[var(--secondary)]',
-      title: 'Cuộc phiêu lưu (resubmit)',
-      author: 'PhamTanD',
-      action: 'Đã duyệt',
-      actionColor: 'bg-[var(--secondary)]/20 text-[var(--secondary)]',
-      details: 'AI Voice: VI',
-      detailsBadges: ['VI'],
-      processingTime: '6 phút',
-    },
-    {
-      id: 7,
-      time: '2025-10-11 15:20',
-      type: 'Báo cáo',
-      typeColor: 'bg-[var(--destructive)]/10 text-[var(--destructive)]',
-      title: 'Báo cáo không hợp lệ',
-      author: 'N/A',
-      action: 'Bỏ qua',
-      actionColor: 'bg-[var(--muted)] text-[var(--muted-foreground)]',
-      details: '',
-      processingTime: '2 phút',
-    },
-    {
-      id: 8,
-      time: '2025-10-11 14:10',
-      type: 'Truyện',
-      typeColor: 'bg-[var(--primary)]/10 text-[var(--primary)]',
-      title: 'Truyện vi phạm bản quyền',
-      author: 'CopyUser',
-      action: 'Gỡ nội dung',
-      actionColor: 'bg-[var(--destructive)]/10 text-[var(--destructive)]',
-      details: '+1 cảnh báo',
-      detailsText: '+1 cảnh báo',
-      detailsBadge: 'Đã thông báo tác giả',
-      processingTime: '20 phút',
-    },
-  ];
+  const stats = useMemo(() => {
+    const publishedCount = historyData.filter(
+      (item) => item.status === "published"
+    ).length;
+    const rejectedCount = historyData.filter(
+      (item) => item.status === "rejected"
+    ).length;
+    const totalCount = historyData.length;
+    const pendingCount = 0;
+    const approvalRate =
+      totalCount > 0
+        ? `${((publishedCount / totalCount) * 100).toFixed(0)}%`
+        : "N/A";
 
-   return (
+    return [
+      { label: "Tổng số", value: totalCount.toString(), color: "text-[var(--foreground)]" },
+      { label: "Đã duyệt", value: publishedCount.toString(), color: "text-green-600" },
+      { label: "Đã từ chối", value: rejectedCount.toString(), color: "text-red-600" },
+      { label: "Đang chờ", value: pendingCount.toString(), color: "text-yellow-500" },
+      { label: "Tỷ lệ duyệt", value: approvalRate, color: "text-[var(--primary)]" },
+    ];
+  }, [historyData]);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        setIsLoading(true);
+
+        const published = await getModerationStories("published");
+        const rejected = await getModerationStories("rejected");
+
+        const combined = [...published, ...rejected].sort(
+          (a, b) =>
+            new Date(b.submittedAt).getTime() -
+            new Date(a.submittedAt).getTime()
+        );
+
+        setHistoryData(combined);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchHistory();
+  }, []);
+
+  return (
     <div className="min-h-screen bg-[var(--background)] p-8 transition-colors duration-300">
-      {/* Header - Updated to match other pages */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
-        <h1 className="text-3xl font-bold text-[var(--primary)] mb-2">
-          Lịch Sử Kiểm Duyệt
-        </h1>
-        <p className="text-[var(--muted-foreground)]">
-          Theo dõi và xem lại các quyết định kiểm duyệt đã thực hiện
-        </p>
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+        <h1 className="text-3xl font-bold text-[var(--primary)] mb-2">Lịch Sử Kiểm Duyệt</h1>
+        <p className="text-[var(--muted-foreground)]">Theo dõi các quyết định kiểm duyệt đã thực hiện</p>
       </motion.div>
 
-    {/* Search and Filters */}
-<motion.div
-  initial={{ opacity: 0, y: -10 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ delay: 0.1 }}
-  className="mb-6 flex flex-col sm:flex-row gap-4 items-stretch"
->
-  {/* Search Input */}
-  <div className="relative flex-1 min-w-[300px]">
-    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--muted-foreground)]" />
-    <Input
-      placeholder="Tìm kiếm theo tiêu đề hoặc tác giả..."
-      className="pl-12 bg-[var(--card)] border-[var(--border)] h-12 w-full"
-    />
-  </div>
-
-  {/* Filter Selects */}
-  <div className="flex flex-col sm:flex-row gap-4 flex-1">
-    <Select defaultValue="all">
-      <SelectTrigger className="flex-1 min-w-[200px] bg-[var(--card)] border-[var(--border)] h-12">
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4" />
-          <SelectValue placeholder="Tất cả hành động" />
-        </div>
-      </SelectTrigger>
-      <SelectContent className="bg-[var(--card)] border-[var(--border)]">
-        <SelectItem value="all">Tất cả hành động</SelectItem>
-        <SelectItem value="approved">Đã duyệt</SelectItem>
-        <SelectItem value="rejected">Từ chối</SelectItem>
-        <SelectItem value="warning">Cảnh báo</SelectItem>
-        <SelectItem value="removed">Gỡ nội dung</SelectItem>
-        <SelectItem value="ignored">Bỏ qua</SelectItem>
-      </SelectContent>
-    </Select>
-
-    <Select defaultValue="7days">
-      <SelectTrigger className="flex-1 min-w-[180px] bg-[var(--card)] border-[var(--border)] h-12">
-        <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4" />
-          <SelectValue placeholder="7 ngày qua" />
-        </div>
-      </SelectTrigger>
-      <SelectContent className="bg-[var(--card)] border-[var(--border)]">
-        <SelectItem value="today">Hôm nay</SelectItem>
-        <SelectItem value="7days">7 ngày qua</SelectItem>
-        <SelectItem value="30days">30 ngày qua</SelectItem>
-        <SelectItem value="all">Tất cả</SelectItem>
-      </SelectContent>
-    </Select>
-  </div>
-
-  {/* Export Button */}
-  <Button className="bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] h-12 min-w-[140px]">
-    <Download className="w-4 h-4 mr-2" />
-    Xuất báo cáo
-  </Button>
-</motion.div>
-
-      {/* Stats Cards */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6"
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+        className="mb-6 flex flex-col sm:flex-row gap-4 items-stretch"
       >
-        {stats.map((stat, index) => (
-          <Card key={index} className="p-4 border-[var(--border)] bg-[var(--card)] text-center">
-            <p className={`text-2xl mb-1 ${stat.color}`}>{stat.value}</p>
-            <p className="text-sm text-[var(--muted-foreground)]">{stat.label}</p>
+        <div className="relative flex-1 min-w-[300px]">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--muted-foreground)]" />
+          <Input placeholder="Tìm kiếm theo tiêu đề hoặc tác giả..."
+            className="pl-12 bg-[var(--card)] border-[var(--border)] h-12 w-full"
+          />
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-4 flex-1">
+          <Select defaultValue="all">
+            <SelectTrigger className="flex-1 bg-[var(--card)] border-[var(--border)] h-12">
+              <div className="flex items-center gap-2"><Filter className="w-4 h-4" /><SelectValue placeholder="Tất cả hành động" /></div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tất cả</SelectItem>
+              <SelectItem value="approved">Đã duyệt</SelectItem>
+              <SelectItem value="rejected">Từ chối</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select defaultValue="7days">
+            <SelectTrigger className="flex-1 bg-[var(--card)] border-[var(--border)] h-12">
+              <div className="flex items-center gap-2"><Clock className="w-4 h-4" /><SelectValue placeholder="7 ngày qua" /></div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Hôm nay</SelectItem>
+              <SelectItem value="7days">7 ngày qua</SelectItem>
+              <SelectItem value="30days">30 ngày qua</SelectItem>
+              <SelectItem value="all">Tất cả</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <Button className="bg-[var(--primary)] text-[var(--primary-foreground)] h-12 min-w-[140px]">
+          <Download className="w-4 h-4 mr-2" />
+          Xuất báo cáo
+        </Button>
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+        className="grid grid-cols-2 md:grid-cols-5 gap-5 mb-8"
+      >
+        {stats.map((s, i) => (
+          <Card key={i} className="p-5 border border-[var(--border)] bg-[var(--card)] rounded-xl shadow-sm hover:shadow-md transition">
+            <p className={`text-3xl font-semibold mb-1 ${s.color}`}>{s.value}</p>
+            <p className="text-sm text-[var(--muted-foreground)]">{s.label}</p>
           </Card>
         ))}
       </motion.div>
 
-      {/* History Table */}
-    {/* History Table */}
-<motion.div
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ delay: 0.3 }}
->
-  <Card className="overflow-hidden border border-[var(--border)] bg-[var(--card)] shadow-sm transition-colors duration-300">
-    <Table className="bg-[var(--card)] transition-colors duration-300">
-      <TableHeader>
-        <TableRow className="bg-[var(--card)] border-b border-[var(--border)] hover:bg-[var(--muted)]/10 transition-colors">
-          <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">
-            Thời gian
-          </TableHead>
-          <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">
-            Loại
-          </TableHead>
-          <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">
-            Tiêu đề
-          </TableHead>
-          <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">
-            Tác giả
-          </TableHead>
-          <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">
-            Hành động
-          </TableHead>
-          <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">
-            Chi tiết
-          </TableHead>
-          <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">
-            Thời gian xử lý
-          </TableHead>
-        </TableRow>
-      </TableHeader>
+      <Card className="overflow-hidden border border-[var(--border)] bg-[var(--card)] rounded-xl shadow-sm">
+        <Table className={cn("w-full text-sm", isLoading && "opacity-50 pointer-events-none")}>
+          <TableHeader>
+            <TableRow className="bg-[var(--muted)]/20">
+              <TableHead className="py-4 px-6">Thời gian</TableHead>
+              <TableHead className="py-4 px-6">Tiêu đề</TableHead>
+              <TableHead className="py-4 px-6">Tác giả</TableHead>
+              <TableHead className="py-4 px-6">Trạng thái</TableHead>
+              <TableHead className="py-4 px-6">Ghi chú</TableHead>
+            </TableRow>
+          </TableHeader>
 
-      <TableBody>
-        {historyData.map((item) => (
-          <TableRow
-            key={item.id}
-            className="border-b border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/20 transition-colors"
-          >
-            <TableCell className="py-4 px-6 text-[var(--muted-foreground)]">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                {item.time}
-              </div>
-            </TableCell>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={5} className="h-48 text-center">
+                  <Loader2 className="w-8 h-8 mx-auto animate-spin text-[var(--primary)]" />
+                  <p className="mt-2 text-[var(--muted-foreground)]">Đang tải...</p>
+                </TableCell>
+              </TableRow>
+            ) : error ? (
+              <TableRow>
+                <TableCell colSpan={5} className="h-48 text-center text-red-600">
+                  <AlertCircle className="w-8 h-8 mx-auto" />
+                  <p className="mt-2">Lỗi: {error}</p>
+                </TableCell>
+              </TableRow>
+            ) : historyData.length === 0 ? (
+              <TableRow><TableCell colSpan={5} className="h-48 text-center text-[var(--muted-foreground)]">Không có dữ liệu</TableCell></TableRow>
+            ) : (
+              historyData.map((item) => (
+                <TableRow key={item.reviewId} className="border-b hover:bg-[var(--muted)]/20 transition cursor-pointer">
+                  <TableCell className="py-4 px-6 text-[var(--muted-foreground)] flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    {moment(item.submittedAt).fromNow()}
+                  </TableCell>
 
-            <TableCell className="py-4 px-6">
-              <Badge variant="outline" className={item.typeColor}>
-                {item.type}
-              </Badge>
-            </TableCell>
+                  <TableCell className="py-4 px-6 font-medium">
+                    {item.title}
+                  </TableCell>
 
-            <TableCell className="py-4 px-6">
-              <div className="text-[var(--foreground)] font-medium">
-                {item.title}
-              </div>
-            </TableCell>
+                  <TableCell className="py-4 px-6">
+                    <div className="flex items-center gap-2 text-[var(--primary)]">
+                      <User className="w-4 h-4" />
+                      {item.authorUsername}
+                    </div>
+                  </TableCell>
 
-            <TableCell className="py-4 px-6">
-              <div className="flex items-center gap-2 text-[var(--primary)]">
-                <User className="w-4 h-4" />
-                {item.author}
-              </div>
-            </TableCell>
-
-            <TableCell className="py-4 px-6">
-              <Badge className={`${item.actionColor} border-0`}>
-                {item.action}
-              </Badge>
-            </TableCell>
-
-            <TableCell className="py-4 px-6">
-              {item.detailsBadges ? (
-                <div className="flex gap-1">
-                  <span className="text-sm text-[var(--muted-foreground)] mr-2">AI Voice:</span>
-                  {item.detailsBadges.map((badge, idx) => (
-                    <Badge 
-                      key={idx} 
-                      variant="outline" 
-                      className="border-[var(--primary)] text-[var(--primary)] text-xs"
+                  <TableCell className="py-4 px-6">
+                    <Badge
+                      className={cn(
+                        "gap-2 border-0 px-3 py-1.5",
+                        item.status === "published" && "bg-green-100 text-green-700",
+                        item.status === "rejected" && "bg-red-100 text-red-600",
+                        item.status === "pending" && "bg-yellow-100 text-yellow-600"
+                      )}
                     >
-                      {badge}
+                      {item.status === "published" && <CheckCircle2 className="w-4 h-4" />}
+                      {item.status === "rejected" && <XCircle className="w-4 h-4" />}
+                      {item.status === "pending" && <Clock className="w-4 h-4" />}
+                      {item.status === "published" ? "Đã duyệt" : item.status === "rejected" ? "Đã từ chối" : "Chờ duyệt"}
                     </Badge>
-                  ))}
-                </div>
-              ) : item.detailsText ? (
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm text-[var(--muted-foreground)]">{item.detailsText}</span>
-                  {item.detailsBadge && (
-                    <Badge className="bg-[var(--destructive)]/10 text-[var(--destructive)] border-0 text-xs w-fit">
-                      {item.detailsBadge}
-                    </Badge>
-                  )}
-                </div>
-              ) : (
-                <span className="text-[var(--muted-foreground)] text-sm">-</span>
-              )}
-            </TableCell>
+                  </TableCell>
 
-            <TableCell className="py-4 px-6 text-[var(--muted-foreground)]">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                {item.processingTime}
-              </div>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  </Card>
-</motion.div>
+                  <TableCell className="py-4 px-6">
+                    <p title={item.pendingNote} className="text-[var(--muted-foreground)] text-sm truncate max-w-[200px]">
+                      {item.pendingNote || "-"}
+                    </p>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Card>
     </div>
   );
 }

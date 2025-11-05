@@ -2,6 +2,7 @@
 import { FileText, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { cn } from "@/lib/utils"; // ✅ SỬA 0: Import 'cn' để dùng
 
 export function Dashboard() {
   const stats = [
@@ -147,27 +148,35 @@ export function Dashboard() {
             {activities.map((activity) => (
               <div 
                 key={activity.id} 
-                className="flex items-start justify-between p-4 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--accent)] transition-colors"
+                // ✅ SỬA 1: Thêm 'group' và 'cursor-pointer'
+                // Đổi 'hover:bg-[var(--accent)]' thành 'hover:bg-[var(--primary)]' cho nhất quán
+                className="group flex items-start justify-between p-4 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--primary)] transition-colors cursor-pointer"
                 style={{ fontFamily: "'Poppins', sans-serif" }}
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
                     <Badge 
                       variant="outline" 
-                      className={activity.statusColor}
+                      // ✅ SỬA 2: Thêm style cho badge khi hover
+                      className={cn(
+                        activity.statusColor,
+                        "group-hover:bg-white/20 group-hover:text-white group-hover:border-transparent"
+                      )}
                       style={{ fontFamily: "'Poppins', sans-serif" }}
                     >
                       {activity.status}
                     </Badge>
                   </div>
                   <div 
-                    className="mb-1 text-[var(--foreground)] font-medium"
+                    // ✅ SỬA 3: Thêm 'group-hover:text-white'
+                    className="mb-1 text-[var(--foreground)] font-medium group-hover:text-white"
                     style={{ fontFamily: "'Poppins', sans-serif" }}
                   >
                     {activity.title}
                   </div>
                   <div 
-                    className="text-sm text-[var(--muted-foreground)]"
+                    // ✅ SỬA 4: Thêm 'group-hover:text-gray-300'
+                    className="text-sm text-[var(--muted-foreground)] group-hover:text-gray-300"
                     style={{ fontFamily: "'Poppins', sans-serif" }}
                   >
                     {activity.author} • {activity.time}
@@ -175,7 +184,11 @@ export function Dashboard() {
                 </div>
                 <Badge 
                   variant="outline" 
-                  className="bg-yellow-100 text-yellow-800 border-yellow-200"
+                  // ✅ SỬA 5: Thêm style cho badge khi hover (giống cái trên)
+                  className={cn(
+                    "bg-yellow-100 text-yellow-800 border-yellow-200",
+                    "group-hover:bg-white/20 group-hover:text-white group-hover:border-transparent"
+                  )}
                   style={{ fontFamily: "'Poppins', sans-serif" }}
                 >
                   Chờ xử lý
