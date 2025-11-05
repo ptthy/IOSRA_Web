@@ -4,7 +4,7 @@ import { Poppins } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/providers/theme-provider";
-import { Navbar } from "@/components/navbar";
+//import { Navbar } from "@/components/navbar";
 import { AppProviders } from "@/components/providers/app-providers";
 
 const poppins = Poppins({
@@ -47,8 +47,9 @@ export default async function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {/* ✅ AppProviders nếu cần global context */}
           <AppProviders activeThemeValue={activeThemeValue}>
-            <Navbar />
-            <main className="min-h-screen">{children}</main>
+            {/* <Navbar /> */}
+            {/* <main className="min-h-screen">{children}</main>*/}
+            {children}
           </AppProviders>
         </ThemeProvider>
       </body>
