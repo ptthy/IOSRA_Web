@@ -1,58 +1,57 @@
-import { cookies } from "next/headers"
-import type { Metadata } from "next"
-
-import "./globals.css"
-import { cn } from "@/lib/utils"
-import { ThemeProvider } from "@/components/providers/theme-provider"
-import { ActiveThemeProvider } from "@/components/active-theme"
-
-// ✅ Import Google Font: Poppins (Next.js native font)
-import { Poppins } from "next/font/google"
+import { cookies } from "next/headers";
+import type { Metadata } from "next";
+import { Poppins } from "next/font/google";
+import "./globals.css";
+import { cn } from "@/lib/utils";
+import { ThemeProvider } from "@/components/providers/theme-provider";
+import { Navbar } from "@/components/navbar";
+import { AppProviders } from "@/components/providers/app-providers";
 
 const poppins = Poppins({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-poppins",
   display: "swap",
-})
+});
+// Dòng này để test save
+// Dòng này để test save
+// Dòng này để test save
 
+// --- Metadata ---
 export const metadata: Metadata = {
-  title: "OP Dashboard",
-  description:
-    "A fully responsive analytics dashboard featuring dynamic charts, interactive tables, a collapsible sidebar, and a light/dark mode theme switcher. Built with modern web technologies, it ensures seamless performance across devices, offering an intuitive user interface for data visualization and exploration.",
-}
+  title: "Tora Novel",
+  description: "Nền tảng đọc truyện tương tác với AI Voice",
+};
+
+// ------------------------------------------
 
 export default async function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
-  const cookieStore = await cookies()
-  const activeThemeValue = cookieStore.get("active_theme")?.value
-  const isScaled = activeThemeValue?.endsWith("-scaled")
+  const cookieStore = await cookies();
+  const activeThemeValue = cookieStore.get("active_theme")?.value;
+  const isScaled = activeThemeValue?.endsWith("-scaled");
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="vi" suppressHydrationWarning>
       <body
         className={cn(
-          poppins.variable, // ✅ Apply Poppins globally
-         
+          poppins.variable,
           activeThemeValue ? `theme-${activeThemeValue}` : "",
           isScaled ? "theme-scaled" : ""
         )}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange={true} // ✅ allow smooth transitions
-          enableColorScheme
-        >
-          <ActiveThemeProvider initialTheme={activeThemeValue}>
-            {children}
-          </ActiveThemeProvider>
+        {/* ✅ Bọc ThemeProvider ngoài cùng */}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {/* ✅ AppProviders nếu cần global context */}
+          <AppProviders activeThemeValue={activeThemeValue}>
+            <Navbar />
+            <main className="min-h-screen">{children}</main>
+          </AppProviders>
         </ThemeProvider>
       </body>
     </html>
-  )
+  );
 }

@@ -1,18 +1,18 @@
-"use client"
+"use client";
 import Image from "next/image";
-import { useState } from "react"
+import { useState } from "react";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -20,30 +20,30 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Calendar, Plus, Edit, Trash2, Gift } from "lucide-react"
-import { toast } from "sonner"
+} from "@/components/ui/select";
+import { Calendar, Plus, Edit, Trash2, Gift } from "lucide-react";
+import { toast } from "sonner";
 
-import { AppSidebar } from "@/components/app-sidebar"
-import { SiteHeader } from "@/components/site-header"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { AppSidebar } from "@/components/op-sidebar";
+import { SiteHeader } from "@/components/site-header";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 interface Event {
-  id: number
-  title: string
-  description: string
-  type: "contest" | "promotion" | "discount"
-  startDate: string
-  endDate: string
-  status: "upcoming" | "ongoing" | "ended"
-  imageUrl: string
+  id: number;
+  title: string;
+  description: string;
+  type: "contest" | "promotion" | "discount";
+  startDate: string;
+  endDate: string;
+  status: "upcoming" | "ongoing" | "ended";
+  imageUrl: string;
 }
 
 const mockEvents: Event[] = [
@@ -81,11 +81,11 @@ const mockEvents: Event[] = [
     imageUrl:
       "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&q=80&auto=format&fit=crop",
   },
-]
+];
 
 export default function EventManagement() {
-  const [events, setEvents] = useState<Event[]>(mockEvents)
-  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [events, setEvents] = useState<Event[]>(mockEvents);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newEvent, setNewEvent] = useState({
     title: "",
     description: "",
@@ -93,7 +93,7 @@ export default function EventManagement() {
     startDate: "",
     endDate: "",
     imageUrl: "",
-  })
+  });
 
   const handleCreateEvent = () => {
     if (
@@ -106,9 +106,9 @@ export default function EventManagement() {
         id: events.length + 1,
         ...newEvent,
         status: "upcoming",
-      }
-      setEvents([...events, event])
-      setShowCreateDialog(false)
+      };
+      setEvents([...events, event]);
+      setShowCreateDialog(false);
       setNewEvent({
         title: "",
         description: "",
@@ -116,17 +116,17 @@ export default function EventManagement() {
         startDate: "",
         endDate: "",
         imageUrl: "",
-      })
-      toast.success("Đã tạo sự kiện mới thành công!")
+      });
+      toast.success("Đã tạo sự kiện mới thành công!");
     } else {
-      toast.error("Vui lòng điền đủ thông tin của sự kiện.")
+      toast.error("Vui lòng điền đủ thông tin của sự kiện.");
     }
-  }
+  };
 
   const handleDeleteEvent = (id: number) => {
-    setEvents(events.filter((e) => e.id !== id))
-    toast.success("Đã xóa sự kiện")
-  }
+    setEvents(events.filter((e) => e.id !== id));
+    toast.success("Đã xóa sự kiện");
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -135,23 +135,23 @@ export default function EventManagement() {
           <Badge variant="outline" className="border-blue-500 text-blue-500">
             Sắp diễn ra
           </Badge>
-        )
+        );
       case "ongoing":
         return (
           <Badge variant="outline" className="border-green-500 text-green-500">
             Đang diễn ra
           </Badge>
-        )
+        );
       case "ended":
         return (
           <Badge variant="outline" className="border-gray-500 text-gray-500">
             Kết thúc
           </Badge>
-        )
+        );
       default:
-        return <Badge variant="outline">Unknown</Badge>
+        return <Badge variant="outline">Unknown</Badge>;
     }
-  }
+  };
 
   const getTypeBadge = (type: string) => {
     switch (type) {
@@ -160,23 +160,23 @@ export default function EventManagement() {
           <Badge className="bg-[var(--primary)] text-[var(--primary-foreground)]">
             Cuộc thi
           </Badge>
-        )
+        );
       case "promotion":
         return (
           <Badge className="bg-[var(--muted)] text-[var(--foreground)] border border-[var(--border)]">
             Khuyến mãi
           </Badge>
-        )
+        );
       case "discount":
         return (
           <Badge className="bg-[var(--primary)]/20 text-[var(--primary)] border border-[var(--primary)]">
             Giảm giá
           </Badge>
-        )
+        );
       default:
-        return <Badge variant="outline">Unknown</Badge>
+        return <Badge variant="outline">Unknown</Badge>;
     }
-  }
+  };
 
   return (
     <SidebarProvider>
@@ -210,15 +210,17 @@ export default function EventManagement() {
                 className="border border-[var(--border)] bg-[var(--card)] shadow-sm hover:shadow-md transition-shadow"
               >
                 <div className="relative h-48 overflow-hidden bg-[var(--muted)]">
-                  <Image 
-                    src={event.imageUrl}
-                    alt={event.title}
-                    className="w-full h-full object-cover"
-                    onError={(e) =>
-                      ((e.target as HTMLImageElement).src =
-                        "https://via.placeholder.com/1200x600?text=No+Image")
-                    }
-                  />
+                <Image
+  src={event.imageUrl || "/fallback.png"}
+  alt={event.title}
+  fill
+  className="object-cover"
+  onError={(e) => {
+    const img = e.target as HTMLImageElement
+    img.src = "/fallback.png"
+}}
+/>
+
                   <div className="absolute top-3 right-3 flex gap-2">
                     {getTypeBadge(event.type)}
                   </div>
@@ -234,7 +236,9 @@ export default function EventManagement() {
                         {event.description}
                       </CardDescription>
                     </div>
-                    <div className="ml-4 flex-shrink-0">{getStatusBadge(event.status)}</div>
+                    <div className="ml-4 flex-shrink-0">
+                      {getStatusBadge(event.status)}
+                    </div>
                   </div>
                 </CardHeader>
 
@@ -247,7 +251,11 @@ export default function EventManagement() {
                   </div>
 
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="flex-1 border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--muted)]">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--muted)]"
+                    >
                       <Edit className="w-4 h-4 mr-1" />
                       Sửa
                     </Button>
@@ -271,7 +279,9 @@ export default function EventManagement() {
             >
               <CardContent className="py-24 text-center">
                 <Gift className="w-12 h-12 mx-auto mb-4 text-[var(--primary)]" />
-                <p className="text-[var(--muted-foreground)]">Tạo sự kiện mới</p>
+                <p className="text-[var(--muted-foreground)]">
+                  Tạo sự kiện mới
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -279,7 +289,9 @@ export default function EventManagement() {
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogContent className="max-w-2xl bg-[var(--card)] border border-[var(--border)]">
               <DialogHeader>
-                <DialogTitle className="text-[var(--primary)]">Tạo Event mới</DialogTitle>
+                <DialogTitle className="text-[var(--primary)]">
+                  Tạo Event mới
+                </DialogTitle>
                 <DialogDescription className="text-[var(--muted-foreground)]">
                   Điền thông tin để tạo sự kiện, cuộc thi hoặc khuyến mãi mới
                 </DialogDescription>
@@ -316,9 +328,9 @@ export default function EventManagement() {
                   <Label htmlFor="type">Loại sự kiện</Label>
                   <Select
                     value={newEvent.type}
-                    onValueChange={(value: "contest" | "promotion" | "discount") =>
-                      setNewEvent({ ...newEvent, type: value })
-                    }
+                    onValueChange={(
+                      value: "contest" | "promotion" | "discount"
+                    ) => setNewEvent({ ...newEvent, type: value })}
                   >
                     <SelectTrigger className="bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)]">
                       <SelectValue placeholder="Chọn loại sự kiện" />
@@ -374,7 +386,11 @@ export default function EventManagement() {
               </div>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="border-[var(--border)] text-[var(--foreground)]">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCreateDialog(false)}
+                  className="border-[var(--border)] text-[var(--foreground)]"
+                >
                   Hủy
                 </Button>
                 <Button
@@ -389,5 +405,5 @@ export default function EventManagement() {
         </main>
       </SidebarInset>
     </SidebarProvider>
-  )
+  );
 }
