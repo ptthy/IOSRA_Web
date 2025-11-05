@@ -22,50 +22,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth, User } from "@/context/AuthContext";
+// 1. IMPORT COMPONENT IMAGEWITHFALLBACK
+import { ImageWithFallback } from "@/components/ui/ImageWithFallback";
 
-// 2. ĐÃ THÊM COMPONENT
-const ERROR_IMG_SRC =
-  "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==";
-
-export function ImageWithFallback(
-  props: React.ImgHTMLAttributes<HTMLImageElement>
-) {
-  const [didError, setDidError] = useState(false);
-
-  const handleError = () => {
-    setDidError(true);
-  };
-
-  const { src, alt, style, className, ...rest } = props;
-
-  return didError ? (
-    <div
-      className={`inline-block bg-gray-100 text-center align-middle ${
-        className ?? ""
-      }`}
-      style={style}
-    >
-      <div className="flex items-center justify-center w-full h-full">
-        <img
-          src={ERROR_IMG_SRC}
-          alt="Error loading image"
-          {...rest}
-          data-original-url={src}
-        />
-      </div>
-    </div>
-  ) : (
-    <img
-      src={src}
-      alt={alt}
-      className={className}
-      style={style}
-      {...rest}
-      onError={handleError}
-    />
-  );
-}
-// KẾT THÚC PHẦN THÊM VÀO
+// 2. XÓA ĐỊNH NGHĨA ImageWithFallback Ở ĐÂY
 
 export function Navbar() {
   const { theme, setTheme } = useTheme();
@@ -113,7 +73,6 @@ export function Navbar() {
   };
 
   if (!mounted) {
-    // Giữ nguyên fallback khi chưa mount
     return (
       <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between px-4">
@@ -130,6 +89,7 @@ export function Navbar() {
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between px-4">
+        {/* Logo */}
         <div
           className="flex items-center gap-2 cursor-pointer"
           onClick={() => handleNavigate("/")}
@@ -138,7 +98,7 @@ export function Navbar() {
           <span className="font-semibold text-xl">Tora Novel</span>
         </div>
 
-        {/* Desktop Navigation - ĐÃ BỔ SUNG LINK */}
+        {/* Desktop Navigation */}
         {!isAuthPage && (
           <div className="hidden md:flex items-center gap-6">
             <button
@@ -151,7 +111,6 @@ export function Navbar() {
             >
               Trang chủ
             </button>
-
             <button
               onClick={() => handleNavigate("/discover")}
               className={`text-sm transition-colors ${
@@ -196,9 +155,9 @@ export function Navbar() {
           </div>
         )}
 
-        {/* Actions (Giữ nguyên) */}
+        {/* Actions */}
         <div className="flex items-center gap-2">
-          {/* Theme Toggle (Giữ nguyên) */}
+          {/* Theme Toggle */}
           <Button
             variant="ghost"
             size="icon"
@@ -212,7 +171,7 @@ export function Navbar() {
             )}
           </Button>
 
-          {/* Auth Buttons / Avatar (Giữ nguyên) */}
+          {/* Auth Buttons / Avatar */}
           {!isAuthPage && (
             <div className="hidden md:flex items-center gap-3">
               {isAuthenticated && user ? (
@@ -224,10 +183,17 @@ export function Navbar() {
                       onClick={() => setOpen(true)}
                     >
                       <Avatar className="h-10 w-10">
+                        {/* 3. DÙNG IMAGEWITHFALLBACK CHO AVATAR */}
                         <AvatarImage
+                          asChild
                           src={user?.avatar}
                           alt={user?.displayName || user?.username || "User"}
-                        />
+                        >
+                          <ImageWithFallback
+                            src={user?.avatar}
+                            alt={user?.displayName || user?.username || "User"}
+                          />
+                        </AvatarImage>
                         <AvatarFallback className="bg-secondary text-secondary-foreground">
                           {getInitials(
                             user?.displayName || user?.username || ""
@@ -243,10 +209,17 @@ export function Navbar() {
                   >
                     <div className="flex items-center gap-3 p-3">
                       <Avatar className="h-10 w-10">
+                        {/* 4. DÙNG IMAGEWITHFALLBACK CHO AVATAR */}
                         <AvatarImage
+                          asChild
                           src={user?.avatar}
                           alt={user?.displayName || user?.username || "User"}
-                        />
+                        >
+                          <ImageWithFallback
+                            src={user?.avatar}
+                            alt={user?.displayName || user?.username || "User"}
+                          />
+                        </AvatarImage>
                         <AvatarFallback className="bg-secondary text-secondary-foreground">
                           {getInitials(
                             user?.displayName || user?.username || ""
@@ -307,14 +280,21 @@ export function Navbar() {
             </SheetTrigger>
             <SheetContent>
               <div className="flex flex-col gap-4 mt-8">
-                {/* User Info (Giữ nguyên) */}
+                {/* User Info */}
                 {isAuthenticated && user && (
                   <div className="flex items-center gap-3 pb-4 border-b">
                     <Avatar className="h-12 w-12">
+                      {/* 5. DÙNG IMAGEWITHFALLBACK CHO AVATAR */}
                       <AvatarImage
+                        asChild
                         src={user.avatar}
                         alt={user.displayName || user.username || "User"}
-                      />
+                      >
+                        <ImageWithFallback
+                          src={user.avatar}
+                          alt={user.displayName || user.username || "User"}
+                        />
+                      </AvatarImage>
                       <AvatarFallback className="bg-primary text-primary-foreground">
                         {getInitials(user?.displayName || user?.username || "")}{" "}
                       </AvatarFallback>
@@ -338,7 +318,6 @@ export function Navbar() {
                     >
                       Trang chủ
                     </button>
-                    {/* Link "Khám phá" từ figma */}
                     <button
                       onClick={() => handleNavigate("/discover")}
                       className="text-left py-2 text-lg"
@@ -357,7 +336,6 @@ export function Navbar() {
                     >
                       Trở thành Tác giả
                     </button>
-                    {/* Link "Góc Sáng Tác" từ figma */}
                     <button
                       onClick={() => handleNavigate("/author/overview")}
                       className="text-left py-2 text-lg"
@@ -367,7 +345,7 @@ export function Navbar() {
                   </>
                 )}
 
-                {/* Auth / Profile Actions (Giữ nguyên) */}
+                {/* Auth / Profile Actions */}
                 <div className="border-t pt-4 flex flex-col gap-2">
                   {isAuthenticated && user ? (
                     <>
