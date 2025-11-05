@@ -132,13 +132,13 @@ export default function AuthorUpgradePage() {
 
   // BIẾN SO SÁNH CAM KẾT
   const isCommitmentMatched = typedCommitment === COMMITMENT_TEXT;
-  const { updateUserRole } = useAuth();
+  const { updateUser } = useAuth();
   useEffect(() => {
     if (upgradeRequest.status === "approved") {
-      updateUserRole("author");
+      updateUser({ role: "author" });
       toast.success("Tài khoản của bạn đã được nâng cấp lên tác giả!");
     }
-  }, [upgradeRequest.status, updateUserRole]);
+  }, [upgradeRequest.status, updateUser]);
 
   // CÁC HÀM XỬ LÝ LOGIC
   // ---------------------------------
@@ -252,7 +252,6 @@ export default function AuthorUpgradePage() {
    * Xử lý gửi yêu cầu (khi bấm nút ở form 'default')
    */
   const handleSubmitRequest = async () => {
-    // LOGIC VALIDATION
     if (!isCommitmentMatched) {
       toast.error("Vui lòng nhập chính xác câu cam kết để tiếp tục.");
       return;
@@ -266,18 +265,32 @@ export default function AuthorUpgradePage() {
       });
 
       toast.success("Yêu cầu của bạn đã được gửi thành công!");
-
-      // Sau khi gửi thành công, fetch lại trạng thái
-      // để UI tự động chuyển sang "Đang chờ duyệt"
       await fetchUpgradeStatus();
     } catch (error) {
-      //   console.error("Lỗi khi gửi yêu cầu:", error);
-      const axiosError = error as AxiosError; // Khai báo rõ ràng
+      const axiosError = error as AxiosError;
 
       if (axiosError.response?.status === 429) {
-        toast.error(
-          "Bạn đã gửi yêu cầu quá nhiều lần. Vui lòng **chờ vài phút** rồi thử lại."
-        );
+        const errorData = axiosError.response?.data as any;
+        const errorMessage = errorData?.error?.message || "";
+
+        const hoursMatch = errorMessage.match(/(\d+)\s*hour/);
+        const daysMatch = errorMessage.match(/(\d+)\s*day/);
+
+        if (hoursMatch) {
+          const hours = hoursMatch[1];
+          toast.error(
+            `Bạn đã gửi yêu cầu quá nhiều lần. Vui lòng chờ ${hours} giờ nữa trước khi thử lại.`
+          );
+        } else if (daysMatch) {
+          const days = daysMatch[1];
+          toast.error(
+            `Bạn đã gửi yêu cầu quá nhiều lần. Vui lòng chờ ${days} ngày nữa trước khi thử lại.`
+          );
+        } else {
+          toast.error(
+            "Bạn đã gửi yêu cầu quá nhiều lần. Vui lòng chờ một thời gian trước khi thử lại."
+          );
+        }
       } else {
         toast.error("Có lỗi xảy ra khi gửi yêu cầu. Vui lòng thử lại.");
       }

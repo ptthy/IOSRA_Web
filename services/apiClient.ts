@@ -3,27 +3,20 @@ import axios from "axios";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-if (!API_BASE_URL) {
-  console.error(
-    "Lỗi: NEXT_PUBLIC_API_BASE_URL chưa được thiết lập trong file .env.local"
-  );
-}
-
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
-// Sửa interceptor request
+// Request interceptor
 apiClient.interceptors.request.use(
   (config) => {
-    // Đảm bảo headers tồn tại
-    config.headers = config.headers || {};
-
     // Chỉ chạy ở client-side
     if (typeof window !== "undefined") {
       const token = localStorage.getItem("authToken");
-      console.log("🔐 Token found:", !!token); // Debug token
 
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -44,17 +37,12 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Thêm interceptor response để xử lý lỗi
+// Response interceptor
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    return response;
+  },
   (error) => {
-    console.error("🚨 API Error:", {
-      status: error.response?.status,
-      url: error.config?.url,
-      method: error.config?.method,
-      data: error.response?.data,
-    });
-
     if (error.response?.status === 403) {
       const errorMessage = error.response?.data?.message?.toLowerCase();
 
@@ -82,4 +70,5 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
 export default apiClient;
