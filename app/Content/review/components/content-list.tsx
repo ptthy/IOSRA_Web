@@ -1,6 +1,7 @@
+// File: review/components/content-list.tsx
 "use client";
 
-import { Search, User, Clock, BookOpen } from "lucide-react";
+import { Search, User, Clock, Loader2, AlertCircle } from "lucide-react"; // Bỏ BookOpen (không dùng)
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,81 +15,96 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useState, useEffect } from "react";
+import { cn } from "@/lib/utils";
+import { useModeration } from "@/context/ModerationContext"; // ✅ SỬA 1: Import hook Context
+import { getModerationStories } from "@/services/moderationApi";
+
+// Định nghĩa kiểu dữ liệu từ API
+interface StoryFromAPI {
+  reviewId: string;
+  storyId: string;
+  authorId: string;
+  title: string;
+  description: string;
+  authorUsername: string;
+  coverUrl: string;
+  aiScore: number;
+  aiResult: "flagged" | "rejected" | "approved";
+  status: "pending" | "published" | "rejected";
+  submittedAt: string;
+  tags: {
+    tagId: string;
+    tagName: string;
+  }[];
+}
 
 interface ContentListProps {
-  onReview: (content: any) => void;
+  onReview: (content: StoryFromAPI) => void;
 }
 
 export function ContentList({ onReview }: ContentListProps) {
-  const contents = [
-    {
-      id: 1,
-      title: "Hành trình vào thế giới isekai",
-      author: "NguyenVanA",
-      type: "Truyện mới",
-      typeColor:
-        "bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200",
-      genre: "Fantasy",
-      genreColor:
-        "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200",
-      submittedAt: "2025-10-12 09:30",
-      wordCount: "45,000 từ",
-    },
-    {
-      id: 2,
-      title: "Chương 24 - Đại chiến",
-      subtitle: "Truyện: Vũ khúc của định mệnh",
-      author: "LeVanC",
-      type: "Chương",
-      typeColor:
-        "bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200",
-      genre: "Action",
-      genreColor:
-        "bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200",
-      submittedAt: "2025-10-12 08:15",
-      wordCount: "5,200 từ",
-    },
-    {
-      id: 3,
-      title: "Tình yêu trong mùa thu",
-      author: "TranThiB",
-      type: "Truyện mới",
-      typeColor:
-        "bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200",
-      genre: "Romance",
-      genreColor:
-        "bg-pink-100 dark:bg-pink-900/40 text-pink-800 dark:text-pink-200",
-      submittedAt: "2025-10-12 07:45",
-      wordCount: "32,000 từ",
-    },
-    {
-      id: 4,
-      title: "Chương 15 - Bí mật được hé lộ",
-      subtitle: "Truyện: Thám tử bóng đêm",
-      author: "PhamTanD",
-      type: "Chương",
-      typeColor:
-        "bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200",
-      genre: "Mystery",
-      genreColor:
-        "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200",
-      submittedAt: "2025-10-11 23:20",
-      wordCount: "4,800 từ",
-    },
-    {
-      id: 5,
-      title: "Chiến tranh ngân hà",
-      author: "HoangThiE",
-      type: "Truyện mới",
-      typeColor:
-        "bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200",
-      genre: "Sci-Fi",
-      genreColor:
-        "bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-200",
-      submittedAt: "2025-10-11 20:15",
-      wordCount: "52,000 từ",
-    },
-  ];
+  const [stories, setStories] = useState<StoryFromAPI[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // ✅ SỬA 2: Lấy hàm 'updateCount' từ context
+  const { updateCount } = useModeration();
+
+  useEffect(() => {
+    const fetchPendingStories = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data: StoryFromAPI[] = await getModerationStories('pending');
+        setStories(data);
+        
+        // ✅ SỬA 3: Gửi số lượng (data.length) lên Context
+        updateCount('pending', data.length);
+        
+      } catch (err: any) {
+        setError(err.message);
+        updateCount('pending', 0); // Nếu lỗi, set số đếm về 0
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPendingStories();
+    
+    // ✅ SỬA 4: Thêm 'updateCount' vào dependency array
+  }, [updateCount]); 
+  
+
+  // --- Render ---
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <Loader2 className="w-10 h-10 text-[var(--primary)] animate-spin" />
+        <p className="ml-3 text-lg">Đang tải danh sách...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px] bg-red-50 text-red-700 p-4 rounded-lg">
+        <AlertCircle className="w-6 h-6 mr-2" />
+        <p className="text-lg">Lỗi khi tải dữ liệu: {error}</p>
+      </div>
+    );
+  }
+
+  if (stories.length === 0) {
+    // Tự động cập nhật sidebar là 0 nếu không có truyện
+    // (useEffect đã làm việc này)
+    return (
+       <div className="flex justify-center items-center min-h-[400px]">
+        <p className="text-lg text-gray-500">Không có truyện nào chờ duyệt.</p>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -96,7 +112,6 @@ export function ContentList({ onReview }: ContentListProps) {
       style={{
         backgroundColor: "var(--background)",
         color: "var(--foreground)",
-        // ✅ Cập nhật dòng này để đảm bảo font hiển thị tiếng Việt chuẩn
         fontFamily:
           "'Poppins', 'Poppins Vietnamese', 'Noto Sans Vietnamese', 'Segoe UI', sans-serif",
       }}
@@ -111,11 +126,11 @@ export function ContentList({ onReview }: ContentListProps) {
           Truyện & Chương Chờ Kiểm Duyệt
         </h1>
         <p className="text-[var(--muted-foreground)]">
-          Danh sách truyện và chương mới cần được kiểm tra và phê duyệt
+          {`Bạn có ${stories.length} nội dung cần kiểm tra và phê duyệt`}
         </p>
       </motion.div>
 
-      {/* Search */}
+      {/* Search (Giữ nguyên) */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -146,16 +161,13 @@ export function ContentList({ onReview }: ContentListProps) {
                   Tác giả
                 </TableHead>
                 <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">
-                  Loại
+                  Đánh giá AI
                 </TableHead>
                 <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">
                   Thể loại
                 </TableHead>
                 <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">
                   Thời gian gửi
-                </TableHead>
-                <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">
-                  Số từ
                 </TableHead>
                 <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6 text-center">
                   Hành động
@@ -164,58 +176,53 @@ export function ContentList({ onReview }: ContentListProps) {
             </TableHeader>
 
             <TableBody>
-              {contents.map((content) => (
+              {stories.map((story) => (
                 <TableRow
-                  key={content.id}
+                  key={story.reviewId}
                   className="border-b border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/20 transition-colors"
                 >
                   <TableCell className="py-4 px-6">
                     <div>
                       <div className="text-[var(--foreground)] font-medium">
-                        {content.title}
+                        {story.title}
                       </div>
-                      {content.subtitle && (
-                        <div className="text-sm text-[var(--muted-foreground)]">
-                          {content.subtitle}
-                        </div>
-                      )}
                     </div>
                   </TableCell>
 
                   <TableCell className="py-4 px-6">
                     <div className="flex items-center gap-2 text-[var(--primary)]">
                       <User className="w-4 h-4" />
-                      {content.author}
+                      {story.authorUsername}
                     </div>
                   </TableCell>
 
                   <TableCell className="py-4 px-6">
-                    <Badge variant="outline" className={content.typeColor}>
-                      {content.type}
+                    <Badge variant={story.aiResult === 'rejected' ? 'destructive' : 'outline'}
+                      className={cn(
+                        story.aiResult === 'flagged' && 'bg-yellow-100 text-yellow-800',
+                        story.aiResult === 'approved' && 'bg-green-100 text-green-800',
+                        story.aiResult === 'rejected' && 'bg-red-100 text-red-800'
+                      )}
+                    >
+                      {story.aiResult} ({(story.aiScore * 100).toFixed(0)}%)
                     </Badge>
                   </TableCell>
 
                   <TableCell className="py-4 px-6">
-                    <Badge variant="outline" className={content.genreColor}>
-                      {content.genre}
-                    </Badge>
+                     {story.tags.slice(0, 2).map((tag) => (
+                      <Badge key={tag.tagId} variant="outline" className="mr-1 mb-1 bg-blue-100 text-blue-800">
+                        {tag.tagName}
+                      </Badge>
+                     ))}
                   </TableCell>
 
                   <TableCell className="py-4 px-6 text-[var(--muted-foreground)]">
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4" />
-                      {content.submittedAt}
+                      {new Date(story.submittedAt).toLocaleString('vi-VN')}
                     </div>
                   </TableCell>
-
-                  <TableCell className="py-4 px-6 text-[var(--muted-foreground)]">
-                    <div className="flex items-center gap-2">
-                      <BookOpen className="w-4 h-4" />
-                      {content.wordCount}
-                    </div>
-                  </TableCell>
-
-                  {/* Button */}
+                  
                   <TableCell className="py-4 px-6 text-center">
                     <motion.div
                       whileHover={{ scale: 1.05 }}
@@ -223,7 +230,7 @@ export function ContentList({ onReview }: ContentListProps) {
                       transition={{ type: "spring", stiffness: 400, damping: 15 }}
                     >
                       <Button
-                        onClick={() => onReview(content)}
+                        onClick={() => onReview(story)}
                         className="bg-[var(--primary)] hover:bg-[color-mix(in srgb, var(--primary) 75%, black)] text-[var(--primary-foreground)] shadow-md font-medium px-4 py-2 rounded-lg transition-all"
                       >
                         Kiểm duyệt
