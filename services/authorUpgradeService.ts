@@ -1,3 +1,4 @@
+//services/authorUpgradeService.ts
 import apiClient from "./apiClient";
 
 export interface AuthorUpgradeRequestPayload {
@@ -7,12 +8,13 @@ export interface AuthorUpgradeRequestPayload {
 export type ApiUpgradeStatus = "PENDING" | "REJECTED" | "APPROVED";
 
 export interface AuthorUpgradeRequestResponse {
-  id: number;
-  status: ApiUpgradeStatus;
-  commitment: string;
-  rejectionReason?: string | null; // Có thể null
+  requestId: string;
+  requesterId: string;
+  requesterUsername: string | null;
+  status: ApiUpgradeStatus | string;
+  content: string; // Trường này chứa cả cam kết và lý do từ chối
   createdAt: string;
-  updatedAt: string;
+  assignedOmodId: string;
 }
 
 const submitRequest = (data: AuthorUpgradeRequestPayload) => {
