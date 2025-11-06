@@ -1,6 +1,5 @@
 "use client";
 
-
 import { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/op-sidebar";
 import { SiteHeader } from "@/components/site-header";
@@ -57,7 +56,9 @@ import {
   approveRequest,
   rejectRequest,
 } from "@/services/operationModService";
-import OpLayout from "@/components/OpLayout";
+
+// (Giả sử bạn có layout này, nếu không hãy xóa dòng này và 2 dòng <OpLayout>)
+import OpLayout from "@/components/OpLayout"; 
 
 // --- Interface cho Author ---
 interface Author {
@@ -123,10 +124,9 @@ export default function AuthorManagement() {
   const [authors, setAuthors] = useState<Author[]>([]);
   const [isLoadingAuthors, setIsLoadingAuthors] = useState(true);
 
-  const [sponsorRequests, setSponsorRequests] =
-    useState<SponsorRequest[]>(mockSponsorRequests);
-  const [isLoadingSponsorRequests, setIsLoadingSponsorRequests] =
-    useState(false);
+  // ✅ SỬA 1: Khởi tạo state loading cho Tab 2
+  const [sponsorRequests, setSponsorRequests] = useState<SponsorRequest[]>([]);
+  const [isLoadingSponsorRequests, setIsLoadingSponsorRequests] = useState(true);
 
   const [selectedAuthor, setSelectedAuthor] = useState<Author | null>(null);
   const [selectedSponsorRequest, setSelectedSponsorRequest] =
@@ -147,7 +147,7 @@ export default function AuthorManagement() {
     useState(false);
   const [isSubmittingReject, setIsSubmittingReject] = useState(false);
 
-  // --- Load danh sách Authors ---
+  // --- Load danh sách Authors (Tab 1) ---
   useEffect(() => {
     async function fetchApprovedAuthors() {
       try {
@@ -172,7 +172,17 @@ export default function AuthorManagement() {
     fetchApprovedAuthors();
   }, []);
 
-  // --- Polling yêu cầu lên Author ---
+  // ✅ SỬA 2: Thêm lại useEffect để tải Mock Data cho Tab 2
+  useEffect(() => {
+    setIsLoadingSponsorRequests(true);
+    const timer = setTimeout(() => {
+      setSponsorRequests(mockSponsorRequests);
+      setIsLoadingSponsorRequests(false);
+    }, 500); // Giả lập loading
+    return () => clearTimeout(timer);
+  }, []);
+
+  // --- Polling yêu cầu lên Author (Tab 3) ---
   useEffect(() => {
     async function fetchAuthorUpgradeRequests() {
       try {
@@ -290,10 +300,25 @@ export default function AuthorManagement() {
         loading: `Đang từ chối ${name}...`,
         success: `Đã từ chối ${name}.`,
         error: "Từ chối thất bại.",
+        // ✅ SỬA 3: Chuyển logic ra khỏi promise
       }
     );
+    // Di chuyển ra ngoài
     setShowAuthorRejectDialog(false);
     setIsSubmittingReject(false);
+  };
+  
+  // (Logic cho Tab 2 - Mock)
+  const handleApproveSponsorRequest = async (request: SponsorRequest) => {
+    setSponsorRequests(sponsorRequests.filter(r => r.id !== request.id));
+    toast.success(`(Mock) Đã duyệt yêu cầu Sponsored của ${request.authorName}`);
+  };
+  const handleRejectSponsorRequest = async () => {
+    if (selectedSponsorRequest && sponsorRejectReason) {
+      setSponsorRequests(sponsorRequests.filter(r => r.id !== selectedSponsorRequest.id));
+      toast.error(`(Mock) Đã từ chối yêu cầu Sponsored của ${selectedSponsorRequest.authorName}`);
+      setShowSponsorRejectDialog(false);
+    }
   };
 
   // --- Filter ---
@@ -302,6 +327,79 @@ export default function AuthorManagement() {
       a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  
+  // --- Các hàm Render ---
+  
+  function renderAuthorUpgradeTable(requests: AuthorUpgradeRequest[], loading: boolean) {
+    return (
+      <Card className="border border-[var(--border)] bg-[var(--card)] shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-[var(--primary)]">{'Yêu cầu chờ duyệt (User -> Author)'}</CardTitle>
+            <CardDescription>Duyệt các user xin nâng cấp lên quyền Author.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-[var(--foreground)]">Tên User</TableHead>
+                <TableHead className="text-[var(--foreground)]">Email</TableHead>
+                <TableHead className="text-[var(--foreground)]">Ngày gửi</TableHead>
+                <TableHead className="text-[var(--foreground)]">Trạng thái</TableHead>
+                <TableHead className="text-[var(--foreground)] text-right">Hành động</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center h-24 text-[var(--muted-foreground)]">
+                    <Loader2 className="w-6 h-6 mx-auto animate-spin" />
+                  </TableCell>
+                </TableRow>
+              ) : requests.length > 0 ? (
+                requests.map((req) => (
+                  <TableRow key={req.requestId}>
+                    <TableCell className="text-[var(--foreground)] font-medium">{req.requesterUsername || `User ID: ${req.requesterId}`}</TableCell>
+                    <TableCell className="text-[var(--muted-foreground)]">{req.requesterEmail || `(Chưa có email)`}</TableCell>
+                    <TableCell className="text-[var(--muted-foreground)]">{new Date(req.createdAt).toLocaleDateString('vi-VN')}</TableCell>
+                    <TableCell>{getAuthorUpgradeStatusBadge(req.status)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          size="sm"
+                          onClick={() => handleApproveAuthorRequest(req)}
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          <Check className="w-4 h-4 mr-1" /> Duyệt
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedAuthorRequest(req);
+                            setAuthorRejectReason("");
+                            setShowAuthorRejectDialog(true);
+                          }}
+                          className="border-red-500 text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
+                        >
+                          <X className="w-4 h-4 mr-1" /> Từ chối
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center h-24 text-[var(--muted-foreground)]">
+                   {'Không có yêu cầu (User -> Author) nào'}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    );
+  }
 
   // --- UI ---
   return (
@@ -386,9 +484,165 @@ export default function AuthorManagement() {
             </Card>
           </TabsContent>
 
-          {/* Tab 2 & Tab 3 giữ nguyên từ file bạn gửi */}
+          {/* ✅ SỬA 4: Thêm lại JSX cho Tab 2 */}
+          <TabsContent value="sponsor-requests" className="space-y-4">
+              <div className="grid gap-4">
+                {isLoadingSponsorRequests ? (
+                   <Card className="border border-dashed"><CardContent className="py-12 text-center text-muted-foreground">Đang tải...</CardContent></Card>
+                ) : sponsorRequests.length > 0 ? (
+                  sponsorRequests.map((request) => (
+                  <Card key={request.id} className="border border-[var(--border)] bg-[var(--card)] shadow-sm">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-[var(--primary)]">{request.authorName}</CardTitle>
+                          <CardDescription>{request.email}</CardDescription>
+                        </div>
+                        <Badge variant="outline">{request.requestDate}</Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-[var(--muted-foreground)]">Số truyện</p>
+                          <p>{request.stories}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-[var(--muted-foreground)]">Total Views</p>
+                          <p>{request.views.toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm text-[var(--muted-foreground)] mb-1">Lý do xin nâng cấp</p>
+                        <p className="text-sm bg-[var(--muted)] p-3 rounded-lg">{request.reason}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => handleApproveSponsorRequest(request)}
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Duyệt
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedSponsorRequest(request);
+                            setSponsorRejectReason(""); // Thêm
+                            setShowSponsorRejectDialog(true);
+                          }}
+                          className="flex-1 border-red-500 text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
+                        >
+                          <XCircle className="w-4 h-4 mr-2" />
+                          Từ chối
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+                ) : (
+                  <Card className="border border-dashed"><CardContent className="py-12 text-center text-muted-foreground">Không có yêu cầu Sponsored (Mock)</CardContent></Card>
+                )}
+              </div>
+            </TabsContent>
+
+          {/* ✅ SỬA 5: Thêm lại JSX cho Tab 3 */}
+          <TabsContent value="author-requests" className="space-y-4">
+            {renderAuthorUpgradeTable(authorUpgradeRequests, isLoadingAuthorRequests)}
+          </TabsContent>
+
         </Tabs>
       </main>
+      
+      {/* ✅ SỬA 6: Thêm lại các Dialogs */}
+
+      {/* Dialog Chi tiết Author */}
+      <Dialog open={!!selectedAuthor} onOpenChange={() => setSelectedAuthor(null)}>
+        <DialogContent className="max-w-2xl bg-[var(--card)] border border-[var(--border)]">
+          <DialogHeader>
+            <DialogTitle className="text-[var(--primary)]">Chi tiết tác giả</DialogTitle>
+          </DialogHeader>
+          {selectedAuthor && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><p className="text-sm text-[var(--muted-foreground)]">Tên</p><p>{selectedAuthor.name}</p></div>
+                <div><p className="text-sm text-[var(--muted-foreground)]">Email</p><p>{selectedAuthor.email}</p></div>
+                <div><p className="text-sm text-[var(--muted-foreground)]">Số truyện</p><p>{selectedAuthor.stories}</p></div>
+                <div><p className="text-sm text-[var(--muted-foreground)]">Total Views</p><p>{selectedAuthor.views.toLocaleString()}</p></div>
+                <div><p className="text-sm text-[var(--muted-foreground)]">Doanh thu</p><p>{selectedAuthor.revenue > 0 ? `${selectedAuthor.revenue.toLocaleString()}₫` : 'Chưa có'}</p></div>
+                <div><p className="text-sm text-[var(--muted-foreground)] mb-2">Trạng thái</p>{getStatusBadge(selectedAuthor.status)}</div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Từ chối Sponsored (Luồng 1 - Mock) */}
+      <Dialog open={showSponsorRejectDialog} onOpenChange={setShowSponsorRejectDialog}>
+        <DialogContent className="bg-[var(--card)] border border-[var(--border)]">
+          <DialogHeader>
+            <DialogTitle className="text-[var(--primary)]">Từ chối yêu cầu Sponsored</DialogTitle>
+            <DialogDescription>
+              Vui lòng ghi rõ lý do từ chối
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder="Nhập lý do từ chối..."
+            value={sponsorRejectReason}
+            onChange={(e) => setSponsorRejectReason(e.target.value)}
+            className="min-h-[100px] bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)]"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSponsorRejectDialog(false)}>Hủy</Button>
+            <Button
+              onClick={handleRejectSponsorRequest}
+              disabled={!sponsorRejectReason}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Xác nhận từ chối
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Từ chối Author (Luồng 2 - API Thật) */}
+      <Dialog open={showAuthorRejectDialog} onOpenChange={setShowAuthorRejectDialog}>
+        <DialogContent className="bg-[var(--card)] border border-[var(--border)]">
+          <DialogHeader>
+            <DialogTitle className="text-[var(--primary)]">Từ chối yêu cầu lên Author</DialogTitle>
+            <DialogDescription>
+              Bạn có chắc chắn muốn từ chối yêu cầu của 
+              <strong className="text-[var(--foreground)]"> {selectedAuthorRequest?.requesterUsername || selectedAuthorRequest?.requesterId}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder="Nhập lý do từ chối (bắt buộc)..."
+            value={authorRejectReason}
+            onChange={(e) => setAuthorRejectReason(e.target.value)}
+            disabled={isSubmittingReject}
+            className="min-h-[120px] bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)]"
+          />
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowAuthorRejectDialog(false)}
+              disabled={isSubmittingReject}
+              className="border-[var(--border)] text-[var(--foreground)]"
+            >
+              Hủy
+            </Button>
+            <Button
+              onClick={handleConfirmAuthorReject}
+              disabled={!authorRejectReason || isSubmittingReject}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isSubmittingReject && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Xác nhận từ chối
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </OpLayout>
   );
 }

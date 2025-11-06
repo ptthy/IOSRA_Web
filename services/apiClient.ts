@@ -1,7 +1,8 @@
-// services/apiClient.ts
 import axios from "axios";
 
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -11,6 +12,7 @@ const apiClient = axios.create({
   },
 });
 
+
 // Request interceptor
 apiClient.interceptors.request.use(
   (config) => {
@@ -18,10 +20,12 @@ apiClient.interceptors.request.use(
     if (typeof window !== "undefined") {
       const token = localStorage.getItem("authToken");
 
+
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
+
 
     // Đối với FormData, không set Content-Type (axios sẽ tự set)
     if (config.data instanceof FormData) {
@@ -30,12 +34,14 @@ apiClient.interceptors.request.use(
       config.headers["Content-Type"] = "application/json";
     }
 
+
     return config;
   },
   (error) => {
     return Promise.reject(error);
   }
 );
+
 
 // Response interceptor
 apiClient.interceptors.response.use(
@@ -45,6 +51,7 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 403) {
       const errorMessage = error.response?.data?.message?.toLowerCase();
+
 
       // Phân biệt các loại 403
       if (
@@ -67,8 +74,12 @@ apiClient.interceptors.response.use(
       }
     }
 
+
     return Promise.reject(error);
   }
 );
 
+
 export default apiClient;
+
+
