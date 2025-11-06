@@ -198,7 +198,7 @@ export default function AuthorChapterDetailPage() {
 
   // Trích xuất phần tiếng Việt từ AI Feedback
   const vietnameseFeedback = chapter
-    ? extractVietnameseFeedback(chapter.aiFeedback)
+    ? extractVietnameseFeedback(chapter.aiFeedback ?? null)
     : null;
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-8">
