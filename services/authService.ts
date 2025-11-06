@@ -1,3 +1,4 @@
+// services/authService.ts
 import apiClient from "./apiClient";
 
 // --- 1. Định nghĩa các kiểu dữ liệu (Interfaces) cho Request Bodies ---
@@ -46,6 +47,14 @@ interface GoogleCompleteData {
   username?: string;
   password?: string;
   confirmPassword?: string;
+}
+
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  role: "reader" | "author"; // Thêm role
+  // ... các trường khác
 }
 
 // -----------------------------------------------------------------
