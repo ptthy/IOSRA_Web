@@ -1,7 +1,8 @@
-import { X, XCircle } from 'lucide-react';
+// File: moderation/components/reject-modal.tsx
+import { X, XCircle, Loader2 } from 'lucide-react'; // ✅ Thêm Loader2
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 
 interface RejectModalProps {
@@ -9,17 +10,24 @@ interface RejectModalProps {
   onReject?: (id: string) => void;
   onClose: () => void;
   onConfirm: (reason: string) => void;
+  isSubmitting?: boolean; // ✅ SỬA 1: Thêm prop isSubmitting
 }
 
-export function RejectModal({ isOpen, onClose, onConfirm }: RejectModalProps) {
+export function RejectModal({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  isSubmitting // ✅ SỬA 2: Nhận prop
+}: RejectModalProps) {
   const [reason, setReason] = useState('');
 
   if (!isOpen) return null;
 
   const handleConfirm = () => {
+    // Không đóng modal ở đây, để 'review-detail.tsx' xử lý
     onConfirm(reason);
-    setReason('');
-    onClose();
+    // setReason('');
+    // onClose();
   };
 
   const commonReasons = [
@@ -49,6 +57,7 @@ export function RejectModal({ isOpen, onClose, onConfirm }: RejectModalProps) {
           <button 
             onClick={onClose} 
             className="text-gray-500 hover:text-gray-700 transition-colors"
+            disabled={isSubmitting} // ✅ SỬA 3: Thêm disabled
           >
             <X className="w-5 h-5" />
           </button>
@@ -69,11 +78,12 @@ export function RejectModal({ isOpen, onClose, onConfirm }: RejectModalProps) {
                 <button
                   key={index}
                   onClick={() => setReason(commonReason)}
+                  disabled={isSubmitting} // ✅ SỬA 3: Thêm disabled
                   className={`w-full text-left p-3 rounded-xl border transition-all bg-white ${
                     reason === commonReason
                       ? 'border-blue-500 bg-blue-50 text-gray-900'
                       : 'border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-gray-50'
-                  }`}
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   <p className="text-sm">{commonReason}</p>
                 </button>
@@ -89,6 +99,7 @@ export function RejectModal({ isOpen, onClose, onConfirm }: RejectModalProps) {
               placeholder="Nhập lý do từ chối..."
               value={reason}
               onChange={(e) => setReason(e.target.value)}
+              disabled={isSubmitting} // ✅ SỬA 3: Thêm disabled
               className="min-h-[120px] bg-white border-gray-300 text-gray-900"
             />
           </div>
@@ -99,6 +110,7 @@ export function RejectModal({ isOpen, onClose, onConfirm }: RejectModalProps) {
           <Button 
             variant="outline" 
             onClick={onClose}
+            disabled={isSubmitting} // ✅ SỬA 3: Thêm disabled
             className="border-gray-300 text-gray-700 hover:bg-gray-50"
           >
             Hủy
@@ -106,9 +118,11 @@ export function RejectModal({ isOpen, onClose, onConfirm }: RejectModalProps) {
           <Button 
             className="bg-red-600 hover:bg-red-700 text-white"
             onClick={handleConfirm}
-            disabled={!reason.trim()}
+            // ✅ SỬA 3: Cập nhật logic disabled
+            disabled={!reason.trim() || isSubmitting}
           >
-            Xác nhận từ chối
+            {/* ✅ SỬA 4: Hiển thị loading */}
+            {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Xác nhận từ chối"}
           </Button>
         </div>
       </motion.div>

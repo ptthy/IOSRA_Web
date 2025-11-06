@@ -6,6 +6,7 @@ import { SentBackList } from "./components/sent-back-list";
 import { ApprovalModal } from "./components/approval-modal";
 import { RejectModal } from "./components/reject-modal";
 import { ReportsList } from "./components/report-list";
+import { toast } from "sonner"; // Import toast để dùng
 
 interface Report {
   id: number;
@@ -43,16 +44,42 @@ export default function ModerationPage() {
   const handleSentBackReview = (content: any) => {
     console.log("SentBackList review clicked:", content);
     setSelectedStory(content);
-    // lưu ý: không route ở đây để giữ layout container
   };
 
-  const handleApprovalConfirm = (languages: string[]) => {
-    console.log("Selected languages:", languages);
+  // ✅ SỬA LỖI: Đổi tham số từ 'languages: string[]' thành 'reason: string'
+  const handleApprovalConfirm = (reason: string) => {
+    console.log("Approval reason:", reason);
+    
+    // (Thêm logic gọi API duyệt ở đây)
+    // Ví dụ:
+    // toast.promise(async () => {
+    //   await apiApproveSentBack(selectedStory.id, reason);
+    //   setSelectedStory(null); // Quay lại danh sách
+    // }, {
+    //   loading: "Đang duyệt...",
+    //   success: "Duyệt thành công!",
+    //   error: "Duyệt thất bại."
+    // });
+
+    toast.success("Đã duyệt (chưa gọi API thật)"); // Thông báo tạm thời
     setIsApprovalOpen(false);
   };
 
   const handleRejectConfirm = (reason: string) => {
     console.log("Rejection reason:", reason);
+
+    // (Thêm logic gọi API từ chối ở đây)
+    // Ví dụ:
+    // toast.promise(async () => {
+    //   await apiRejectSentBack(selectedStory.id, reason);
+    //   setSelectedStory(null); // Quay lại danh sách
+    // }, {
+    //   loading: "Đang từ chối...",
+    //   success: "Từ chối thành công!",
+    //   error: "Từ chối thất bại."
+    // });
+    
+    toast.error("Đã từ chối (chưa gọi API thật)"); // Thông báo tạm thời
     setIsRejectOpen(false);
   };
 
@@ -121,7 +148,7 @@ export default function ModerationPage() {
       <ApprovalModal
         isOpen={isApprovalOpen}
         onClose={() => setIsApprovalOpen(false)}
-        onConfirm={handleApprovalConfirm}
+        onConfirm={handleApprovalConfirm} // Bây giờ đã hợp lệ
       />
 
       <RejectModal
