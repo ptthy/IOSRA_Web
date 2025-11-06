@@ -348,9 +348,7 @@ export default function ManageChaptersPage() {
                           ? "Đã xuất bản"
                           : chapter.status === "pending"
                           ? "Chờ duyệt"
-                          : chapter.status === "draft"
-                          ? "Bản nháp"
-                          : chapter.status}
+                          : "Chưa xuất bản"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -363,7 +361,7 @@ export default function ManageChaptersPage() {
                           <Eye className="h-4 w-4 mr-1" />
                           Xem
                         </Button>
-                        {chapter.status === "draft" && (
+                        {/* {chapter.status === "draft" && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -372,7 +370,7 @@ export default function ManageChaptersPage() {
                             <Edit className="h-4 w-4 mr-1" />
                             Sửa
                           </Button>
-                        )}
+                        )} */}
                       </div>
                     </TableCell>
                   </TableRow>

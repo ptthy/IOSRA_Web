@@ -153,7 +153,7 @@ export default function AuthorChapterDetailPage() {
     setIsSubmitting(true);
     try {
       await chapterService.submitChapterForReview(chapterId);
-      toast.success("✅ Đã gửi chương cho AI đánh giá thành công!");
+      toast.success("Đã gửi chương cho AI đánh giá thành công!");
       // Reload để cập nhật trạng thái mới
       loadChapter();
     } catch (error: any) {
@@ -300,7 +300,7 @@ export default function AuthorChapterDetailPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {chapter.aiScore !== undefined && (
+            {chapter.aiScore != null && (
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Star className="h-5 w-5 text-yellow-500" />
@@ -328,7 +328,6 @@ export default function AuthorChapterDetailPage() {
                 </div>
               </div>
             )}
-
             {vietnameseFeedback && (
               <div>
                 <div className="flex items-center gap-2 mb-2">

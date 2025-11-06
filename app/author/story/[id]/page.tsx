@@ -29,7 +29,7 @@ import { chapterService } from "@/services/chapterService"; // Import chapterSer
 import type { Story, Chapter } from "@/services/apiTypes";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-import { ImageWithFallback } from "@/components/ui/image-with-fallback";
+import { ImageWithFallback } from "@/components/ui/ImageWithFallback";
 const extractVietnameseFeedback = (feedback: string | null): string | null => {
   if (!feedback) return null;
 

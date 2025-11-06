@@ -49,8 +49,7 @@ import {
 import { storyService } from "@/services/storyService";
 import type { Tag, CreateStoryRequest } from "@/services/apiTypes";
 import { toast } from "sonner";
-import { ImageWithFallback } from "@/components/ui/image-with-fallback";
-
+import { ImageWithFallback } from "@/components/ui/ImageWithFallback";
 const LOCAL_STORAGE_KEY = "create-story-draft-v1";
 
 export default function CreateStoryPage() {
