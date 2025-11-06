@@ -55,10 +55,12 @@ const data = {
 // 2. Interface từ AppSidebar
 interface AppSidebarProps {
   onLogout?: () => void;
+   darkMode: boolean;
+  toggleDarkMode: () => void;
 }
 
 // 3. Component chính, kết hợp logic và UI
-export function AppSidebar({ onLogout }: AppSidebarProps) {
+export function AppSidebar({ darkMode, toggleDarkMode, onLogout }: AppSidebarProps) {
   const pathname = usePathname();
   const [theme, setTheme] = React.useState<"light" | "dark">("light");
   const [isCollapsed, setIsCollapsed] = React.useState(false);

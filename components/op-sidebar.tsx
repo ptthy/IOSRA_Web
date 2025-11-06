@@ -30,7 +30,6 @@ import { authService } from "@/services/authService";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 
-// Dữ liệu menu
 const data = {
   navMain: [
     { title: "Dashboard", url: "/Op/dashboard", icon: LayoutDashboard },
@@ -42,14 +41,21 @@ const data = {
   ],
 };
 
-interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {}
+// 🧩 Sửa phần props để nhận darkMode + toggleDarkMode
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  darkMode: boolean;
+  toggleDarkMode: () => void;
+}
 
-export function AppSidebar(props: AppSidebarProps) {
+export function AppSidebar({
+  darkMode,
+  toggleDarkMode,
+  ...props
+}: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { logout: clientLogout } = useAuth();
   const [isCollapsed, setIsCollapsed] = React.useState(false);
-  const [theme, setTheme] = React.useState<"light" | "dark">("light");
 
   const handleLogout = async () => {
     try {
@@ -64,12 +70,6 @@ export function AppSidebar(props: AppSidebarProps) {
     } catch {
       router.push("/login");
     }
-  };
-
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light";
-    setTheme(newTheme);
-    document.documentElement.classList.toggle("dark", newTheme === "dark");
   };
 
   return (
@@ -130,15 +130,15 @@ export function AppSidebar(props: AppSidebarProps) {
       <SidebarFooter className="p-4 space-y-2 border-t">
         <Button
           variant="ghost"
-          onClick={toggleTheme}
+          onClick={toggleDarkMode}
           className="w-full justify-start"
         >
-          {theme === "light" ? (
-            <Moon className="w-5 h-5" />
-          ) : (
-            <Sun className="w-5 h-5" />
+          {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          {!isCollapsed && (
+            <span className="ml-2">
+              {darkMode ? "Chế độ sáng" : "Chế độ tối"}
+            </span>
           )}
-          {!isCollapsed && <span className="ml-2">Chế độ tối</span>}
         </Button>
 
         <Button
