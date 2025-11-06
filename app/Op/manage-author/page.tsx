@@ -71,7 +71,7 @@ interface Author {
   revenue: number;
 }
 
-// --- Interface cho Sponsored Request ---
+// --- Interface cho Sponsored Request (Mock) ---
 interface SponsorRequest {
   id: number;
   authorId: number;
@@ -106,7 +106,7 @@ const mockSponsorRequests: SponsorRequest[] = [
   },
 ];
 
-// --- Interface cho Author Upgrade Request ---
+// --- Interface cho Author Upgrade Request (API Thật) ---
 interface AuthorUpgradeRequest {
   requestId: string;
   requesterId: string;
@@ -124,9 +124,9 @@ export default function AuthorManagement() {
   const [authors, setAuthors] = useState<Author[]>([]);
   const [isLoadingAuthors, setIsLoadingAuthors] = useState(true);
 
-  // ✅ SỬA 1: Khởi tạo state loading cho Tab 2
   const [sponsorRequests, setSponsorRequests] = useState<SponsorRequest[]>([]);
-  const [isLoadingSponsorRequests, setIsLoadingSponsorRequests] = useState(true);
+  const [isLoadingSponsorRequests, setIsLoadingSponsorRequests] =
+    useState(true);
 
   const [selectedAuthor, setSelectedAuthor] = useState<Author | null>(null);
   const [selectedSponsorRequest, setSelectedSponsorRequest] =
@@ -152,7 +152,8 @@ export default function AuthorManagement() {
     async function fetchApprovedAuthors() {
       try {
         setIsLoadingAuthors(true);
-        const data: AuthorUpgradeRequest[] = await getUpgradeRequests("APPROVED");
+        // ✅ SỬA 1: Dùng chữ thường "approved"
+        const data: AuthorUpgradeRequest[] = await getUpgradeRequests("approved");
         const approvedAuthors: Author[] = data.map((req) => ({
           id: req.requesterId,
           name: req.requesterUsername || `User ID: ${req.requesterId}`,
@@ -172,7 +173,7 @@ export default function AuthorManagement() {
     fetchApprovedAuthors();
   }, []);
 
-  // ✅ SỬA 2: Thêm lại useEffect để tải Mock Data cho Tab 2
+  // --- Load Mock Sponsored Requests (Tab 2) ---
   useEffect(() => {
     setIsLoadingSponsorRequests(true);
     const timer = setTimeout(() => {
@@ -186,7 +187,8 @@ export default function AuthorManagement() {
   useEffect(() => {
     async function fetchAuthorUpgradeRequests() {
       try {
-        const data: AuthorUpgradeRequest[] = await getUpgradeRequests("PENDING");
+        // ✅ SỬA 2: Dùng chữ thường "pending"
+        const data: AuthorUpgradeRequest[] = await getUpgradeRequests("pending");
         setAuthorUpgradeRequests(data);
       } catch (error) {
         console.error(error);
@@ -288,6 +290,7 @@ export default function AuthorManagement() {
     const name =
       selectedAuthorRequest.requesterUsername ||
       `User ID: ${selectedAuthorRequest.requesterId}`;
+      
     setIsSubmittingReject(true);
     toast.promise(
       async () => {
@@ -300,12 +303,13 @@ export default function AuthorManagement() {
         loading: `Đang từ chối ${name}...`,
         success: `Đã từ chối ${name}.`,
         error: "Từ chối thất bại.",
-        // ✅ SỬA 3: Chuyển logic ra khỏi promise
+        // ✅ SỬA 3: Chuyển logic vào 'finally' để đảm bảo luôn chạy
+        finally: () => {
+          setShowAuthorRejectDialog(false);
+          setIsSubmittingReject(false);
+        }
       }
     );
-    // Di chuyển ra ngoài
-    setShowAuthorRejectDialog(false);
-    setIsSubmittingReject(false);
   };
   
   // (Logic cho Tab 2 - Mock)
@@ -484,7 +488,7 @@ export default function AuthorManagement() {
             </Card>
           </TabsContent>
 
-          {/* ✅ SỬA 4: Thêm lại JSX cho Tab 2 */}
+          {/* Tab 2: Yêu cầu Sponsored (Mock) */}
           <TabsContent value="sponsor-requests" className="space-y-4">
               <div className="grid gap-4">
                 {isLoadingSponsorRequests ? (
@@ -528,7 +532,7 @@ export default function AuthorManagement() {
                           variant="outline"
                           onClick={() => {
                             setSelectedSponsorRequest(request);
-                            setSponsorRejectReason(""); // Thêm
+                            setSponsorRejectReason(""); 
                             setShowSponsorRejectDialog(true);
                           }}
                           className="flex-1 border-red-500 text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
@@ -546,7 +550,7 @@ export default function AuthorManagement() {
               </div>
             </TabsContent>
 
-          {/* ✅ SỬA 5: Thêm lại JSX cho Tab 3 */}
+          {/* Tab 3: Yêu cầu lên Author (API Thật) */}
           <TabsContent value="author-requests" className="space-y-4">
             {renderAuthorUpgradeTable(authorUpgradeRequests, isLoadingAuthorRequests)}
           </TabsContent>
@@ -554,7 +558,7 @@ export default function AuthorManagement() {
         </Tabs>
       </main>
       
-      {/* ✅ SỬA 6: Thêm lại các Dialogs */}
+      {/* (Dialogs) */}
 
       {/* Dialog Chi tiết Author */}
       <Dialog open={!!selectedAuthor} onOpenChange={() => setSelectedAuthor(null)}>
