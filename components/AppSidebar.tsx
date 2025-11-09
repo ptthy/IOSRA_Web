@@ -82,16 +82,16 @@ export function AppSidebar({ darkMode, toggleDarkMode, onLogout }: AppSidebarPro
         {/* Header: Giữ lại từ OpSidebar, đổi text logo */}
         <div className="flex items-center justify-between p-4 border-b h-16">
           {!isCollapsed && (
-            <span className="text-xl font-bold text-primary">Op Moderator</span>
+            <span className="text-xl font-bold text-primary">ToraNovel</span>
           )}
-          <Button
+          {/* <Button
             variant="ghost"
             size="icon"
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="ml-auto"
-          >
+          > */}
             {/* Dùng icon khác cho collapse, vì LayoutDashboard đã dùng cho nav */}
-            <svg
+            {/* <svg
               xmlns="http://www.w3.org/2000/svg"
               width="24"
               height="24"
@@ -106,7 +106,7 @@ export function AppSidebar({ darkMode, toggleDarkMode, onLogout }: AppSidebarPro
               <rect width="18" height="18" x="3" y="3" rx="2" />
               <path d="M9 3v18" />
             </svg>
-          </Button>
+          </Button> */}
         </div>
 
         {/* Navigation: Dùng logic map từ AppSidebar + style Button từ OpSidebar */}
