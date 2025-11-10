@@ -35,6 +35,7 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+    isAuthor: boolean;
   login: (data: any) => Promise<void>;
   logout: () => void;
   setAuthData: (user: User, token: string) => void;
@@ -223,6 +224,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     token,
     isAuthenticated: !!token,
     isLoading,
+    isAuthor: user?.role === "author",
     login,
     logout,
     setAuthData,

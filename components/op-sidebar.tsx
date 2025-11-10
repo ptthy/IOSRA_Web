@@ -30,6 +30,7 @@ import { authService } from "@/services/authService";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 
+// 🧭 Danh sách menu chính
 const data = {
   navMain: [
     { title: "Dashboard", url: "/Op/dashboard", icon: LayoutDashboard },
@@ -41,21 +42,29 @@ const data = {
   ],
 };
 
-// 🧩 Sửa phần props để nhận darkMode + toggleDarkMode
+// 🧩 Interface props
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   darkMode: boolean;
   toggleDarkMode: () => void;
+  onCollapse?: (val: boolean) => void; // ✅ thêm để Layout biết khi nào sidebar thu/mở
 }
 
 export function AppSidebar({
   darkMode,
   toggleDarkMode,
+  onCollapse,
   ...props
 }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { logout: clientLogout } = useAuth();
   const [isCollapsed, setIsCollapsed] = React.useState(false);
+
+  const toggleCollapse = () => {
+    const newVal = !isCollapsed;
+    setIsCollapsed(newVal);
+    onCollapse?.(newVal); // ✅ báo về Layout
+  };
 
   const handleLogout = async () => {
     try {
@@ -75,32 +84,35 @@ export function AppSidebar({
   return (
     <Sidebar
       collapsible="offcanvas"
-      className={`bg-card text-foreground border-none shadow-lg transition-all duration-300 ${
+      className={`transition-all duration-300 border-none shadow-lg ${
         isCollapsed ? "w-16" : "w-64"
-      }`}
+      } bg-white text-slate-900 dark:bg-[#0A2540] dark:text-white`}
       {...props}
     >
-      {/* Header */}
+      {/* ===== Header ===== */}
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton className="data-[slot=sidebar-menu-button]:!p-6 border-b border-white/20 flex justify-between items-center">
+            <SidebarMenuButton className="data-[slot=sidebar-menu-button]:!p-6 flex justify-between items-center">
               {!isCollapsed && (
-                <h2 className="text-xl font-bold">Op Moderator</h2>
+                <h2 className="text-xl font-bold">ToraNovel</h2>
               )}
-              <Button
+              {/* <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setIsCollapsed(!isCollapsed)}
+                onClick={toggleCollapse}
               >
                 <LayoutDashboard className="w-5 h-5" />
-              </Button>
+              </Button> */}
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+
+        {/* ✅ Line phân cách */}
+        <div className="border-t border-gray-300 dark:border-white/20 mx-4 mt-2" />
       </SidebarHeader>
 
-      {/* Menu */}
+      {/* ===== Menu chính ===== */}
       <SidebarContent>
         <div className="p-4 space-y-2">
           {data.navMain.map((item) => {
@@ -126,8 +138,9 @@ export function AppSidebar({
         </div>
       </SidebarContent>
 
-      {/* Footer */}
+      {/* ===== Footer ===== */}
       <SidebarFooter className="p-4 space-y-2 border-t">
+        {/* Nút Dark Mode */}
         <Button
           variant="ghost"
           onClick={toggleDarkMode}
@@ -141,6 +154,7 @@ export function AppSidebar({
           )}
         </Button>
 
+        {/* Nút Logout */}
         <Button
           variant="ghost"
           onClick={handleLogout}
