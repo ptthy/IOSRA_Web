@@ -1,12 +1,12 @@
-// File: services/moderationApi.ts
+
 "use client";
 
 import apiClient from "@/services/apiClient"; 
 
-// ✅ SỬA 1: Tắt Mock Data để dùng API thật
+// Tắt Mock Data để dùng API thật
 const USE_MOCK_DATA = false; 
 
-// --- (Mock Data - Sẽ không được dùng nữa) ---
+// --- (Phần Mock Data - Sẽ không được dùng nữa) ---
 const mockPendingStories = [
   {
     reviewId: "0156ec13-6e0a-4874-a7ae-2fc530fa86da",
@@ -30,7 +30,7 @@ const mockPendingStories = [
 // --- (Hết Mock Data) ---
 
 
-// --- API 1: Lấy danh sách truyện ---
+// --- API 1: Lấy danh sách TRUYỆN ---
 export async function getModerationStories(status: 'pending' | 'published' | 'rejected') {
   
   if (USE_MOCK_DATA) {
@@ -45,7 +45,6 @@ export async function getModerationStories(status: 'pending' | 'published' | 're
 
   // --- API THẬT ---
   try {
-    // ✅ SỬA 2: Thêm '/api' vào trước đường dẫn (Fix lỗi 404)
     const response = await apiClient.get('/api/moderation/stories', { 
       params: { status }
     });
@@ -55,7 +54,7 @@ export async function getModerationStories(status: 'pending' | 'published' | 're
   }
 }
 
-// --- API 3: Ra quyết định ---
+// --- API 2: Ra quyết định TRUYỆN ---
 export async function postModerationDecision(
   reviewId: string,
   approve: boolean,
@@ -75,10 +74,63 @@ export async function postModerationDecision(
   // --- API THẬT ---
   try {
     const payload = { approve, moderatorNote };
-    // ✅ SỬA 3: Thêm '/api' vào trước đường dẫn (Fix lỗi 404)
     const response = await apiClient.post(`/api/moderation/stories/${reviewId}/decision`, payload);
     return response.data;
   } catch (error: any) {
     throw new Error(error.response?.data?.message || error.message || "Lỗi khi gửi quyết định");
+  }
+}
+
+// --- API 3: Lấy danh sách BÌNH LUẬN ---
+export async function getModerationComments(
+  status: "pending" | "approved" | "removed",
+  page: number,
+  pageSize: number
+) {
+  try {
+    // ✅ SỬA LỖI 400: Chuyển đổi status sang Chữ Hoa (UPPERCASE)
+    const apiStatus = status.toUpperCase(); // "pending" -> "PENDING"
+
+    const response = await apiClient.get('/api/moderation/comments', { 
+      params: { 
+        status: apiStatus, // Gửi "PENDING", "APPROVED", "REMOVED"
+        page, 
+        pageSize 
+      }
+    });
+    return response.data; // Trả về { items: [], total, page, pageSize }
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Lỗi khi tải bình luận");
+  }
+}
+// --- API 4: Duyệt (Approve) BÌNH LUẬN ---
+// (Đây là hàm bị trùng - chỉ giữ 1 bản)
+export async function approveComment(commentId: string) {
+  try {
+    
+    // Giả lập
+    await new Promise(res => setTimeout(res, 500));
+    console.log(`(Mock) Đã duyệt ${commentId}`);
+    return { message: "Duyệt thành công (Mock)"};
+
+  } catch (error: any) {
+     throw new Error(error.response?.data?.message || "Lỗi khi xử lý bình luận");
+  }
+}
+
+// --- API 5: Gỡ (Remove) BÌNH LUẬN ---
+// (Đây là hàm bị trùng - chỉ giữ 1 bản)
+export async function removeComment(commentId: string) {
+   try {
+    // TODO: Yêu cầu Backend cung cấp API này.
+    // Ví dụ: const response = await apiClient.post(`/api/moderation/comments/${commentId}/remove`);
+
+    // Giả lập
+    await new Promise(res => setTimeout(res, 500));
+    console.log(`(Mock) Đã gỡ ${commentId}`);
+    return { message: "Gỡ thành công (Mock)"};
+
+  } catch (error: any) {
+     throw new Error(error.response?.data?.message || "Lỗi khi xử lý bình luận");
   }
 }

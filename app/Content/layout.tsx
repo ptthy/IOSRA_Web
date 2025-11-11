@@ -1,4 +1,4 @@
-// File: app/Content/layout.tsx (CẬP NHẬT)
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -9,8 +9,8 @@ import {
   SidebarInset,
 } from "@/components/ui/sidebar";
 import { EnhancedSidebar } from "./dashboard/components/enhanced-sidebar";
-// ✅ SỬA 1: Import Provider
 import { ModerationProvider } from "@/context/ModerationContext";
+
 
 export default function ContentLayout({
   children,
@@ -21,9 +21,8 @@ export default function ContentLayout({
   const [currentPage, setCurrentPage] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // ... (Tất cả logic useEffect, handleNavigate, handleToggleTheme giữ nguyên)
-   useEffect(() => {
-    // Logic này sẽ dùng URL đúng từ EnhancedSidebar của bạn
+  useEffect(() => {
+    // ✅ SỬA 1: Thêm logic cho 'tags'
     const getCurrentPageFromPath = (path: string) => {
       if (path.includes("/Content/dashboard")) return "dashboard";
       if (path.includes("/Content/review")) {
@@ -36,6 +35,7 @@ export default function ContentLayout({
         return "reports"; // Fallback
       }
       if (path.includes("/Content/statistics")) return "statistics";
+      if (path.includes("/Content/tags")) return "tags"; // <-- THÊM DÒNG NÀY
       if (path.includes("/Content/settings")) return "settings";
       return "dashboard"; // Fallback
     };
@@ -68,14 +68,12 @@ export default function ContentLayout({
   };
 
   return (
-    // ✅ SỬA 2: Bọc ModerationProvider bên ngoài SidebarProvider
     <ModerationProvider>
       <SidebarProvider>
         <Sidebar
           collapsible="offcanvas"
           className="w-[280px] bg-[var(--primary)] text-[var(--primary-foreground)] border-r-0 shadow-lg transition-colors duration-300"
         >
-          {/* EnhancedSidebar bây giờ có thể truy cập Context */}
           <EnhancedSidebar
             currentPage={currentPage}
             onNavigate={handleNavigate}
@@ -84,9 +82,10 @@ export default function ContentLayout({
           />
         </Sidebar>
 
-        <SidebarInset>
-          <main className="flex-1 p-6 overflow-y-auto transition-colors duration-300">
-            {/* {children} (tức là review/page.tsx) bây giờ cũng có thể truy cập Context */}
+        {/* Cấu trúc Layout (Giữ nguyên) */}
+        <SidebarInset className="flex flex-col h-screen"> 
+         
+          <main className="flex-1 p-6 overflow-y-auto transition-colors duration-300 bg-[var(--background)]">
             {children}
           </main>
         </SidebarInset>
