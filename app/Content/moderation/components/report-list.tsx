@@ -1,315 +1,379 @@
-"use client"; // Đảm bảo "use client" ở đầu nếu chưa có
 
+"use client";
+
+import React, { useState, useEffect } from "react";
 import {
-  Search,
-  AlertTriangle,
-  Flag,
-  CheckCircle2,
-  Trash2,
-  Eye,
-} from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Loader2,
+  AlertCircle,
+  X,
+  Check,
+  Search,
+} from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
+import moment from "moment";
+import "moment/locale/vi";
 
-interface ReportsListProps {
-  onHandle: (report: any) => void;
+// Import các hàm API
+import {
+  getModerationComments,
+  approveComment,
+  removeComment,
+} from "@/services/moderationApi";
+
+// Interface dựa trên API bạn gửi
+interface CommentItem {
+  commentId: string;
+  storyId: string;
+  storyTitle: string;
+  chapterId: string;
+  chapterNo: number;
+  chapterTitle: string;
+  readerId: string;
+  username: string;
+  avatarUrl: string | null;
+  content: string;
+  status: "pending" | "approved" | "removed";
+  isLocked: boolean;
+  createdAt: string;
 }
 
-export function ReportsList({ onHandle }: ReportsListProps) {
-  const reports = [
-    {
-      id: 1,
-      priority: "high",
-      reportCount: 5,
-      storyTitle: "Hành trình isekai",
-      chapter: "Chương 5",
-      reporter: "Reader123",
-      reportDate: "2025-10-12 11:20",
-      reportType: "Spam",
-      reason: "Bình luận spam quảng cáo",
-      content: "Mua hàng giá rẻ tại website xxx.com - Click ngay!",
-      status: "new",
-    },
-    {
-      id: 2,
-      priority: "high",
-      reportCount: 3,
-      storyTitle: "Tình yêu mùa thu",
-      chapter: "Chương 12",
-      reporter: "UserABC",
-      violator: "BadUser123",
-      reportDate: "2025-10-12 10:45",
-      reportType: "Nội dung không phù hợp",
-      reason: "Ngôn từ không phù hợp với tiêu chuẩn cộng đồng",
-      content: "Bình luận chứa từ ngữ xúc phạm...",
-      status: "processing",
-    },
-    {
-      id: 3,
-      priority: "medium",
-      reportCount: 2,
-      storyTitle: "Chiến tranh ngân hà",
-      chapter: "Chương 8",
-      reporter: "ModFan",
-      reportDate: "2025-10-11 15:30",
-      reportType: "Vi phạm bản quyền",
-      reason: "Nội dung sao chép từ nguồn khác",
-      content: "Phát hiện đoạn văn giống hệt truyện gốc...",
-      status: "resolved",
-    },
-  ];
+interface ApiResponse {
+  items: CommentItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
 
-  const container = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
-  };
+type CommentStatus = "pending" | "approved" | "removed";
 
-  const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 },
-  };
+export function ReportsList() {
+  const [comments, setComments] = useState<CommentItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<CommentStatus>("pending");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const filterReports = (status: string) => {
-    if (status === "all") return reports;
-    return reports.filter((r) => r.status === status);
-  };
+  // Load dữ liệu khi 'activeTab' thay đổi
+  useEffect(() => {
+    const loadComments = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response: ApiResponse = await getModerationComments(activeTab, 1, 20);
+        setComments(response.items);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadComments();
+  }, [activeTab]);
 
-  const ReportCard = ({ report }: { report: any }) => (
-    <motion.div variants={item}>
-      <Card className="p-6 border border-[var(--border)] bg-[var(--card)] shadow-sm hover:shadow-md transition-all duration-300">
-        <div className="flex items-start gap-4">
-          {/* Priority Badge */}
-          <div className="flex-shrink-0">
-            {report.priority === "high" ? (
-              <div className="w-12 h-12 rounded-xl bg-red-50 dark:bg-red-950/30 flex items-center justify-center">
-                <Flag className="w-6 h-6 text-red-600 dark:text-red-400" />
-              </div>
-            ) : (
-              <div className="w-12 h-12 rounded-xl bg-orange-50 dark:bg-orange-950/30 flex items-center justify-center">
-                <AlertTriangle className="w-6 h-6 text-orange-600 dark:text-orange-400" />
-              </div>
-            )}
-          </div>
-
-          {/* Content */}
-          <div className="flex-1">
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex-1">
-                <div className="flex items-center flex-wrap gap-2 mb-2">
-                  <h4 className="text-xl font-semibold text-[var(--foreground)]">
-                    {report.storyTitle}
-                  </h4>
-                  <Badge
-                    className={`${
-                      report.priority === "high"
-                        ? "bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800"
-                        : "bg-orange-50 dark:bg-orange-950/30 text-orange-800 dark:text-orange-300 border border-orange-200 dark:border-orange-800"
-                    }`}
-                  >
-                    {report.reportCount} báo cáo
-                  </Badge>
-                  {report.status === "resolved" && (
-                    <Badge className="bg-green-50 dark:bg-green-950/30 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800">
-                      Đã xử lý
-                    </Badge>
-                  )}
-                  {report.status === "processing" && (
-                    <Badge className="bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                      Đang xử lý
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-sm text-[var(--muted-foreground)] mb-1">
-                  {report.chapter}
-                  {report.violator && ` • Người bị báo cáo: `}
-                  {report.violator && (
-                    <span className="text-red-600 dark:text-red-400 font-medium">
-                      {report.violator}
-                    </span>
-                  )}
-                </p>
-                <p className="text-xs text-[var(--muted-foreground)]">
-                  Báo cáo bởi:{" "}
-                  <span className="text-[var(--primary)] font-medium">
-                    {report.reporter}
-                  </span>{" "}
-                  • {report.reportDate}
-                </p>
-              </div>
-              {report.status !== "resolved" && (
-                <Button
-                  className="bg-[var(--primary)] hover:bg-[color-mix(in_srgb,_var(--primary)_75%,_black)] text-[var(--primary-foreground)] shadow-md font-medium px-4 py-2 rounded-lg transition-all"
-                  onClick={() => onHandle(report)}
-                >
-                  Xử lý
-                </Button>
-              )}
-            </div>
-
-            {/* Report Details */}
-            <div className="rounded-xl bg-blue-50 dark:bg-blue-950/30 p-4 space-y-3 border border-blue-200 dark:border-blue-800">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge
-                    variant="outline"
-                    className="border-[var(--primary)] text-[var(--primary)]"
-                  >
-                    {report.reportType}
-                  </Badge>
-                </div>
-                <p className="text-sm text-blue-900 dark:text-blue-200">
-                  <span className="font-medium">Lý do:</span> {report.reason}
-                </p>
-              </div>
-              <div className="pt-3 border-t border-blue-200 dark:border-blue-800">
-                <p className="text-sm text-blue-800 dark:text-blue-300 mb-1">
-                  Nội dung bị báo cáo:
-                </p>
-                <p className="text-sm text-[var(--foreground)] italic bg-[var(--background)] p-3 rounded-lg">
-                  &ldquo;{report.content}&rdquo;
-                </p>
-              </div>
-              {report.status !== "resolved" && (
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1 border-[var(--border)]"
-                  >
-                    <Eye className="w-4 h-4 mr-2" />
-                    Xem chi tiết
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    <CheckCircle2 className="w-4 h-4 mr-2" />
-                    Đánh dấu đã xử lý
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </Card>
-    </motion.div>
+  // Lọc bình luận theo từ khóa tìm kiếm
+  const filteredComments = comments.filter(comment =>
+    comment.storyTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    comment.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    comment.content.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  return (
-    <div
-      className="min-h-screen p-8 transition-colors duration-300"
-      style={{
-        backgroundColor: "var(--background)",
-        color: "var(--foreground)",
-        fontFamily:
-          "'Poppins', 'Poppins Vietnamese', 'Noto Sans Vietnamese', 'Segoe UI', sans-serif",
-      }}
-    >
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
-        <h1 className="text-3xl font-bold text-[var(--primary)] mb-2">
-          Báo Cáo Vi Phạm
-        </h1>
-        <p className="text-[var(--muted-foreground)]">
-          Xử lý các báo cáo vi phạm từ người dùng
-        </p>
-      </motion.div>
+  // Xử lý hành động (Duyệt / Gỡ)
+  const handleAction = async (commentId: string, action: "approve" | "remove") => {
+    const originalComments = comments;
+    setComments(prev => prev.filter(c => c.commentId !== commentId));
 
-      {/* Search */}
+    try {
+      if (action === "approve") {
+        await approveComment(commentId);
+        toast.success("Đã duyệt bình luận.");
+      } else if (action === "remove") {
+        await removeComment(commentId);
+        toast.success("Đã gỡ bình luận.");
+      }
+    } catch (err: any) {
+      toast.error(err.message);
+      setComments(originalComments); // Hoàn tác nếu lỗi
+    }
+  };
+
+  return (
+    <div className="min-h-screen p-6" style={{ backgroundColor: '#F0EAD6' }}>
+      {/* Header */}
+      <div className="mb-8">
+        <motion.h1 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-2xl font-bold text-gray-900 mb-2"
+        >
+          Báo Cáo Vi Phạm
+        </motion.h1>
+        <motion.p 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="text-gray-700"
+        >
+          Xử lý các báo cáo vi phạm từ người dùng
+        </motion.p>
+      </div>
+
+      {/* Search Bar */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        transition={{ delay: 0.2 }}
         className="mb-6 relative"
       >
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--muted-foreground)]" />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
         <Input
-          placeholder="Tìm kiếm theo tên truyện hoặc người bị báo cáo..."
-          className="pl-12 h-12 bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)]"
+          placeholder="Tìm kiếm theo tên truyện hoặc người dùng..."
+          className="pl-12 h-12 bg-white border-amber-200 text-gray-900 focus:border-amber-300 focus:ring-amber-300"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{ backgroundColor: 'white' }}
         />
       </motion.div>
 
       {/* Tabs */}
-      <Tabs defaultValue="all" className="space-y-6">
-        <TabsList className="bg-[var(--card)] border border-[var(--border)]">
-          <TabsTrigger value="all">Tất cả</TabsTrigger>
-          <TabsTrigger value="new">Mới</TabsTrigger>
-          <TabsTrigger value="processing">Đang xử lý</TabsTrigger>
-          <TabsTrigger value="resolved">Đã xử lý</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="all">
-          <motion.div
-            variants={container}
-            initial="hidden"
-            animate="show"
-            className="space-y-4"
-          >
-            {filterReports("all").map((report) => (
-              <ReportCard key={report.id} report={report} />
-            ))}
-          </motion.div>
-        </TabsContent>
-
-        <TabsContent value="new">
-          <motion.div
-            variants={container}
-            initial="hidden"
-            animate="show"
-            className="space-y-4"
-          >
-            {filterReports("new").map((report) => (
-              <ReportCard key={report.id} report={report} />
-            ))}
-          </motion.div>
-        </TabsContent>
-
-        <TabsContent value="processing">
-          <motion.div
-            variants={container}
-            initial="hidden"
-            animate="show"
-            className="space-y-4"
-          >
-            {filterReports("processing").map((report) => (
-              <ReportCard key={report.id} report={report} />
-            ))}
-          </motion.div>
-        </TabsContent>
-
-        <TabsContent value="resolved">
-          <motion.div
-            variants={container}
-            initial="hidden"
-            animate="show"
-            className="space-y-4"
-          >
-            {filterReports("resolved").map((report) => (
-              <ReportCard key={report.id} report={report} />
-            ))}
-          </motion.div>
-        </TabsContent>
-      </Tabs>
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Tabs 
+          defaultValue="pending" 
+          onValueChange={(value) => setActiveTab(value as CommentStatus)}
+          className="space-y-6"
+        >
+          <TabsList className="bg-white border border-amber-200 p-1 rounded-lg shadow-sm">
+            <TabsTrigger 
+              value="pending" 
+              className="data-[state=active]:bg-amber-100 data-[state=active]:text-amber-800 data-[state=active]:border data-[state=active]:border-amber-300 rounded-md transition-colors"
+            >
+              Mới (Chờ duyệt)
+            </TabsTrigger>
+            <TabsTrigger 
+              value="approved"
+              className="data-[state=active]:bg-green-100 data-[state=active]:text-green-800 data-[state=active]:border data-[state=active]:border-green-300 rounded-md transition-colors"
+            >
+              Đã duyệt
+            </TabsTrigger>
+            <TabsTrigger 
+              value="removed"
+              className="data-[state=active]:bg-red-100 data-[state=active]:text-red-800 data-[state=active]:border data-[state=active]:border-red-300 rounded-md transition-colors"
+            >
+              Đã gỡ
+            </TabsTrigger>
+          </TabsList>
+          
+          {/* Content cho các tab */}
+          <TabsContent value="pending" className="m-0">
+            <CommentTable
+              comments={filteredComments}
+              isLoading={isLoading}
+              error={error}
+              onAction={handleAction}
+              showActions={true}
+            />
+          </TabsContent>
+          <TabsContent value="approved" className="m-0">
+            <CommentTable
+              comments={filteredComments}
+              isLoading={isLoading}
+              error={error}
+              onAction={handleAction}
+              showActions={false}
+            />
+          </TabsContent>
+          <TabsContent value="removed" className="m-0">
+            <CommentTable
+              comments={filteredComments}
+              isLoading={isLoading}
+              error={error}
+              onAction={handleAction}
+              showActions={false}
+            />
+          </TabsContent>
+        </Tabs>
+      </motion.div>
     </div>
+  );
+}
+
+// Component Bảng - Cập nhật với palette #F0EAD6
+function CommentTable({
+  comments,
+  isLoading,
+  error,
+  onAction,
+  showActions = true,
+}: {
+  comments: CommentItem[];
+  isLoading: boolean;
+  error: string | null;
+  onAction: (commentId: string, action: "approve" | "remove") => void;
+  showActions?: boolean;
+}) {
+
+  const getStatusBadge = (status: CommentStatus) => {
+    switch (status) {
+      case "pending":
+        return (
+          <Badge 
+            variant="outline" 
+            className="bg-amber-50 text-amber-700 border-amber-200 font-medium"
+          >
+            Chờ duyệt
+          </Badge>
+        );
+      case "approved":
+        return (
+          <Badge 
+            variant="outline" 
+            className="bg-green-50 text-green-700 border-green-200 font-medium"
+          >
+            Đã duyệt
+          </Badge>
+        );
+      case "removed":
+        return (
+          <Badge 
+            variant="outline" 
+            className="bg-red-50 text-red-700 border-red-200 font-medium"
+          >
+            Đã gỡ
+          </Badge>
+        );
+    }
+  };
+  
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64 bg-white rounded-xl border border-amber-200">
+        <Loader2 className="w-8 h-8 animate-spin text-amber-600" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-64 text-red-700 bg-red-50 rounded-xl border border-red-200">
+        <AlertCircle className="w-8 h-8 mr-2" /> Lỗi: {error}
+      </div>
+    );
+  }
+
+  if (comments.length === 0) {
+    return (
+      <div className="flex justify-center items-center h-64 text-gray-600 bg-white rounded-xl border border-amber-200">
+        Không có bình luận nào trong mục này.
+      </div>
+    );
+  }
+
+  return (
+    <Card className="overflow-hidden border border-amber-200 bg-white rounded-xl shadow-sm">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-amber-50/70 border-b border-amber-200 hover:bg-amber-50">
+            <TableHead className="py-4 px-6 text-xs font-medium text-amber-800 uppercase tracking-wider">Người dùng</TableHead>
+            <TableHead className="py-4 px-6 text-xs font-medium text-amber-800 uppercase tracking-wider">Nội dung bình luận</TableHead>
+            <TableHead className="py-4 px-6 text-xs font-medium text-amber-800 uppercase tracking-wider">Vị trí</TableHead>
+            <TableHead className="py-4 px-6 text-xs font-medium text-amber-800 uppercase tracking-wider">Thời gian</TableHead>
+            <TableHead className="py-4 px-6 text-xs font-medium text-amber-800 uppercase tracking-wider text-right">Trạng thái</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {comments.map((comment) => (
+            <TableRow 
+              key={comment.commentId} 
+              className="border-b border-amber-100 hover:bg-amber-50/30 transition-colors"
+            >
+              
+              {/* CỘT: NGƯỜI DÙNG */}
+              <TableCell className="py-4 px-6">
+                <div className="flex items-center gap-3">
+                  <Avatar className="w-9 h-9 border border-amber-200 shadow-sm">
+                    <AvatarImage src={comment.avatarUrl || undefined} />
+                    <AvatarFallback className="bg-amber-100 text-amber-700 text-sm font-medium">
+                      {comment.username.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <span className="font-medium text-gray-900 text-sm block">{comment.username}</span>
+                    <span className="text-amber-600 text-xs">@{comment.readerId}</span>
+                  </div>
+                </div>
+              </TableCell>
+              
+              {/* CỘT: NỘI DUNG BÌNH LUẬN */}
+              <TableCell className="py-4 px-6 max-w-md">
+                <p className="text-gray-900 text-sm leading-relaxed">{comment.content}</p>
+              </TableCell>
+
+              {/* CỘT: VỊ TRÍ */}
+              <TableCell className="py-4 px-6">
+                <div className="text-sm">
+                  <p className="text-gray-900 font-medium">{comment.storyTitle}</p>
+                  <p className="text-amber-700 text-xs mt-1">Chương {comment.chapterNo}: {comment.chapterTitle}</p>
+                </div>
+              </TableCell>
+
+              {/* CỘT: THỜI GIAN */}
+              <TableCell className="py-4 px-6">
+                <div className="text-sm text-amber-700 font-medium">
+                  {moment(comment.createdAt).fromNow()}
+                </div>
+              </TableCell>
+
+              {/* CỘT: TRẠNG THÁI & HÀNH ĐỘNG */}
+              <TableCell className="py-4 px-6 text-right">
+                <div className="flex items-center justify-end gap-3">
+                  {/* Hiển thị badge trạng thái */}
+                  {getStatusBadge(comment.status)}
+                  
+                  {/* Chỉ hiển thị nút hành động nếu là tab "pending" và showActions = true */}
+                  {showActions && comment.status === "pending" && (
+                    <div className="flex gap-2 ml-3">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-8 w-8 p-0 border-green-300 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 shadow-sm"
+                        onClick={() => onAction(comment.commentId, 'approve')}
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-8 w-8 p-0 border-red-300 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 shadow-sm"
+                        onClick={() => onAction(comment.commentId, 'remove')}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
   );
 }

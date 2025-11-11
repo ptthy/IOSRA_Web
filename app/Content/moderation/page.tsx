@@ -8,19 +8,8 @@ import { RejectModal } from "./components/reject-modal";
 import { ReportsList } from "./components/report-list";
 import { toast } from "sonner"; // Import toast để dùng
 
-interface Report {
-  id: number;
-  priority: string;
-  reportCount: number;
-  storyTitle: string;
-  chapter: string;
-  reporter: string;
-  reportDate: string;
-  reportType: string;
-  reason: string;
-  content: string;
-  status: string;
-}
+// ✅ SỬA 1: Xóa Interface 'Report' (vì logic đã chuyển vào report-list)
+// interface Report { ... }
 
 export default function ModerationPage() {
   const [isApprovalOpen, setIsApprovalOpen] = useState(false);
@@ -29,7 +18,6 @@ export default function ModerationPage() {
   const searchParams = useSearchParams();
   const [selectedStory, setSelectedStory] = useState<any | null>(null);
 
-  // đọc query param ?tab=reports | sent-back
   useEffect(() => {
     const tab = searchParams.get("tab") as "reports" | "sent-back" | null;
     if (tab && (tab === "reports" || tab === "sent-back")) {
@@ -37,71 +25,47 @@ export default function ModerationPage() {
     }
   }, [searchParams]);
 
-  const handleReportAction = (report: Report) => {
-    console.log("ReportsList handled report:", report);
-  };
+  // ✅ SỬA 2: Xóa hàm 'handleReportAction' (không còn dùng)
+  // const handleReportAction = (report: Report) => {
+  //   console.log("ReportsList handled report:", report);
+  // };
 
   const handleSentBackReview = (content: any) => {
     console.log("SentBackList review clicked:", content);
     setSelectedStory(content);
   };
 
-  // ✅ SỬA LỖI: Đổi tham số từ 'languages: string[]' thành 'reason: string'
   const handleApprovalConfirm = (reason: string) => {
     console.log("Approval reason:", reason);
-    
-    // (Thêm logic gọi API duyệt ở đây)
-    // Ví dụ:
-    // toast.promise(async () => {
-    //   await apiApproveSentBack(selectedStory.id, reason);
-    //   setSelectedStory(null); // Quay lại danh sách
-    // }, {
-    //   loading: "Đang duyệt...",
-    //   success: "Duyệt thành công!",
-    //   error: "Duyệt thất bại."
-    // });
-
-    toast.success("Đã duyệt (chưa gọi API thật)"); // Thông báo tạm thời
+    // (Logic duyệt truyện 'sent-back' ở đây)
+    toast.success("Đã duyệt (chưa gọi API thật)");
     setIsApprovalOpen(false);
+    setSelectedStory(null); // Quay lại danh sách
   };
 
   const handleRejectConfirm = (reason: string) => {
     console.log("Rejection reason:", reason);
-
-    // (Thêm logic gọi API từ chối ở đây)
-    // Ví dụ:
-    // toast.promise(async () => {
-    //   await apiRejectSentBack(selectedStory.id, reason);
-    //   setSelectedStory(null); // Quay lại danh sách
-    // }, {
-    //   loading: "Đang từ chối...",
-    //   success: "Từ chối thành công!",
-    //   error: "Từ chối thất bại."
-    // });
-    
-    toast.error("Đã từ chối (chưa gọi API thật)"); // Thông báo tạm thời
+    // (Logic từ chối truyện 'sent-back' ở đây)
+    toast.error("Đã từ chối (chưa gọi API thật)");
     setIsRejectOpen(false);
+    setSelectedStory(null); // Quay lại danh sách
   };
 
   return (
     <div className="space-y-6">
-      {/* === Nếu bạn cần tab UI ở tương lai, thả vào đây === */}
-      {/* Hiện tại logic tab lấy từ query param nên không render tab bar */}
-
       {/* Reports */}
-      {activeTab === "reports" && <ReportsList onHandle={handleReportAction} />}
+      {/* ✅ SỬA 3: Xóa prop 'onHandle' */}
+      {activeTab === "reports" && <ReportsList />}
 
       {/* Sent back list (list view) */}
       {activeTab === "sent-back" && !selectedStory && (
-        // Không set full-page padding / background ở đây — layout sẽ handle padding & width
         <div className="space-y-6">
           <SentBackList onReview={handleSentBackReview} />
         </div>
       )}
 
-      {/* Sent back — chi tiết 1 item */}
+      {/* Sent back — chi tiết 1 item (Giữ nguyên) */}
       {activeTab === "sent-back" && selectedStory && (
-        // Dùng var tokens đúng, không dùng bg-card (sai)
         <div className="bg-[var(--card)] text-[var(--foreground)] p-6 rounded-xl shadow-sm border border-[var(--border)]">
           <h2 className="text-2xl font-semibold mb-3">{selectedStory.title}</h2>
 
@@ -144,11 +108,11 @@ export default function ModerationPage() {
         </div>
       )}
 
-      {/* Modals */}
+      {/* Modals (Giữ nguyên) */}
       <ApprovalModal
         isOpen={isApprovalOpen}
         onClose={() => setIsApprovalOpen(false)}
-        onConfirm={handleApprovalConfirm} // Bây giờ đã hợp lệ
+        onConfirm={handleApprovalConfirm}
       />
 
       <RejectModal
