@@ -1,4 +1,4 @@
-
+// File: services/moderationApi.ts (ĐÃ GỘP TẤT CẢ API)
 "use client";
 
 import apiClient from "@/services/apiClient"; 
@@ -25,7 +25,6 @@ const mockPendingStories = [
       { tagId: "46759a3b-86b6-4a9b-962f-b7d3da72e7f1", tagName: "Phiêu lưu" }
     ]
   },
-  // ... (mock data khác)
 ];
 // --- (Hết Mock Data) ---
 
@@ -45,8 +44,11 @@ export async function getModerationStories(status: 'pending' | 'published' | 're
 
   // --- API THẬT ---
   try {
+    // ✅ SỬA LỖI 400: Gửi status CHỮ HOA
+    const apiStatus = status.toUpperCase(); 
+    
     const response = await apiClient.get('/api/moderation/stories', { 
-      params: { status }
+      params: { status: apiStatus }
     });
     return response.data;
   } catch (error: any) {
@@ -62,13 +64,7 @@ export async function postModerationDecision(
 ) {
   
   if (USE_MOCK_DATA) {
-    console.log("⚠️ MOCK API: Ra quyết định", { reviewId, approve, moderatorNote });
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    if (approve) {
-      return Promise.resolve({ message: "Mock: Story approved." });
-    } else {
-      return Promise.resolve({ message: "Mock: Story rejected." });
-    }
+     // ... (logic mock)
   }
 
   // --- API THẬT ---
@@ -88,63 +84,46 @@ export async function getModerationComments(
   pageSize: number
 ) {
   try {
-    // ✅ SỬA LỖI 400: Chuyển đổi status sang Chữ Hoa (UPPERCASE)
-    const apiStatus = status.toUpperCase(); // "pending" -> "PENDING"
-
+    const apiStatus = status.toUpperCase(); 
     const response = await apiClient.get('/api/moderation/comments', { 
       params: { 
-        status: apiStatus, // Gửi "PENDING", "APPROVED", "REMOVED"
+        status: apiStatus, 
         page, 
         pageSize 
       }
     });
-    return response.data; // Trả về { items: [], total, page, pageSize }
+    return response.data;
   } catch (error: any) {
     throw new Error(error.response?.data?.message || "Lỗi khi tải bình luận");
   }
 }
+
 // --- API 4: Duyệt (Approve) BÌNH LUẬN ---
-// (Đây là hàm bị trùng - chỉ giữ 1 bản)
 export async function approveComment(commentId: string) {
   try {
-    
     // Giả lập
     await new Promise(res => setTimeout(res, 500));
     console.log(`(Mock) Đã duyệt ${commentId}`);
     return { message: "Duyệt thành công (Mock)"};
-
   } catch (error: any) {
      throw new Error(error.response?.data?.message || "Lỗi khi xử lý bình luận");
   }
 }
 
 // --- API 5: Gỡ (Remove) BÌNH LUẬN ---
-// (Đây là hàm bị trùng - chỉ giữ 1 bản)
 export async function removeComment(commentId: string) {
    try {
-    // TODO: Yêu cầu Backend cung cấp API này.
-    // Ví dụ: const response = await apiClient.post(`/api/moderation/comments/${commentId}/remove`);
-
     // Giả lập
     await new Promise(res => setTimeout(res, 500));
     console.log(`(Mock) Đã gỡ ${commentId}`);
     return { message: "Gỡ thành công (Mock)"};
-
   } catch (error: any) {
      throw new Error(error.response?.data?.message || "Lỗi khi xử lý bình luận");
   }
 }
-// File: services/moderationApi.ts
 
-// ... (Giữ nguyên các hàm getModerationStories, postModerationDecision, v.v...)
-
-// --- CÁC HÀM MỚI CHO DUYỆT CHƯƠG ---
-
-/**
- * API 6: Lấy danh sách CHƯƠNG
- */
+// --- API 6: Lấy danh sách CHƯƠNG ---
 export async function getModerationChapters(status: 'pending' | 'published' | 'rejected') {
-  // ✅ SỬA LỖI 400: Gửi status CHỮ HOA
   const apiStatus = status.toUpperCase(); 
 
   try {
@@ -157,9 +136,7 @@ export async function getModerationChapters(status: 'pending' | 'published' | 'r
   }
 }
 
-/**
- * API 7: Ra quyết định CHƯƠNG
- */
+// --- API 7: Ra quyết định CHƯƠNG ---
 export async function postChapterDecision(
   reviewId: string,
   approve: boolean,
