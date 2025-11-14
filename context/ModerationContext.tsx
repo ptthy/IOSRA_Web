@@ -1,53 +1,59 @@
-// File: context/ModerationContext.tsx (ĐÃ SỬA)
+// File: context/ModerationContext.tsx (ĐÃ SỬA LỖI TYPE)
 "use client";
 
-import React, { 
-  createContext, 
-  useContext, 
-  useState, 
-  ReactNode, 
-  useCallback, // ✅ SỬA 1: Import useCallback
-  useMemo      // ✅ SỬA 2: Import useMemo
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  ReactNode,
 } from "react";
 
-// Định nghĩa các loại số đếm
+// ✅ SỬA 1: Định nghĩa kiểu (type) cho 'counts'
+// (Thêm 'chaptersPending' cho trang "Duyệt Chương" mới)
 interface ModerationCounts {
   pending: number;
   sentBack: number;
   reports: number;
+  chaptersPending: number; 
 }
+
+// ✅ SỬA 2: Định nghĩa kiểu cho Context
+// Nó sẽ cung cấp 'counts' VÀ hàm 'updateCount'
+type CountKey = keyof ModerationCounts; // 'pending' | 'sentBack' | ...
 
 interface ModerationContextType {
   counts: ModerationCounts;
-  updateCount: (key: keyof ModerationCounts, value: number) => void;
+  updateCount: (key: CountKey, value: number) => void;
 }
 
-// Tạo Context
+// ✅ SỬA 3: Áp dụng kiểu 'ModerationContextType' cho Context
+// (Khởi tạo là 'undefined' vì chưa có Provider)
 const ModerationContext = createContext<ModerationContextType | undefined>(
   undefined
 );
 
-// Tạo Provider (component cha bọc ngoài)
+// --- Provider Component (Phần cung cấp dữ liệu) ---
 export const ModerationProvider = ({ children }: { children: ReactNode }) => {
+  
+  // ✅ SỬA 4: Áp dụng kiểu 'ModerationCounts' cho state
   const [counts, setCounts] = useState<ModerationCounts>({
-    pending: 0, 
-    sentBack: 7, 
-    reports: 12, 
+    pending: 0,
+    sentBack: 0,
+    reports: 0,
+    chaptersPending: 0, // Thêm giá trị mặc định
   });
 
-  // ✅ SỬA 3: Ổn định hàm 'updateCount' bằng useCallback
-  const updateCount = useCallback((key: keyof ModerationCounts, value: number) => {
+  // ✅ SỬA 5: Dùng 'CountKey' để gõ (type) chính xác cho 'key'
+  const updateCount = useCallback((key: CountKey, value: number) => {
     setCounts((prev) => ({
       ...prev,
       [key]: value,
     }));
-  }, []); // Mảng rỗng = hàm này chỉ được tạo 1 lần
+  }, []);
 
-  // ✅ SỬA 4: Ổn định đối tượng 'value' bằng useMemo
-  const value = useMemo(() => ({
-    counts,
-    updateCount
-  }), [counts, updateCount]); // Chỉ tạo object mới khi 'counts' thay đổi
+  // Giá trị cung cấp cho Context (khớp với ModerationContextType)
+  const value = { counts, updateCount };
 
   return (
     <ModerationContext.Provider value={value}>
@@ -56,11 +62,14 @@ export const ModerationProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// Tạo Hook (để component con lấy dữ liệu)
-export const useModeration = (): ModerationContextType => {
+// --- Hook (Phần tiêu thụ dữ liệu) ---
+export const useModeration = () => {
   const context = useContext(ModerationContext);
-  if (!context) {
+  
+  // ✅ SỬA 6: Kiểm tra nếu context là 'undefined' (lỗi phổ biến)
+  if (context === undefined) {
     throw new Error("useModeration phải được dùng bên trong ModerationProvider");
   }
+  
   return context;
 };
