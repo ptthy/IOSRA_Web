@@ -134,3 +134,42 @@ export async function removeComment(commentId: string) {
      throw new Error(error.response?.data?.message || "Lỗi khi xử lý bình luận");
   }
 }
+// File: services/moderationApi.ts
+
+// ... (Giữ nguyên các hàm getModerationStories, postModerationDecision, v.v...)
+
+// --- CÁC HÀM MỚI CHO DUYỆT CHƯƠG ---
+
+/**
+ * API 6: Lấy danh sách CHƯƠNG
+ */
+export async function getModerationChapters(status: 'pending' | 'published' | 'rejected') {
+  // ✅ SỬA LỖI 400: Gửi status CHỮ HOA
+  const apiStatus = status.toUpperCase(); 
+
+  try {
+    const response = await apiClient.get('/api/moderation/chapters', { 
+      params: { status: apiStatus }
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Lỗi khi tải danh sách chương");
+  }
+}
+
+/**
+ * API 7: Ra quyết định CHƯƠNG
+ */
+export async function postChapterDecision(
+  reviewId: string,
+  approve: boolean,
+  moderatorNote: string
+) {
+  try {
+    const payload = { approve, moderatorNote };
+    const response = await apiClient.post(`/api/moderation/chapters/${reviewId}/decision`, payload);
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Lỗi khi gửi quyết định chương");
+  }
+}

@@ -1,4 +1,4 @@
-
+// File: app/Content/layout.tsx (CẬP NHẬT)
 "use client";
 
 import { useState, useEffect } from "react";
@@ -22,20 +22,22 @@ export default function ContentLayout({
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
-    // ✅ SỬA 1: Thêm logic cho 'tags'
+    // ✅ SỬA 1: Thêm logic cho 'chapters'
     const getCurrentPageFromPath = (path: string) => {
       if (path.includes("/Content/dashboard")) return "dashboard";
       if (path.includes("/Content/review")) {
         if (path.includes("history")) return "history";
         return "content-list";
       }
+      // ✅ THÊM DÒNG MỚI:
+      if (path.includes("/Content/chapters")) return "chapters"; 
       if (path.includes("/Content/moderation")) {
         if (path.includes("reports")) return "reports";
         if (path.includes("sent-back")) return "sent-back";
         return "reports"; // Fallback
       }
       if (path.includes("/Content/statistics")) return "statistics";
-      if (path.includes("/Content/tags")) return "tags"; // <-- THÊM DÒNG NÀY
+      if (path.includes("/Content/tags")) return "tags"; 
       if (path.includes("/Content/settings")) return "settings";
       return "dashboard"; // Fallback
     };
@@ -84,7 +86,7 @@ export default function ContentLayout({
 
         {/* Cấu trúc Layout (Giữ nguyên) */}
         <SidebarInset className="flex flex-col h-screen"> 
-         
+    
           <main className="flex-1 p-6 overflow-y-auto transition-colors duration-300 bg-[var(--background)]">
             {children}
           </main>

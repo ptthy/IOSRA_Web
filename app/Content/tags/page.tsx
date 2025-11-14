@@ -1,9 +1,8 @@
-
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, BookOpen } from "lucide-react";
+import { PlusCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Poppins } from "next/font/google";
@@ -20,7 +19,7 @@ export default function TagManagementPage() {
   const [tags, setTags] = useState<TagPagedItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // (State cho các Modal CRUD sau này)
   // const [showCreateModal, setShowCreateModal] = useState(false);
   // const [showEditModal, setShowEditModal] = useState<TagPagedItem | null>(null);
@@ -53,8 +52,8 @@ export default function TagManagementPage() {
   };
 
   const handleDeleteTag = (tag: TagPagedItem) => {
-     toast.error(`Chức năng 'Xóa Tag' [${tag.name}] chưa được kết nối API.`);
-     // setShowDeleteModal(tag);
+    toast.error(`Chức năng 'Xóa Tag' [${tag.name}] chưa được kết nối API.`);
+    // setShowDeleteModal(tag);
   };
 
   // Tính tổng số truyện đang sử dụng tags
@@ -68,28 +67,28 @@ export default function TagManagementPage() {
         animate={{ opacity: 1, y: 0 }}
         className="mb-8"
       >
-        <div className="flex justify-between items-start">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <BookOpen className="w-6 h-6 text-blue-600" />
-              </div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Quản lý Thể loại
-              </h1>
-            </div>
-            <p className="text-gray-600 mb-2">
+            <h1 className="text-3xl font-bold text-[var(--primary)]">
+              Quản lý Thể loại
+            </h1>
+            <p className="text-[var(--muted-foreground)] mb-3">
               Quản lý danh sách thể loại truyện và theo dõi mức độ phổ biến
             </p>
+
             {tags.length > 0 && (
-              <div className="flex items-center gap-4 text-sm text-gray-500">
-                <span>{tags.length} thể loại</span>
-                <span>•</span>
-                <span>{totalUsage.toLocaleString()} truyện đang sử dụng</span>
+              <div className="flex items-center gap-3 mt-2">
+                <div className="px-3 py-1 bg-[var(--primary)]/10 text-[var(--primary)] font-medium rounded-full text-sm shadow-sm">
+                  {tags.length} thể loại
+                </div>
+                <div className="px-3 py-1 bg-[var(--muted-foreground)]/10 text-[var(--muted-foreground)] font-medium rounded-full text-sm shadow-sm">
+                  {totalUsage.toLocaleString()} truyện đang sử dụng
+                </div>
               </div>
             )}
           </div>
-          <Button 
+
+          <Button
             onClick={handleCreateTag}
             className="bg-blue-600 hover:bg-blue-700 shadow-sm"
           >
@@ -114,11 +113,11 @@ export default function TagManagementPage() {
         />
       </motion.div>
 
-      {/* (Bạn sẽ thêm các Modal CRUD ở đây) */}
+      {/* (Các Modal CRUD thêm sau này) */}
       {/* <CreateTagModal 
           isOpen={showCreateModal} 
           onClose={() => setShowCreateModal(false)} 
-          onSuccess={() => loadTags()} // Tải lại data sau khi tạo
+          onSuccess={() => loadTags()} 
       /> */}
     </div>
   );
