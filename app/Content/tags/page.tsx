@@ -60,7 +60,18 @@ export default function TagManagementPage() {
   const totalUsage = tags.reduce((sum, tag) => sum + tag.usage, 0);
 
   return (
-    <div className={cn("min-h-screen bg-[#F0EAD6] p-6", poppins.className)}>
+    <div
+      className={cn(
+        "min-h-screen p-8 transition-colors duration-300",
+        poppins.className
+      )}
+      style={{
+        backgroundColor: "var(--background)",
+        color: "var(--foreground)",
+      }}
+    >
+
+
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}

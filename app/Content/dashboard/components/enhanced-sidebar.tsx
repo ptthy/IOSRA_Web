@@ -66,8 +66,8 @@ export function EnhancedSidebar({
   return (
     <>
       {/* Header sidebar */}
-      <SidebarHeader>
-        <div className="flex items-center gap-4 px-6 h-16 border-b transition-colors duration-300 bg-[var(--card)] border-[var(--border)]">
+     <SidebarHeader>
+        <div className="flex items-center gap-4 px-6 h-16 transition-colors duration-300 bg-[var(--card)]">
           <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center shadow-sm flex-shrink-0">
             <BookOpen className="w-6 h-6 text-[var(--primary)]" />
           </div>
