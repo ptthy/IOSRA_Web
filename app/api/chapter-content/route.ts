@@ -15,24 +15,45 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const contentUrl = `${R2_BASE_URL}/${contentPath}`;
-    console.log("🔍 [API] Fetching content from:", contentUrl);
+    // Đảm bảo path không có slash dư thừa
+    const cleanPath = contentPath.startsWith("/")
+      ? contentPath.slice(1)
+      : contentPath;
+    const contentUrl = `${R2_BASE_URL}/${cleanPath}`;
 
-    const response = await fetch(contentUrl);
+    console.log("🔍 [API Proxy] Fetching content from:", contentUrl);
+
+    const response = await fetch(contentUrl, {
+      headers: {
+        Accept: "text/plain, */*",
+      },
+    });
 
     if (!response.ok) {
+      console.error("❌ [API Proxy] R2 response not OK:", response.status);
       return NextResponse.json(
-        { error: "Failed to fetch content" },
+        { error: `Failed to fetch content: ${response.status}` },
         { status: response.status }
       );
     }
 
     const text = await response.text();
-    return NextResponse.json({ content: text });
+    console.log(
+      "✅ [API Proxy] Successfully fetched content, length:",
+      text.length
+    );
+
+    return NextResponse.json({
+      content: text,
+      source: "proxy",
+    });
   } catch (error) {
-    console.error("❌ [API] Error fetching chapter content:", error);
+    console.error("❌ [API Proxy] Error fetching chapter content:", error);
+    // Xử lý lỗi TypeScript
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: `Internal server error: ${errorMessage}` },
       { status: 500 }
     );
   }

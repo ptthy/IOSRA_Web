@@ -280,7 +280,8 @@ export default function StoryDetailPage() {
                         Điểm AI
                       </p>
                       <p className="text-sm font-semibold text-primary">
-                        {story.aiScore.toFixed(2)} / 1.00
+                        {/* Sửa từ 0-1 sang 1-10 */}
+                        {story.aiScore.toFixed(1)} / 10.0
                       </p>
                     </div>
                     <div>
@@ -288,7 +289,8 @@ export default function StoryDetailPage() {
                         Kết quả
                       </p>
                       <p className="text-sm">
-                        {story.aiScore >= 0.5 ? "✅ Đạt" : "❌ Không đạt"}
+                        {/* Cập nhật ngưỡng từ 0.5 (tương đương 5/10) sang 5 */}
+                        {story.aiScore * 10 >= 5 ? "✅ Đạt" : "❌ Không đạt"}
                       </p>
                     </div>
                   </>

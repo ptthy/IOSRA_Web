@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css"; /* Giữ lại từ nhánh main */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'); /* Giữ lại từ nhánh main */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"); /* Giữ lại từ nhánh main */
 
 /* ✅ Base setup */
 @custom-variant dark (&:is(.dark *)); /* Giữ lại từ nhánh main */
@@ -149,4 +149,186 @@
 /* Fix z-index cho Dropdown */
 [data-radix-popper-content-wrapper] {
   z-index: 9999 !important;
+}
+.rich-text-content h1,
+.rich-text-content h2,
+.rich-text-content h3 {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: bold;
+}
+
+.rich-text-content h1 {
+  font-size: 1.5em;
+}
+.rich-text-content h2 {
+  font-size: 1.3em;
+}
+.rich-text-content h3 {
+  font-size: 1.1em;
+}
+
+.rich-text-content p {
+  margin-bottom: 1em;
+  line-height: 1.6;
+}
+
+.rich-text-content strong,
+.rich-text-content b {
+  font-weight: bold;
+}
+
+.rich-text-content em,
+.rich-text-content i {
+  font-style: italic;
+}
+
+.rich-text-content u {
+  text-decoration: underline;
+}
+
+.rich-text-content s,
+.rich-text-content strike {
+  text-decoration: line-through;
+}
+
+.rich-text-content blockquote {
+  border-left: 4px solid #ddd;
+  padding-left: 1em;
+  margin: 1em 0;
+  font-style: italic;
+}
+
+.rich-text-content ul,
+.rich-text-content ol {
+  margin: 1em 0;
+  padding-left: 2em;
+}
+
+.rich-text-content li {
+  margin-bottom: 0.5em;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-in-out;
+}
+.markdown-content {
+  line-height: 1.8;
+}
+
+.markdown-content p {
+  margin-bottom: 1rem;
+  text-align: justify;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+  font-weight: bold;
+}
+
+.markdown-content h1 {
+  font-size: 2rem;
+}
+.markdown-content h2 {
+  font-size: 1.75rem;
+}
+.markdown-content h3 {
+  font-size: 1.5rem;
+}
+.markdown-content h4 {
+  font-size: 1.25rem;
+}
+.markdown-content h5 {
+  font-size: 1.1rem;
+}
+.markdown-content h6 {
+  font-size: 1rem;
+}
+
+.markdown-content strong {
+  font-weight: bold;
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+.markdown-content del {
+  text-decoration: line-through;
+}
+
+.markdown-content blockquote {
+  border-left: 4px solid #00416a;
+  padding-left: 1rem;
+  margin-left: 0;
+  margin-right: 0;
+  font-style: italic;
+  color: #666;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin-bottom: 1rem;
+  padding-left: 2rem;
+}
+
+.markdown-content li {
+  margin-bottom: 0.5rem;
+}
+
+.markdown-content code {
+  background-color: #f4f4f4;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.25rem;
+  font-family: monospace;
+}
+
+/* HTML content styles */
+.html-content p {
+  margin-bottom: 1rem;
+  text-align: justify;
+  line-height: 1.8;
+}
+
+.html-content strong {
+  font-weight: bold;
+}
+
+.html-content em {
+  font-style: italic;
+}
+
+.html-content blockquote {
+  border-left: 4px solid #00416a;
+  padding-left: 1rem;
+  margin-left: 0;
+  margin-right: 0;
+  font-style: italic;
+  color: #666;
+}
+
+/* Plain text content styles */
+.plain-content p {
+  margin-bottom: 1rem;
+  text-align: justify;
+  line-height: 1.8;
+}
+.ql-editor {
+  min-height: 400px;
 }

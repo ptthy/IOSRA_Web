@@ -100,6 +100,7 @@ export default function RegisterRoute() {
           username: backendUsername,
           email: backendEmail,
           role: roles && roles.length > 0 ? roles[0] : "reader",
+          isPremium: false,
         };
 
         // Đăng nhập thành công

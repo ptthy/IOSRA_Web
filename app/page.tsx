@@ -1,530 +1,870 @@
+// // // app/page.tsx
+// // "use client";
+
+// // import { useState, useEffect } from "react";
+// // import { useRouter } from "next/navigation";
+// // import { useAuth } from "@/context/AuthContext";
+// // import { Navbar } from "@/components/navbar";
+// // import { Button } from "@/components/ui/button";
+// // import { HeroCarousel } from "@/components/ads/hero-carousel";
+// // import { SecondaryBanner } from "@/components/ads/secondary-banner";
+// // import { RankBadge } from "@/components/rank-badge";
+// // import { Book, TrendingUp, Clock, ChevronRight, Eye } from "lucide-react";
+// // import { storyCatalogApi } from "@/services/storyCatalog";
+// // import type { Story, TopWeeklyStory } from "@/services/storyCatalog";
+
+// // // Component con để handle image với fallback
+// // function StoryImage({
+// //   src,
+// //   alt,
+// //   className,
+// // }: {
+// //   src: string;
+// //   alt: string;
+// //   className?: string;
+// // }) {
+// //   const [imageError, setImageError] = useState(false);
+
+// //   const ERROR_IMG_SRC =
+// //     "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==";
+
+// //   if (imageError) {
+// //     return (
+// //       <div
+// //         className={`flex items-center justify-center bg-muted ${
+// //           className || ""
+// //         }`}
+// //       >
+// //         <img
+// //           src={ERROR_IMG_SRC}
+// //           alt="Error loading image"
+// //           className="w-20 h-20 opacity-50"
+// //         />
+// //       </div>
+// //     );
+// //   }
+
+// //   return (
+// //     <img
+// //       src={src}
+// //       alt={alt}
+// //       className={className}
+// //       onError={() => setImageError(true)}
+// //     />
+// //   );
+// // }
+
+// // // ĐỊNH NGHĨA PROPS CHO STORYCARD VỚI weeklyViewCount
+// // interface CustomStoryCardProps {
+// //   story: Story;
+// //   onClick: () => void;
+// //   weeklyViewCount?: number;
+// // }
+
+// // //  COMPONENT STORYCARD CUSTOM -
+// // function CustomStoryCard({
+// //   story,
+// //   onClick,
+// //   weeklyViewCount,
+// // }: CustomStoryCardProps) {
+// //   return (
+// //     <div
+// //       className="cursor-pointer transform transition-transform hover:scale-105 w-48 flex-shrink-0 h-full"
+// //       onClick={onClick}
+// //     >
+// //       <div className="bg-card rounded-lg shadow-md overflow-hidden border border-border h-full flex flex-col">
+// //         {/* Story Image */}
+// //         <div className="relative aspect-[3/4] overflow-hidden flex-shrink-0">
+// //           <StoryImage
+// //             src={story.coverUrl}
+// //             alt={story.title}
+// //             className="w-full h-full object-cover"
+// //           />
+// //           {story.isPremium && (
+// //             <div className="absolute top-2 right-2">
+// //               <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
+// //                 Premium
+// //               </span>
+// //             </div>
+// //           )}
+// //         </div>
+
+// //         {/* Story Info */}
+// //         <div className="p-3 flex-1 flex flex-col min-h-0">
+// //           <h3 className="font-semibold text-sm line-clamp-2 mb-2 flex-shrink-0">
+// //             {story.title}
+// //           </h3>
+// //           <p className="text-xs text-muted-foreground mb-2 flex-shrink-0">
+// //             {story.authorUsername}
+// //           </p>
+
+// //           {weeklyViewCount !== undefined && (
+// //             <div className="flex items-center gap-1 text-xs text-muted-foreground mb-3 flex-shrink-0">
+// //               <Eye className="h-3 w-3" />
+// //               <span>{weeklyViewCount} lượt/tuần</span>
+// //             </div>
+// //           )}
+
+// //           {/* SỬA: HIỂN THỊ TAG FULL KHÔNG GIỚI HẠN */}
+// //           <div className="flex flex-wrap gap-1 mt-auto">
+// //             {story.tags.slice(0, 2).map((tag) => (
+// //               <span
+// //                 key={tag.tagId}
+// //                 className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs px-2 py-0.5 rounded flex-shrink-0 whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
+// //               >
+// //                 {tag.tagName}
+// //               </span>
+// //             ))}
+// //           </div>
+// //         </div>
+// //       </div>
+// //     </div>
+// //   );
+// // }
+
+// // export default function HomePage() {
+// //   const router = useRouter();
+// //   const { isAuthenticated, isPremium } = useAuth();
+// //   const [topWeekly, setTopWeekly] = useState<TopWeeklyStory[]>([]);
+// //   const [latestStories, setLatestStories] = useState<Story[]>([]);
+// //   const [loading, setLoading] = useState(true);
+// //   const [error, setError] = useState<string | null>(null);
+
+// //   useEffect(() => {
+// //     const loadData = async () => {
+// //       setLoading(true);
+// //       setError(null);
+// //       try {
+// //         console.log("🔄 Bắt đầu tải dữ liệu từ API...");
+
+// //         const [weeklyResponse, latestResponse] = await Promise.all([
+// //           storyCatalogApi.getTopWeeklyStories(10),
+// //           storyCatalogApi.getLatestStories(10),
+// //         ]);
+
+// //         console.log("✅ Dữ liệu nhận được:", {
+// //           topWeekly: weeklyResponse,
+// //           latestStories: latestResponse,
+// //         });
+
+// //         if (!Array.isArray(weeklyResponse)) {
+// //           throw new Error("Dữ liệu top weekly không hợp lệ");
+// //         }
+
+// //         if (!Array.isArray(latestResponse)) {
+// //           throw new Error("Dữ liệu latest stories không hợp lệ");
+// //         }
+
+// //         setTopWeekly(weeklyResponse);
+// //         setLatestStories(latestResponse);
+// //       } catch (error: any) {
+// //         console.error("❌ Lỗi tải dữ liệu:", error);
+
+// //         if (error.response) {
+// //           if (error.response.status === 404) {
+// //             setError(
+// //               "API endpoints không tồn tại. Vui lòng kiểm tra với quản trị viên."
+// //             );
+// //           } else if (error.response.status === 500) {
+// //             setError("Lỗi server. Vui lòng thử lại sau.");
+// //           } else {
+// //             setError(
+// //               `Lỗi server: ${error.response.status} - ${error.response.statusText}`
+// //             );
+// //           }
+// //         } else if (error.request) {
+// //           setError(
+// //             "Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng."
+// //           );
+// //         } else {
+// //           setError(error.message || "Có lỗi xảy ra khi tải dữ liệu.");
+// //         }
+
+// //         setTopWeekly([]);
+// //         setLatestStories([]);
+// //       } finally {
+// //         setLoading(false);
+// //       }
+// //     };
+
+// //     loadData();
+// //   }, []);
+
+// //   const handleNavigate = (page: string, storyId?: string) => {
+// //     if (storyId) {
+// //       router.push(`/${page}/${storyId}`);
+// //     } else {
+// //       router.push(`/${page}`);
+// //     }
+// //   };
+
+// //   if (loading) {
+// //     return (
+// //       <div className="min-h-screen bg-background">
+// //         <Navbar />
+// //         <div className="flex items-center justify-center min-h-[60vh]">
+// //           <div className="text-center">
+// //             <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+// //             <p className="text-muted-foreground">Đang tải...</p>
+// //           </div>
+// //         </div>
+// //       </div>
+// //     );
+// //   }
+
+// //   if (error) {
+// //     return (
+// //       <div className="min-h-screen bg-background">
+// //         <Navbar />
+// //         <div className="flex items-center justify-center min-h-[60vh]">
+// //           <div className="text-center">
+// //             <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
+// //               <Book className="h-8 w-8 text-destructive" />
+// //             </div>
+// //             <h3 className="text-lg font-semibold mb-2">Có lỗi xảy ra</h3>
+// //             <p className="text-muted-foreground mb-4">{error}</p>
+// //             <Button onClick={() => window.location.reload()}>Thử lại</Button>
+// //           </div>
+// //         </div>
+// //       </div>
+// //     );
+// //   }
+
+// //   return (
+// //     <div className="min-h-screen bg-background">
+// //       <Navbar />
+
+// //       {/* Hero Carousel */}
+// //       <div className="animate-fade-in">
+// //         <div className="container mx-auto px-4">
+// //           <HeroCarousel />
+// //         </div>
+// //       </div>
+
+// //       {/* Top Truyện Tuần */}
+// //       <section className="py-4 animate-slide-up bg-background">
+// //         {" "}
+// //         {/* GIẢM XUỐNG py-4 */}
+// //         <div className="container mx-auto px-4">
+// //           <div className="flex items-center justify-between mb-4">
+// //             {" "}
+// //             {/* GIẢM XUỐNG mb-4 */}
+// //             <div className="flex items-center gap-3">
+// //               <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10">
+// //                 <TrendingUp className="h-5 w-5 text-primary" />
+// //               </div>
+// //               <div>
+// //                 <h2 className="font-bold text-2xl md:text-3xl">
+// //                   Top Truyện Tuần
+// //                 </h2>
+// //                 <p className="text-sm text-muted-foreground mt-1">
+// //                   Những tác phẩm hot nhất tuần này
+// //                 </p>
+// //               </div>
+// //             </div>
+// //             <button
+// //               onClick={() => handleNavigate("search")}
+// //               className="flex items-center gap-1 text-sm text-primary hover:gap-2 transition-all group"
+// //             >
+// //               <span className="hidden sm:inline">Xem tất cả</span>
+// //               <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+// //             </button>
+// //           </div>
+// //           <div className="relative">
+// //             <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-custom scroll-smooth pt-1 px-0">
+// //               {" "}
+// //               {/* GIẢM gap, pb, pt */}
+// //               {topWeekly.map((item, index) => (
+// //                 <div
+// //                   key={item.story.storyId}
+// //                   className="relative flex-shrink-0"
+// //                 >
+// //                   {index < 3 && <RankBadge rank={index + 1} />}
+// //                   <CustomStoryCard
+// //                     story={item.story}
+// //                     onClick={() => handleNavigate("story", item.story.storyId)}
+// //                     weeklyViewCount={item.weeklyViewCount}
+// //                   />
+// //                 </div>
+// //               ))}
+// //             </div>
+// //           </div>
+// //         </div>
+// //       </section>
+
+// //       {/* Secondary Banner  */}
+// //       {!isPremium && (
+// //         <div className="container mx-auto px-4 py-2">
+// //           {" "}
+// //           {/* ✅ GIẢM XUỐNG py-2 */}
+// //           <SecondaryBanner />
+// //         </div>
+// //       )}
+
+// //       {/* Truyện Mới Cập Nhật  */}
+// //       <section
+// //         className="py-4 animate-slide-up"
+// //         style={{ animationDelay: "0.1s" }}
+// //       >
+// //         <div className="container mx-auto px-4">
+// //           <div className="flex items-center justify-between mb-4">
+// //             {" "}
+// //             {/* GIẢM XUỐNG mb-4 */}
+// //             <div className="flex items-center gap-3">
+// //               <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-secondary/10">
+// //                 <Clock className="h-5 w-5 text-secondary" />
+// //               </div>
+// //               <div>
+// //                 <h2 className="font-bold text-2xl md:text-3xl">
+// //                   Truyện Mới Cập Nhật
+// //                 </h2>
+// //                 <p className="text-sm text-muted-foreground mt-1">
+// //                   Những chương mới nhất vừa được đăng tải
+// //                 </p>
+// //               </div>
+// //             </div>
+// //             <button
+// //               onClick={() => handleNavigate("search")}
+// //               className="flex items-center gap-1 text-sm text-primary hover:gap-2 transition-all group"
+// //             >
+// //               <span className="hidden sm:inline">Xem tất cả</span>
+// //               <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+// //             </button>
+// //           </div>
+
+// //           <div className="relative">
+// //             <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-custom scroll-smooth pt-1 px-0">
+// //               {" "}
+// //               {/*  GIẢM gap, pb, pt */}
+// //               {latestStories.map((story) => (
+// //                 <div key={story.storyId} className="flex-shrink-0">
+// //                   <CustomStoryCard
+// //                     story={story}
+// //                     onClick={() => handleNavigate("story", story.storyId)}
+// //                   />
+// //                 </div>
+// //               ))}
+// //             </div>
+// //           </div>
+// //         </div>
+// //       </section>
+
+// //       {/* CTA Section -  */}
+// //       <section className="border-t py-8 bg-muted/50">
+// //         {" "}
+// //         {/* GIẢM XUỐNG py-8 */}
+// //         <div className="container mx-auto px-4 text-center">
+// //           <div className="max-w-2xl mx-auto">
+// //             <h2 className="text-3xl font-bold mb-4">
+// //               Bạn có câu chuyện để kể?
+// //             </h2>
+// //             <p className="text-muted-foreground mb-6">
+// //               {" "}
+// //               {/* GIẢM XUỐNG mb-6 */}
+// //               Tham gia cộng đồng tác giả của chúng tôi và chia sẻ câu chuyện của
+// //               bạn với hàng triệu độc giả trên khắp thế giới.
+// //             </p>
+// //           </div>
+// //         </div>
+// //       </section>
+// //     </div>
+// //   );
+// // }
+// // app/page.tsx
 // "use client";
-// import { useState } from "react"; // Thêm useState
-// import Link from "next/link";
-// import { Layout } from "lucide-react";
+
+// import { useState, useEffect } from "react";
+// import { useRouter } from "next/navigation";
+// import { useAuth } from "@/context/AuthContext";
+// import { Navbar } from "@/components/navbar";
 // import { Button } from "@/components/ui/button";
-// import {
-//   Card,
-//   CardContent,
-//   CardDescription,
-//   CardFooter,
-//   CardHeader,
-//   CardTitle,
-// } from "@/components/ui/card";
-// import { Badge } from "@/components/ui/badge";
-// import { Book, TrendingUp, Star, Eye, Users } from "lucide-react";
+// import { HeroCarousel } from "@/components/ads/hero-carousel";
+// import { SecondaryBanner } from "@/components/ads/secondary-banner";
+// import { RankBadge } from "@/components/rank-badge";
+// import { StoryCard } from "@/components/story-card"; // ✅ IMPORT STORYCARD
+// import { TrendingUp, Clock, ChevronRight } from "lucide-react";
+// import { storyCatalogApi } from "@/services/storyCatalog";
+// import type { Story, TopWeeklyStory } from "@/services/storyCatalog";
 
-// // --- DỮ LIỆU MOCK VÀ COMPONENT HỖ TRỢ (TỪ HOME-PAGE) ---
+// export default function HomePage() {
+//   const router = useRouter();
+//   const { isAuthenticated, isPremium } = useAuth();
+//   const [topWeekly, setTopWeekly] = useState<TopWeeklyStory[]>([]);
+//   const [latestStories, setLatestStories] = useState<Story[]>([]);
+//   const [loading, setLoading] = useState(true);
+//   const [error, setError] = useState<string | null>(null);
 
-// const FEATURED_STORIES = [
-//   {
-//     id: 1,
-//     title: "Hành Trình Về Phương Đông",
-//     author: "Nguyễn Văn A",
-//     genre: "Tiên Hiệp",
-//     views: "1.2M",
-//     chapters: 245,
-//     rating: 4.8,
-//     image:
-//       "https://images.unsplash.com/photo-1613574841859-cbab4621150f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmYW50YXN5JTIwYWR2ZW50dXJlJTIwYm9va3xlbnwxfHx8fDE3NjEwODcwMjd8MA&ixlib=rb-4.1.0&q=80&w=1080",
-//     description:
-//       "Một câu chuyện kỳ ảo về hành trình tu luyện của một thiếu niên...",
-//   },
-//   {
-//     id: 2,
-//     title: "Thế Giới Song Song",
-//     author: "Trần Thị B",
-//     genre: "Khoa Học Viễn Tưởng",
-//     views: "890K",
-//     chapters: 189,
-//     rating: 4.6,
-//     image:
-//       "https://images.unsplash.com/photo-1582203914614-e23623afc345?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxib29rcyUyMGxpYnJhcnklMjByZWFkaW5nfGVufDF8fHx8MTc2MTA3NTY4MHww&ixlib=rb-4.1.0&q=80&w=1080",
-//     description: "Khám phá những chiều không gian song song đầy bí ẩn...",
-//   },
-//   {
-//     id: 3,
-//     title: "Ký Ức Thời Gian",
-//     author: "Lê Văn C",
-//     genre: "Lãng Mạn",
-//     views: "650K",
-//     chapters: 156,
-//     rating: 4.9,
-//     image:
-//       "https://images.unsplash.com/photo-1560415903-cca53660d61d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3cml0aW5nJTIwdmludGFnZSUyMGRlc2t8ZW58MXx8fHwxNzYxMTI4NTEwfDA&ixlib=rb-4.1.0&q=80&w=1080",
-//     description: "Một câu chuyện tình đẹp vượt qua ranh giới thời gian...",
-//   },
-// ];
+//   useEffect(() => {
+//     const loadData = async () => {
+//       setLoading(true);
+//       setError(null);
+//       try {
+//         console.log("🔄 Bắt đầu tải dữ liệu từ API...");
 
-// const STATS = [
-//   { icon: Book, label: "Truyện", value: "10,000+" },
-//   { icon: Users, label: "Tác giả", value: "2,500+" },
-//   { icon: Eye, label: "Lượt đọc", value: "50M+" },
-//   { icon: Star, label: "Đánh giá", value: "4.7/5" },
-// ];
+//         const [weeklyResponse, latestResponse] = await Promise.all([
+//           storyCatalogApi.getTopWeeklyStories(10),
+//           storyCatalogApi.getLatestStories(10),
+//         ]);
 
-// // Component con để handle image với fallback
-// function StoryImage({
-//   src,
-//   alt,
-//   className,
-// }: {
-//   src: string;
-//   alt: string;
-//   className?: string;
-// }) {
-//   const [imageError, setImageError] = useState(false);
+//         console.log("✅ Dữ liệu nhận được:", {
+//           topWeekly: weeklyResponse,
+//           latestStories: latestResponse,
+//         });
 
-//   const ERROR_IMG_SRC =
-//     "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==";
+//         if (!Array.isArray(weeklyResponse)) {
+//           throw new Error("Dữ liệu top weekly không hợp lệ");
+//         }
 
-//   if (imageError) {
+//         if (!Array.isArray(latestResponse)) {
+//           throw new Error("Dữ liệu latest stories không hợp lệ");
+//         }
+
+//         setTopWeekly(weeklyResponse);
+//         setLatestStories(latestResponse);
+//       } catch (error: any) {
+//         console.error("❌ Lỗi tải dữ liệu:", error);
+
+//         if (error.response) {
+//           if (error.response.status === 404) {
+//             setError(
+//               "API endpoints không tồn tại. Vui lòng kiểm tra với quản trị viên."
+//             );
+//           } else if (error.response.status === 500) {
+//             setError("Lỗi server. Vui lòng thử lại sau.");
+//           } else {
+//             setError(
+//               `Lỗi server: ${error.response.status} - ${error.response.statusText}`
+//             );
+//           }
+//         } else if (error.request) {
+//           setError(
+//             "Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng."
+//           );
+//         } else {
+//           setError(error.message || "Có lỗi xảy ra khi tải dữ liệu.");
+//         }
+
+//         setTopWeekly([]);
+//         setLatestStories([]);
+//       } finally {
+//         setLoading(false);
+//       }
+//     };
+
+//     loadData();
+//   }, []);
+
+//   const handleNavigate = (page: string, storyId?: string) => {
+//     if (storyId) {
+//       router.push(`/${page}/${storyId}`);
+//     } else {
+//       router.push(`/${page}`);
+//     }
+//   };
+
+//   if (loading) {
 //     return (
-//       <div
-//         className={`flex items-center justify-center bg-gray-100 ${
-//           className || ""
-//         }`}
-//       >
-//         <img
-//           src={ERROR_IMG_SRC}
-//           alt="Error loading image"
-//           className="w-20 h-20 opacity-50"
-//         />
+//       <div className="min-h-screen bg-background">
+//         <Navbar />
+//         <div className="flex items-center justify-center min-h-[60vh]">
+//           <div className="text-center">
+//             <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+//             <p className="text-muted-foreground">Đang tải...</p>
+//           </div>
+//         </div>
+//       </div>
+//     );
+//   }
+
+//   if (error) {
+//     return (
+//       <div className="min-h-screen bg-background">
+//         <Navbar />
+//         <div className="flex items-center justify-center min-h-[60vh]">
+//           <div className="text-center">
+//             <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
+//               <Book className="h-8 w-8 text-destructive" />
+//             </div>
+//             <h3 className="text-lg font-semibold mb-2">Có lỗi xảy ra</h3>
+//             <p className="text-muted-foreground mb-4">{error}</p>
+//             <Button onClick={() => window.location.reload()}>Thử lại</Button>
+//           </div>
+//         </div>
 //       </div>
 //     );
 //   }
 
 //   return (
-//     <img
-//       src={src}
-//       alt={alt}
-//       className={className}
-//       onError={() => setImageError(true)}
-//     />
-//   );
-// }
+//     <div className="min-h-screen bg-background">
+//       <Navbar />
 
-// // --- COMPONENT PAGE CHÍNH ĐÃ GỘP ---
+//       {/* Hero Carousel */}
+//       <div className="animate-fade-in">
+//         <div className="container mx-auto px-4">
+//           <HeroCarousel />
+//         </div>
+//       </div>
 
-// export default function Page() {
-//   // Logic từ file route gốc
-//   const handleNavigate = (page: string) => {
-//     // Điều hướng tạm thời (sau này có thể dùng router.push)
-//     console.log(`Đi đến trang: ${page}`); // Thay alert bằng console.log hoặc modal
-//   };
-//   const isLoggedIn = false;
-
-//   // JSX từ component HomePage gốc
-//   return (
-//     <div className="min-h-screen">
-//       {/* Hero Section */}
-//       <section className="relative overflow-hidden border-b">
-//         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-accent/5 to-secondary/10" />
-//         <div className="container relative mx-auto px-4 py-20 lg:py-32">
-//           <div className="max-w-3xl">
-//             <Badge className="mb-4" variant="secondary">
-//               <TrendingUp className="mr-1 h-3 w-3" />
-//               Nền tảng đọc truyện hàng đầu Việt Nam
-//             </Badge>
-//             <h1 className="mb-6 text-5xl lg:text-6xl">
-//               Khám phá thế giới văn học không giới hạn
-//             </h1>
-//             <p className="mb-8 text-xl text-muted-foreground">
-//               Đọc hàng ngàn truyện miễn phí hoặc trở thành tác giả và chia sẻ
-//               câu chuyện của bạn với hàng triệu độc giả.
-//             </p>
-//             <div className="flex flex-wrap gap-4">
-//               {!isLoggedIn ? (
-//                 <>
-//                   <Button size="lg" onClick={() => handleNavigate("register")}>
-//                     Bắt đầu ngay
-//                   </Button>
-//                   <Button
-//                     size="lg"
-//                     variant="outline"
-//                     onClick={() => handleNavigate("login")}
-//                   >
-//                     Đăng nhập
-//                   </Button>
-//                 </>
-//               ) : (
-//                 <Button size="lg" onClick={() => handleNavigate("library")}>
-//                   Vào thư viện
-//                 </Button>
-//               )}
+//       {/* Top Truyện Tuần */}
+//       <section className="py-4 animate-slide-up bg-background">
+//         <div className="container mx-auto px-4">
+//           <div className="flex items-center justify-between mb-4">
+//             <div className="flex items-center gap-3">
+//               <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10">
+//                 <TrendingUp className="h-5 w-5 text-primary" />
+//               </div>
+//               <div>
+//                 <h2 className="font-bold text-2xl md:text-3xl">
+//                   Top Truyện Tuần
+//                 </h2>
+//                 <p className="text-sm text-muted-foreground mt-1">
+//                   Những tác phẩm hot nhất tuần này
+//                 </p>
+//               </div>
+//             </div>
+//             <button
+//               onClick={() => handleNavigate("search")}
+//               className="flex items-center gap-1 text-sm text-primary hover:gap-2 transition-all group"
+//             >
+//               <span className="hidden sm:inline">Xem tất cả</span>
+//               <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+//             </button>
+//           </div>
+//           <div className="relative">
+//             <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-custom scroll-smooth pt-1 px-0">
+//               {topWeekly.map((item, index) => (
+//                 <div
+//                   key={item.story.storyId}
+//                   className="relative flex-shrink-0"
+//                 >
+//                   {index < 3 && <RankBadge rank={index + 1} />}
+//                   {/* ✅ SỬ DỤNG STORYCARD */}
+//                   <StoryCard
+//                     story={item.story}
+//                     onClick={() => handleNavigate("story", item.story.storyId)}
+//                   />
+//                 </div>
+//               ))}
 //             </div>
 //           </div>
 //         </div>
 //       </section>
 
-//       {/* Stats Section */}
-//       <section className="border-b py-12 bg-card">
-//         <div className="container mx-auto px-4">
-//           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-//             {STATS.map((stat, index) => (
-//               <div key={index} className="text-center">
-//                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-3">
-//                   <stat.icon className="h-6 w-6" />
-//                 </div>
-//                 <div className="text-2xl mb-1">{stat.value}</div>
-//                 <div className="text-sm text-muted-foreground">
-//                   {stat.label}
-//                 </div>
-//               </div>
-//             ))}
-//           </div>
+//       {/* Secondary Banner */}
+//       {!isPremium && (
+//         <div className="container mx-auto px-4 py-2">
+//           <SecondaryBanner />
 //         </div>
-//       </section>
+//       )}
 
-//       {/* Featured Stories */}
-//       <section className="py-16">
+//       {/* Truyện Mới Cập Nhật */}
+//       <section
+//         className="py-4 animate-slide-up"
+//         style={{ animationDelay: "0.1s" }}
+//       >
 //         <div className="container mx-auto px-4">
-//           <div className="mb-8">
-//             <h2 className="text-3xl mb-2">Truyện nổi bật</h2>
-//             <p className="text-muted-foreground">
-//               Những tác phẩm được yêu thích nhất
-//             </p>
+//           <div className="flex items-center justify-between mb-4">
+//             <div className="flex items-center gap-3">
+//               <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-secondary/10">
+//                 <Clock className="h-5 w-5 text-secondary" />
+//               </div>
+//               <div>
+//                 <h2 className="font-bold text-2xl md:text-3xl">
+//                   Truyện Mới Cập Nhật
+//                 </h2>
+//                 <p className="text-sm text-muted-foreground mt-1">
+//                   Những chương mới nhất vừa được đăng tải
+//                 </p>
+//               </div>
+//             </div>
+//             <button
+//               onClick={() => handleNavigate("search")}
+//               className="flex items-center gap-1 text-sm text-primary hover:gap-2 transition-all group"
+//             >
+//               <span className="hidden sm:inline">Xem tất cả</span>
+//               <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+//             </button>
 //           </div>
 
-//           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-//             {FEATURED_STORIES.map((story) => (
-//               <Card
-//                 key={story.id}
-//                 className="overflow-hidden hover:shadow-lg transition-shadow"
-//               >
-//                 <div className="aspect-[16/9] overflow-hidden">
-//                   <StoryImage
-//                     src={story.image}
-//                     alt={story.title}
-//                     className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+//           <div className="relative">
+//             <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-custom scroll-smooth pt-1 px-0">
+//               {latestStories.map((story) => (
+//                 <div key={story.storyId} className="flex-shrink-0">
+//                   {/* ✅ SỬ DỤNG STORYCARD */}
+//                   <StoryCard
+//                     story={story}
+//                     onClick={() => handleNavigate("story", story.storyId)}
 //                   />
 //                 </div>
-//                 <CardHeader>
-//                   <div className="flex items-start justify-between gap-2 mb-2">
-//                     <CardTitle className="line-clamp-1">
-//                       {story.title}
-//                     </CardTitle>
-//                     <Badge variant="secondary">{story.genre}</Badge>
-//                   </div>
-//                   <CardDescription className="line-clamp-2">
-//                     {story.description}
-//                   </CardDescription>
-//                 </CardHeader>
-//                 <CardContent>
-//                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
-//                     <div className="flex items-center gap-1">
-//                       <Eye className="h-4 w-4" />
-//                       {story.views}
-//                     </div>
-//                     <div className="flex items-center gap-1">
-//                       <Book className="h-4 w-4" />
-//                       {story.chapters} chương
-//                     </div>
-//                     <div className="flex items-center gap-1">
-//                       <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-//                       {story.rating}
-//                     </div>
-//                   </div>
-//                 </CardContent>
-//                 <CardFooter>
-//                   <Button className="w-full" variant="outline">
-//                     Đọc ngay
-//                   </Button>
-//                 </CardFooter>
-//               </Card>
-//             ))}
+//               ))}
+//             </div>
 //           </div>
 //         </div>
 //       </section>
 
 //       {/* CTA Section */}
-//       <section className="border-t py-16 bg-card">
+//       <section className="border-t py-8 bg-muted/50">
 //         <div className="container mx-auto px-4 text-center">
 //           <div className="max-w-2xl mx-auto">
-//             <h2 className="text-3xl mb-4">Bạn có câu chuyện để kể?</h2>
-//             <p className="text-muted-foreground mb-8">
+//             <h2 className="text-3xl font-bold mb-4">
+//               Bạn có câu chuyện để kể?
+//             </h2>
+//             <p className="text-muted-foreground mb-6">
 //               Tham gia cộng đồng tác giả của chúng tôi và chia sẻ câu chuyện của
 //               bạn với hàng triệu độc giả trên khắp thế giới.
 //             </p>
-//             <Button
-//               size="lg"
-//               onClick={() => handleNavigate(isLoggedIn ? "author" : "register")}
-//             >
-//               Trở thành tác giả
-//             </Button>
 //           </div>
 //         </div>
 //       </section>
 //     </div>
 //   );
 // }
-
+// app/page.tsx
 "use client";
-import { useState } from "react"; // Thêm useState
-import Link from "next/link";
-// Lỗi: Layout không được import, nhưng cũng không được dùng. Tôi sẽ xóa đi.
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Book, TrendingUp, Star, Eye, Users } from "lucide-react";
+import { HeroCarousel } from "@/components/ads/hero-carousel";
+import { SecondaryBanner } from "@/components/ads/secondary-banner";
+import { RankBadge } from "@/components/rank-badge";
+import { StoryCard } from "@/components/story-card";
+import { Book, TrendingUp, Clock, ChevronRight } from "lucide-react";
+import { storyCatalogApi } from "@/services/storyCatalog";
+import type { Story, TopWeeklyStory } from "@/services/storyCatalog";
 
-// --- DỮ LIỆU MOCK VÀ COMPONENT HỖ TRỢ (TỪ HOME-PAGE) ---
+export default function HomePage() {
+  const router = useRouter();
+  const { isAuthenticated, isPremium } = useAuth();
+  const [topWeekly, setTopWeekly] = useState<TopWeeklyStory[]>([]);
+  const [latestStories, setLatestStories] = useState<Story[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-const FEATURED_STORIES = [
-  {
-    id: 1,
-    title: "Hành Trình Về Phương Đông",
-    author: "Nguyễn Văn A",
-    genre: "Tiên Hiệp",
-    views: "1.2M",
-    chapters: 245,
-    rating: 4.8,
-    image:
-      "https://images.unsplash.com/photo-1613574841859-cbab4621150f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmYW50YXN5JTIwYWR2ZW50dXJlJTIwYm9va3xlbnwxfHx8fDE3NjEwODcwMjd8MA&ixlib=rb-4.1.0&q=80&w=1080",
-    description:
-      "Một câu chuyện kỳ ảo về hành trình tu luyện của một thiếu niên...",
-  },
-  {
-    id: 2,
-    title: "Thế Giới Song Song",
-    author: "Trần Thị B",
-    genre: "Khoa Học Viễn Tưởng",
-    views: "890K",
-    chapters: 189,
-    rating: 4.6,
-    image:
-      "https://images.unsplash.com/photo-1582203914614-e23623afc345?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxib29rcyUyMGxpYnJhcnklMjByZWFkaW5nfGVufDF8fHx8MTc2MTA3NTY4MHww&ixlib=rb-4.1.0&q=80&w=1080",
-    description: "Khám phá những chiều không gian song song đầy bí ẩn...",
-  },
-  {
-    id: 3,
-    title: "Ký Ức Thời Gian",
-    author: "Lê Văn C",
-    genre: "Lãng Mạn",
-    views: "650K",
-    chapters: 156,
-    rating: 4.9,
-    image:
-      "https://images.unsplash.com/photo-1560415903-cca53660d61d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3cml0aW5nJTIwdmludGFnZSUyMGRlc2t8ZW58MXx8fHwxNzYxMTI4NTEwfDA&ixlib=rb-4.1.0&q=80&w=1080",
-    description: "Một câu chuyện tình đẹp vượt qua ranh giới thời gian...",
-  },
-];
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        console.log("🔄 Bắt đầu tải dữ liệu từ API...");
 
-const STATS = [
-  { icon: Book, label: "Truyện", value: "10,000+" },
-  { icon: Users, label: "Tác giả", value: "2,500+" },
-  { icon: Eye, label: "Lượt đọc", value: "50M+" },
-  { icon: Star, label: "Đánh giá", value: "4.7/5" },
-];
+        const [weeklyResponse, latestResponse] = await Promise.all([
+          storyCatalogApi.getTopWeeklyStories(10),
+          storyCatalogApi.getLatestStories(10),
+        ]);
 
-// Component con để handle image với fallback
-function StoryImage({
-  src,
-  alt,
-  className,
-}: {
-  src: string;
-  alt: string;
-  className?: string;
-}) {
-  const [imageError, setImageError] = useState(false);
+        console.log("✅ Dữ liệu nhận được:", {
+          topWeekly: weeklyResponse,
+          latestStories: latestResponse,
+        });
 
-  const ERROR_IMG_SRC =
-    "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==";
+        if (!Array.isArray(weeklyResponse)) {
+          throw new Error("Dữ liệu top weekly không hợp lệ");
+        }
 
-  if (imageError) {
+        if (!Array.isArray(latestResponse)) {
+          throw new Error("Dữ liệu latest stories không hợp lệ");
+        }
+
+        setTopWeekly(weeklyResponse);
+        setLatestStories(latestResponse);
+      } catch (error: any) {
+        console.error("❌ Lỗi tải dữ liệu:", error);
+
+        if (error.response) {
+          if (error.response.status === 404) {
+            setError(
+              "API endpoints không tồn tại. Vui lòng kiểm tra với quản trị viên."
+            );
+          } else if (error.response.status === 500) {
+            setError("Lỗi server. Vui lòng thử lại sau.");
+          } else {
+            setError(
+              `Lỗi server: ${error.response.status} - ${error.response.statusText}`
+            );
+          }
+        } else if (error.request) {
+          setError(
+            "Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng."
+          );
+        } else {
+          setError(error.message || "Có lỗi xảy ra khi tải dữ liệu.");
+        }
+
+        setTopWeekly([]);
+        setLatestStories([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  const handleNavigate = (page: string, storyId?: string) => {
+    if (storyId) {
+      router.push(`/${page}/${storyId}`);
+    } else {
+      router.push(`/${page}`);
+    }
+  };
+
+  if (loading) {
     return (
-      <div
-        className={`flex items-center justify-center bg-gray-100 ${
-          className || ""
-        }`}
-      >
-        <img
-          src={ERROR_IMG_SRC}
-          alt="Error loading image"
-          className="w-20 h-20 opacity-50"
-        />
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Đang tải...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Book className="h-8 w-8 text-destructive" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Có lỗi xảy ra</h3>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()}>Thử lại</Button>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <img
-      src={src}
-      alt={alt}
-      className={className}
-      onError={() => setImageError(true)}
-    />
-  );
-}
-
-// --- COMPONENT PAGE CHÍNH ĐÃ GỘP ---
-
-export default function Page() {
-  // Logic từ file route gốc
-  const handleNavigate = (page: string) => {
-    // Điều hướng tạm thời (sau này có thể dùng router.push)
-    console.log(`Đi đến trang: ${page}`); // Thay alert bằng console.log hoặc modal
-  };
-  const isLoggedIn = false;
-
-  // JSX từ component HomePage gốc
-  return (
-    <>
+    <div className="min-h-screen bg-background">
       <Navbar />
-      <div className="min-h-screen">
-        {/* Hero Section */}
-        <section className="relative overflow-hidden border-b">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-accent/5 to-secondary/10" />
-          <div className="container relative mx-auto px-4 py-20 lg:py-32">
-            <div className="max-w-3xl">
-              <Badge className="mb-4" variant="secondary">
-                <TrendingUp className="mr-1 h-3 w-3" />
-                Nền tảng đọc truyện hàng đầu Việt Nam
-              </Badge>
-              <h1 className="mb-6 text-5xl lg:text-6xl">
-                Khám phá thế giới văn học không giới hạn
-              </h1>
-              <p className="mb-8 text-xl text-muted-foreground">
-                Đọc hàng ngàn truyện miễn phí hoặc trở thành tác giả và chia sẻ
-                câu chuyện của bạn với hàng triệu độc giả.
-              </p>
-              <div className="flex flex-wrap gap-4">
-                {!isLoggedIn ? (
-                  <>
-                    <Button
-                      size="lg"
-                      onClick={() => handleNavigate("register")}
-                    >
-                      Bắt đầu ngay
-                    </Button>
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      onClick={() => handleNavigate("login")}
-                    >
-                      Đăng nhập
-                    </Button>
-                  </>
-                ) : (
-                  <Button size="lg" onClick={() => handleNavigate("library")}>
-                    Vào thư viện
-                  </Button>
-                )}
+
+      {/* Hero Carousel */}
+      <div className="animate-fade-in">
+        <div className="container mx-auto px-4">
+          <HeroCarousel />
+        </div>
+      </div>
+
+      {/* Top Truyện Tuần */}
+      <section className="py-4 animate-slide-up bg-background">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10">
+                <TrendingUp className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="font-bold text-2xl md:text-3xl">
+                  Top Truyện Tuần
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Những tác phẩm hot nhất tuần này
+                </p>
               </div>
             </div>
+            <button
+              onClick={() => handleNavigate("search")}
+              className="flex items-center gap-1 text-sm text-primary hover:gap-2 transition-all group"
+            >
+              <span className="hidden sm:inline">Xem tất cả</span>
+              <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+            </button>
           </div>
-        </section>
-
-        {/* Stats Section */}
-        <section className="border-b py-12 bg-card">
-          <div className="container mx-auto px-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {STATS.map((stat, index) => (
-                <div key={index} className="text-center">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-3">
-                    <stat.icon className="h-6 w-6" />
-                  </div>
-                  <div className="text-2xl mb-1">{stat.value}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {stat.label}
-                  </div>
+          <div className="relative">
+            {/* QUAN TRỌNG: Thêm min-h-[420px] để đảm bảo tất cả card cùng chiều cao */}
+            <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-custom scroll-smooth pt-1 px-0 min-h-[420px]">
+              {topWeekly.map((item, index) => (
+                <div
+                  key={item.story.storyId}
+                  className="relative flex-shrink-0"
+                >
+                  {index < 3 && <RankBadge rank={index + 1} />}
+                  <StoryCard
+                    story={item.story}
+                    onClick={() => handleNavigate("story", item.story.storyId)}
+                  />
                 </div>
               ))}
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Featured Stories */}
-        <section className="py-16">
-          <div className="container mx-auto px-4">
-            <div className="mb-8">
-              <h2 className="text-3xl mb-2">Truyện nổi bật</h2>
-              <p className="text-muted-foreground">
-                Những tác phẩm được yêu thích nhất
-              </p>
+      {/* Secondary Banner */}
+      {!isPremium && (
+        <div className="container mx-auto px-4 py-2">
+          <SecondaryBanner />
+        </div>
+      )}
+
+      {/* Truyện Mới Cập Nhật */}
+      <section
+        className="py-4 animate-slide-up"
+        style={{ animationDelay: "0.1s" }}
+      >
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-secondary/10">
+                <Clock className="h-5 w-5 text-secondary" />
+              </div>
+              <div>
+                <h2 className="font-bold text-2xl md:text-3xl">
+                  Truyện Mới Cập Nhật
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Những chương mới nhất vừa được đăng tải
+                </p>
+              </div>
             </div>
+            <button
+              onClick={() => handleNavigate("search")}
+              className="flex items-center gap-1 text-sm text-primary hover:gap-2 transition-all group"
+            >
+              <span className="hidden sm:inline">Xem tất cả</span>
+              <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+            </button>
+          </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {FEATURED_STORIES.map((story) => (
-                <Card
-                  key={story.id}
-                  className="overflow-hidden hover:shadow-lg transition-shadow"
-                >
-                  <div className="aspect-[16/9] overflow-hidden">
-                    <StoryImage
-                      src={story.image}
-                      alt={story.title}
-                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                    />
-                  </div>
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <CardTitle className="line-clamp-1">
-                        {story.title}
-                      </CardTitle>
-                      <Badge variant="secondary">{story.genre}</Badge>
-                    </div>
-                    <CardDescription className="line-clamp-2">
-                      {story.description}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Eye className="h-4 w-4" />
-                        {story.views}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Book className="h-4 w-4" />
-                        {story.chapters} chương
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                        {story.rating}
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button className="w-full" variant="outline">
-                      Đọc ngay
-                    </Button>
-                  </CardFooter>
-                </Card>
+          <div className="relative">
+            {/* QUAN TRỌNG: Thêm min-h-[420px] để đảm bảo tất cả card cùng chiều cao */}
+            <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-custom scroll-smooth pt-1 px-0 min-h-[420px]">
+              {latestStories.map((story) => (
+                <div key={story.storyId} className="flex-shrink-0">
+                  <StoryCard
+                    story={story}
+                    onClick={() => handleNavigate("story", story.storyId)}
+                  />
+                </div>
               ))}
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* CTA Section */}
-        <section className="border-t py-16 bg-card">
-          <div className="container mx-auto px-4 text-center">
-            <div className="max-w-2xl mx-auto">
-              <h2 className="text-3xl mb-4">Bạn có câu chuyện để kể?</h2>
-              <p className="text-muted-foreground mb-8">
-                Tham gia cộng đồng tác giả của chúng tôi và chia sẻ câu chuyện
-                của bạn với hàng triệu độc giả trên khắp thế giới.
-              </p>
-              <Button
-                size="lg"
-                onClick={() =>
-                  handleNavigate(isLoggedIn ? "author" : "register")
-                }
-              >
-                Trở thành tác giả
-              </Button>
-            </div>
+      {/* CTA Section */}
+      <section className="border-t py-8 bg-muted/50">
+        <div className="container mx-auto px-4 text-center">
+          <div className="max-w-2xl mx-auto">
+            <h2 className="text-3xl font-bold mb-4">
+              Bạn có câu chuyện để kể?
+            </h2>
+            <p className="text-muted-foreground mb-6">
+              Tham gia cộng đồng tác giả của chúng tôi và chia sẻ câu chuyện của
+              bạn với hàng triệu độc giả trên khắp thế giới.
+            </p>
           </div>
-        </section>
-      </div>
-    </>
+        </div>
+      </section>
+    </div>
   );
 }

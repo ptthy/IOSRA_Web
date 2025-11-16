@@ -74,4 +74,18 @@ export const chapterService = {
   async submitChapter(chapterId: string): Promise<void> {
     return this.submitChapterForReview(chapterId);
   },
+
+  // === Endpoint 12: PUT /api/AuthorChapter/{storyId}/{chapterId} ===
+  async updateChapter(
+    storyId: string,
+    chapterId: string,
+    data: { title: string; content: string; languageCode: string }
+  ): Promise<Chapter> {
+    console.log(`Calling API: PUT /api/AuthorChapter/${storyId}/${chapterId}`);
+    const response = await apiClient.put<Chapter>(
+      `/api/AuthorChapter/${storyId}/${chapterId}`,
+      data
+    );
+    return response.data;
+  },
 };

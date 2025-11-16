@@ -119,7 +119,7 @@ export function Navbar() {
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              Khám phá
+              Tìm kiếm
             </button>
             <button
               onClick={() => handleNavigate("/profile")}
@@ -322,7 +322,7 @@ export function Navbar() {
                       onClick={() => handleNavigate("/discover")}
                       className="text-left py-2 text-lg"
                     >
-                      Khám phá
+                      Tìm kiếm
                     </button>
                     <button
                       onClick={() => handleNavigate("/profile")}
