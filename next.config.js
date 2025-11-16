@@ -6,16 +6,16 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'res.cloudinary.com',
-        port: '',
-        pathname: '/**', // Cho phép mọi đường dẫn con
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+        port: "",
+        pathname: "/**", // Cho phép mọi đường dẫn con
       },
       {
-        protocol: 'https',
-        hostname: 'images.unsplash.com', // Thêm cả domain dự phòng
-        port: '',
-        pathname: '/**',
+        protocol: "https",
+        hostname: "images.unsplash.com", // Thêm cả domain dự phòng
+        port: "",
+        pathname: "/**",
       },
     ],
   },

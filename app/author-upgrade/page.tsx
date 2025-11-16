@@ -341,7 +341,7 @@ export default function AuthorUpgradePage() {
     <>
       <Navbar />
       <div className="min-h-screen flex items-center justify-center p-4 py-12 bg-background">
-        <div className="w-full max-w-3xl space-y-4">
+        <div className="w-full max-w-7xl space-y-4">
           {/* BỔ SUNG "CỤC" HIỂN THỊ TRẠNG THÁI HIỆN TẠI */}
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-muted-foreground">

@@ -1,9 +1,7 @@
 // services/authService.ts
 import apiClient from "./apiClient";
 
-
 // --- 1. Định nghĩa các kiểu dữ liệu (Interfaces) cho Request Bodies ---
-
 
 // POST /Auth/register
 interface RegisterData {
@@ -13,13 +11,11 @@ interface RegisterData {
   confirmPassword?: string;
 }
 
-
 // POST /Auth/login
 interface LoginData {
   identifier?: string;
   password?: string;
 }
-
 
 // POST /Auth/verify
 interface VerifyOtpData {
@@ -27,12 +23,10 @@ interface VerifyOtpData {
   otp: string;
 }
 
-
 // POST /Auth/forgot-pass
 interface ForgotPasswordData {
   email: string;
 }
-
 
 // POST /Auth/forgot-pass/verify
 interface ResetPasswordData {
@@ -42,12 +36,10 @@ interface ResetPasswordData {
   confirmNewPassword?: string;
 }
 
-
 // POST /Auth/google
 interface GoogleLoginData {
   idToken: string;
 }
-
 
 // POST /Auth/google/complete
 interface GoogleCompleteData {
@@ -57,7 +49,6 @@ interface GoogleCompleteData {
   confirmPassword?: string;
 }
 
-
 interface User {
   id: string;
   username: string;
@@ -66,12 +57,9 @@ interface User {
   // ... các trường khác
 }
 
-
 // -----------------------------------------------------------------
 
-
 // --- 2. Tạo đối tượng Service chứa 8 hàm API ---
-
 
 export const authService = {
   /**
@@ -81,7 +69,6 @@ export const authService = {
     return apiClient.post("/api/Auth/register", data);
   },
 
-
   /**
    * API Đăng nhập bằng email/username và mật khẩu
    * Trả về { user, token }
@@ -90,14 +77,12 @@ export const authService = {
     return apiClient.post("/api/Auth/login", data);
   },
 
-
   /**
    * API Xác thực OTP sau khi đăng ký
    */
   verifyOtp: (data: VerifyOtpData) => {
     return apiClient.post("/api/Auth/verify", data);
   },
-
 
   /**
    * API Yêu cầu gửi mã OTP để quên mật khẩu
@@ -106,14 +91,12 @@ export const authService = {
     return apiClient.post("/api/Auth/forgot-pass", data);
   },
 
-
   /**
    * API Xác thực OTP và đặt mật khẩu mới
    */
   resetPassword: (data: ResetPasswordData) => {
     return apiClient.post("/api/Auth/forgot-pass/verify", data);
   },
-
 
   /**
    * API Đăng nhập bằng Google (bước 1)
@@ -122,14 +105,12 @@ export const authService = {
     return apiClient.post("/api/Auth/google", data);
   },
 
-
   /**
    * API Hoàn tất đăng ký/đăng nhập Google (bước 2, nếu cần)
    */
   completeGoogleLogin: (data: GoogleCompleteData) => {
     return apiClient.post("/api/Auth/google/complete", data);
   },
-
 
   /**
    * API Đăng xuất (vô hiệu hóa token phía server)
@@ -139,6 +120,3 @@ export const authService = {
     return apiClient.post("/api/Auth/logout");
   },
 };
-
-
-

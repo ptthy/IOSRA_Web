@@ -8,6 +8,7 @@ export interface Story {
   tagIds?: string[];
   tags?: Tag[];
   authorId: string;
+  authorUsername?: string; // Thêm trường này
   authorName?: string;
   status: "draft" | "pending" | "rejected" | "published" | "completed";
   aiScore?: number;
@@ -17,9 +18,12 @@ export interface Story {
   moderatorStatus?: string | null;
   aiFeedback?: string | null;
   moderatorNote?: string | null;
+  totalChapters?: number;
+  isPremium?: boolean;
+  publishedAt: string;
+  lengthPlan?: string;
   createdAt: string;
   updatedAt: string;
-  publishedAt?: string | null;
 }
 
 export interface CreateStoryRequest {
@@ -75,3 +79,6 @@ export interface CreateChapterRequest {
   languageCode: "vi-VN" | "en-US" | "zh-CN" | "ja-JP";
   content: string;
 }
+
+export * from "./storyCatalog";
+export * from "./storyRatingService";
