@@ -1,4 +1,4 @@
-// File: services/moderationApi.ts (ĐÃ GỘP TẤT CẢ API)
+// File: services/moderationApi.ts
 "use client";
 
 import apiClient from "@/services/apiClient"; 
@@ -6,7 +6,34 @@ import apiClient from "@/services/apiClient";
 // Tắt Mock Data để dùng API thật
 const USE_MOCK_DATA = false; 
 
+// --- KHAI BÁO INTERFACE (Để sử dụng trong ModerationList) ---
+// Định nghĩa kiểu dữ liệu cơ bản của một Report
+interface ReportItem {
+    id: string; 
+    targetType: "story" | "chapter" | "comment" | string; 
+    targetId: string;
+    reason: string;
+    details: string;
+    status: "pending" | "resolved" | "rejected" | string; 
+    reporterId: string;
+    reportedAt: string;
+    resolvedBy?: string; 
+    resolvedAt?: string;
+}
+
+// Định nghĩa kiểu dữ liệu trả về từ API Reports có phân trang
+interface ApiResponse {
+    items: ReportItem[];
+    total?: number;
+    page?: number;
+    pageSize?: number;
+}
+// -----------------------------------------------------------
+
+
 // --- (Phần Mock Data - Sẽ không được dùng nữa) ---
+// Giữ nguyên mockPendingStories
+
 const mockPendingStories = [
   {
     reviewId: "0156ec13-6e0a-4874-a7ae-2fc530fa86da",
@@ -149,4 +176,161 @@ export async function postChapterDecision(
   } catch (error: any) {
     throw new Error(error.response?.data?.message || "Lỗi khi gửi quyết định chương");
   }
+}
+
+// PHẦN MỚI: API XỬ LÝ BÁO CÁO (CONTENT MOD HANDLING)
+
+// 1. Lấy danh sách Report
+// Đã thêm kiểu trả về Promise<ApiResponse>
+export async function getHandlingReports(
+  status: 'pending' | 'resolved' | 'rejected' | null,
+  targetType: 'story' | 'chapter' | 'comment' | null,
+  page: number,
+  pageSize: number
+): Promise<ApiResponse> { // <-- KHAI BÁO KIỂU TRẢ VỀ TƯỜNG MINH
+  try {
+    const params: any = { page, pageSize };
+    if (status) params.status = status;
+    if (targetType) params.targetType = targetType;
+
+    const response = await apiClient.get('/api/ContentModHandling/reports', { params });
+    return response.data as ApiResponse; // ÉP KIỂU KẾT QUẢ API
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Lỗi khi tải danh sách báo cáo");
+  }
+}
+
+// 2. Xem chi tiết 1 Report
+export async function getReportDetail(reportId: string): Promise<ReportItem> {
+  try {
+    const response = await apiClient.get(`/api/ContentModHandling/reports/${reportId}`);
+    return response.data as ReportItem;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Lỗi khi xem chi tiết báo cáo");
+  }
+}
+
+// 3. Chốt trạng thái Report (Resolved - Phạt / Rejected - Bỏ qua)
+export async function updateReportStatus(reportId: string, status: 'resolved' | 'rejected') {
+  try {
+    // Body: { "status": "resolved" }
+    const response = await apiClient.put(`/api/ContentModHandling/reports/${reportId}/status`, { status });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Lỗi khi cập nhật trạng thái báo cáo");
+  }
+}
+
+// 4. Ẩn/Hiện Nội dung (Story, Chapter, Comment)
+export async function updateContentStatus(
+  targetType: 'story' | 'chapter' | 'comment',
+  targetId: string,
+  status: 'hidden' | 'published' | 'visible' // Comment dùng 'visible', story/chapter dùng 'published'
+) {
+  try {
+    let endpoint = '';
+    if (targetType === 'story') endpoint = `/api/ContentModHandling/stories/${targetId}`;
+    if (targetType === 'chapter') endpoint = `/api/ContentModHandling/chapters/${targetId}`;
+    if (targetType === 'comment') endpoint = `/api/ContentModHandling/comments/${targetId}`;
+
+    const response = await apiClient.put(endpoint, { status });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Lỗi khi thay đổi trạng thái nội dung");
+  }
+}
+
+const MOCK_REPORTS_DATA: ReportItem[] = [ // Đã thêm kiểu dữ liệu cho Mock Data
+  // PENDING REPORTS
+  {
+    id: "rep-001",
+    targetType: "chapter",
+    targetId: "chap-abc1234",
+    reason: "ip_infringement",
+    details: "Chương 5 truyện này sao chép nội dung từ tiểu thuyết A, link gốc: https://example.com/A",
+    status: "pending",
+    reporterId: "user-reporter-456",
+    reportedAt: new Date(Date.now() - 3600000).toISOString(), // 1 giờ trước
+  },
+  {
+    id: "rep-002",
+    targetType: "story",
+    targetId: "story-xyz7890",
+    reason: "negative_content",
+    details: "Nội dung truyện xuyên tạc lịch sử và có xu hướng gây thù ghét tôn giáo.",
+    status: "pending",
+    reporterId: "user-reporter-111",
+    reportedAt: new Date(Date.now() - 7200000).toISOString(), // 2 giờ trước
+  },
+  {
+    id: "rep-003",
+    targetType: "comment",
+    targetId: "cmt-def5678",
+    reason: "spam",
+    details: "Bình luận này chỉ quảng cáo link web ngoài, không liên quan nội dung.",
+    status: "pending",
+    reporterId: "user-reporter-999",
+    reportedAt: new Date(Date.now() - 10800000).toISOString(), // 3 giờ trước
+  },
+  
+  // RESOLVED REPORTS (Đã xử phạt)
+  {
+    id: "rep-004",
+    targetType: "chapter",
+    targetId: "chap-hij1234",
+    reason: "misinformation",
+    details: "Thông tin sai sự thật về dịch bệnh được lan truyền trong chương này.",
+    status: "resolved",
+    reporterId: "user-reporter-333",
+    reportedAt: new Date(Date.now() - 86400000).toISOString(), // 1 ngày trước
+    resolvedBy: "cmod-001",
+    resolvedAt: new Date(Date.now() - 43200000).toISOString(), // 12 giờ trước
+  },
+  
+  // REJECTED REPORTS (Đã từ chối)
+  {
+    id: "rep-005",
+    targetType: "story",
+    targetId: "story-klm4567",
+    reason: "negative_content",
+    details: "Report vô căn cứ, truyện có yếu tố dark nhưng không vi phạm quy định.",
+    status: "rejected",
+    reporterId: "user-reporter-555",
+    reportedAt: new Date(Date.now() - 172800000).toISOString(), // 2 ngày trước
+    resolvedBy: "cmod-001",
+    resolvedAt: new Date(Date.now() - 86400000).toISOString(), // 1 ngày trước
+  },
+];
+
+/**
+ * MOCK FUNCTION: Giả lập việc gọi API lấy danh sách reports
+ * @param status - 'pending', 'resolved', 'rejected'
+ * @returns Object có thuộc tính items (giống API thật)
+ */
+// Đã thêm kiểu trả về Promise<ApiResponse>
+export async function MOCK_getHandlingReports(
+  status: 'pending' | 'resolved' | 'rejected' | null,
+  targetType: 'story' | 'chapter' | 'comment' | null,
+  page: number,
+  pageSize: number
+): Promise<ApiResponse> { // <-- KHAI BÁO KIỂU TRẢ VỀ TƯỜNG MINH
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 800)); 
+  
+  const filteredReports = MOCK_REPORTS_DATA.filter(report => {
+    // Lọc theo status (rất quan trọng cho Tabs)
+    if (status && report.status !== status) return false;
+    return true;
+  });
+
+  // Giả lập phân trang và trả về dưới dạng OBJECT (ApiResponse) để khớp với API thật
+  const startIndex = (page - 1) * pageSize;
+  const items = filteredReports.slice(startIndex, startIndex + pageSize);
+
+  return {
+      items: items,
+      total: filteredReports.length,
+      page: page,
+      pageSize: pageSize,
+  };
 }
