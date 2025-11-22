@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Navbar } from "@/components/navbar";
+import { Navbar } from "@/components/layout/Navbar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -236,7 +236,6 @@ export default function SearchPage() {
 
   return (
     <div className="min-h-screen">
-      <Navbar />
       <div className="max-w-7xl mx-auto space-y-8 pb-16 pt-6 px-4">
         {/* Header */}
         <div className="space-y-2">

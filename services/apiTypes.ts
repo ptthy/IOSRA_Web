@@ -4,6 +4,7 @@ export interface Story {
   storyId: string;
   title: string;
   description: string;
+  shortDescription?: string;
   coverUrl?: string;
   tagIds?: string[];
   tags?: Tag[];
@@ -79,6 +80,62 @@ export interface CreateChapterRequest {
   languageCode: "vi-VN" | "en-US" | "zh-CN" | "ja-JP";
   content: string;
 }
+// --- Public Profile Types ---
+export interface PublicProfile {
+  accountId: string;
+  username: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  gender: "M" | "F" | "other" | "unspecified" | null;
+  createdAt: string;
+  isAuthor: boolean;
+  author?: {
+    authorId: string;
+    rankName: string;
+    isRestricted: boolean;
+    isVerified: boolean;
+    followerCount: number;
+    publishedStoryCount: number;
+    latestPublishedAt: string | null;
+  };
+  followState: {
+    isFollowing: boolean;
+    notificationsEnabled: boolean;
+    followedAt: string | null;
+  } | null;
+}
 
+// --- Author Follow Types ---
+export interface FollowAuthorRequest {
+  enableNotifications: boolean;
+}
+
+export interface FollowStatusResponse {
+  isFollowing: boolean;
+  notificationsEnabled: boolean;
+  followedAt: string;
+}
+
+export interface FollowerInfo {
+  followerId: string;
+  username: string;
+  avatarUrl: string | null;
+  notificationsEnabled: boolean;
+  followedAt: string;
+}
+
+export interface FollowersResponse {
+  items: FollowerInfo[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface PublicStoriesResponse {
+  items: Story[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
 export * from "./storyCatalog";
 export * from "./storyRatingService";

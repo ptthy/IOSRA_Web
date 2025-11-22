@@ -16,6 +16,7 @@ import {
   Send,
   X,
   MessageSquare,
+  Loader2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -25,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ReactionsPopup } from "./ReactionsPopup";
+import { useAuth } from "@/context/AuthContext";
 
 interface CommentItemProps {
   comment: ChapterComment;
@@ -37,6 +39,8 @@ interface CommentItemProps {
   onDislike?: (commentId: string) => Promise<void>;
   onRemoveReaction?: (commentId: string) => Promise<void>;
   currentUserId?: string;
+  onReplySubmit?: (content: string, parentId: string) => Promise<void>;
+  // ❌ KHÔNG CẦN prop isDarkTheme NỮA
 }
 
 export function CommentItem({
@@ -50,7 +54,10 @@ export function CommentItem({
   onDislike,
   onRemoveReaction,
   currentUserId,
+  onReplySubmit,
 }: CommentItemProps) {
+  const { user } = useAuth();
+
   const [showReply, setShowReply] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
@@ -61,371 +68,270 @@ export function CommentItem({
   const [likeCount, setLikeCount] = useState(comment.likeCount || 0);
   const [dislikeCount, setDislikeCount] = useState(comment.dislikeCount || 0);
   const [replyText, setReplyText] = useState("");
+  const [isReplying, setIsReplying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
 
-  // Kiểm tra xem user hiện tại có phải là chủ sở hữu comment không
   const isOwner = currentUserId === comment.readerId;
 
-  const timeAgo = (dateString: string) => {
-    const now = new Date();
-    const past = new Date(dateString);
-    const diffMs = now.getTime() - past.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
+  // --- 🔥 CHUẨN TAILWIND DARK MODE (như file mẫu) ---
+  // Mặc định (Light): Chữ đen, nền trắng
+  // Dark (dark:): Chữ trắng, nền tối
 
-    if (diffDays > 0) return `${diffDays} ngày trước`;
-    if (diffHours > 0) return `${diffHours} giờ trước`;
-    if (diffMins > 0) return `${diffMins} phút trước`;
-    return "Vừa xong";
+  const containerClass =
+    "bg-card border-border hover:bg-accent/50 transition-colors border rounded-lg p-4";
+  const textClass = "text-foreground"; // Tự động đen/trắng theo theme hệ thống
+  const subTextClass = "text-muted-foreground";
+
+  const inputClass =
+    "bg-background border-input text-foreground placeholder:text-muted-foreground focus-visible:ring-ring";
+
+  const handleSendReply = async () => {
+    if (!replyText.trim() || !onReplySubmit) return;
+    setIsReplying(true);
+    try {
+      await onReplySubmit(replyText, comment.commentId);
+      setReplyText("");
+      setShowReply(false);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsReplying(false);
+    }
   };
 
+  // ... (Các hàm handle khác giữ nguyên)
   const handleLike = async () => {
-    if (!onLike || !onRemoveReaction) return;
-
+    if (!onLike) return;
     setLoading(true);
     try {
       if (liked) {
-        await onRemoveReaction(comment.commentId);
+        await onRemoveReaction?.(comment.commentId);
         setLiked(false);
-        setLikeCount((prev) => prev - 1);
-      } else if (disliked) {
-        await onLike(comment.commentId);
-        setLiked(true);
-        setDisliked(false);
-        setLikeCount((prev) => prev + 1);
-        setDislikeCount((prev) => prev - 1);
+        setLikeCount((p) => p - 1);
       } else {
         await onLike(comment.commentId);
         setLiked(true);
-        setLikeCount((prev) => prev + 1);
+        if (disliked) setDislikeCount((p) => p - 1);
+        setDisliked(false);
+        setLikeCount((p) => p + 1);
       }
-    } catch (error) {
-      console.error("Error updating like:", error);
+    } catch (e) {
     } finally {
       setLoading(false);
     }
   };
-
   const handleDislike = async () => {
-    if (!onDislike || !onRemoveReaction) return;
-
+    if (!onDislike) return;
     setLoading(true);
     try {
       if (disliked) {
-        await onRemoveReaction(comment.commentId);
+        await onRemoveReaction?.(comment.commentId);
         setDisliked(false);
-        setDislikeCount((prev) => prev - 1);
-      } else if (liked) {
-        await onDislike(comment.commentId);
-        setDisliked(true);
-        setLiked(false);
-        setDislikeCount((prev) => prev + 1);
-        setLikeCount((prev) => prev - 1);
+        setDislikeCount((p) => p - 1);
       } else {
         await onDislike(comment.commentId);
         setDisliked(true);
-        setDislikeCount((prev) => prev + 1);
+        if (liked) setLikeCount((p) => p - 1);
+        setLiked(false);
+        setDislikeCount((p) => p + 1);
       }
-    } catch (error) {
-      console.error("Error updating dislike:", error);
+    } catch (e) {
     } finally {
       setLoading(false);
     }
   };
-
   const handleEdit = async () => {
-    if (!onUpdateComment || !editContent.trim()) return;
-
+    if (!onUpdateComment) return;
     setEditLoading(true);
     try {
       await onUpdateComment(comment.commentId, editContent);
       setIsEditing(false);
-    } catch (error) {
-      console.error("Error updating comment:", error);
-      throw error;
+    } catch (e) {
     } finally {
       setEditLoading(false);
     }
   };
-
   const handleDelete = async () => {
     if (!onDeleteComment) return;
-
     setDeleteLoading(true);
     try {
       await onDeleteComment(comment.commentId);
-    } catch (error) {
-      console.error("Error deleting comment:", error);
-      throw error;
+    } catch (e) {
     } finally {
       setDeleteLoading(false);
     }
   };
-
   const showReactionsPopup = () => {
-    if (likeCount > 0 || dislikeCount > 0) {
-      setShowReactions(true);
-    }
+    if (likeCount > 0 || dislikeCount > 0) setShowReactions(true);
   };
-
   const cancelEdit = () => {
     setIsEditing(false);
     setEditContent(comment.content);
   };
-
-  // Tính toán text hiển thị tổng reactions (giống Facebook)
-  const getReactionsText = () => {
-    if (likeCount > 0 && dislikeCount > 0) {
-      return `${likeCount + dislikeCount}`;
-    } else if (likeCount > 0) {
-      return `${likeCount}`;
-    } else if (dislikeCount > 0) {
-      return `${dislikeCount}`;
-    }
-    return null;
+  const hasReactions = likeCount > 0 || dislikeCount > 0;
+  const timeAgo = (d: string) => {
+    const diff = Date.now() - new Date(d).getTime();
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return "Vừa xong";
+    if (min < 60) return `${min} phút trước`;
+    const h = Math.floor(min / 60);
+    if (h < 24) return `${h} giờ trước`;
+    return `${Math.floor(h / 24)} ngày trước`;
   };
 
-  // Kiểm tra xem có reactions nào không
-  const hasReactions = likeCount > 0 || dislikeCount > 0;
-
   return (
-    <>
-      <div className="p-4 rounded-lg border transition-colors bg-card hover:bg-card/80">
+    <div className="flex flex-col gap-2 w-full">
+      <div className={containerClass}>
         <div className="flex gap-3">
-          <Avatar className="h-10 w-10 flex-shrink-0 border">
+          <Avatar className="h-10 w-10 border">
             <AvatarImage src={comment.avatarUrl || ""} />
-            <AvatarFallback className="text-sm bg-primary/10 text-primary">
-              {comment.username?.[0]?.toUpperCase() || "U"}
-            </AvatarFallback>
+            <AvatarFallback>U</AvatarFallback>
           </Avatar>
 
           <div className="flex-1 min-w-0">
-            {/* Header với username và thời gian */}
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="font-semibold text-sm text-foreground">
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <div className="flex items-center gap-2">
+                <span className={`text-sm font-semibold ${textClass}`}>
                   {comment.username}
                 </span>
-                <span className="text-xs text-muted-foreground flex-shrink-0">
+                <span className={`text-xs ${subTextClass}`}>
                   {timeAgo(comment.createdAt)}
                 </span>
                 {showChapterTag && comment.chapterNo && (
-                  <span className="text-[10px] px-2 py-1 rounded-full bg-primary/10 text-primary border">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
                     Ch.{comment.chapterNo}
                   </span>
                 )}
               </div>
-
-              {/* Dropdown menu 3 chấm - luôn hiển thị */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 -mr-2 opacity-60 hover:opacity-100"
+                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
                   >
-                    <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                    <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  {/* Actions cho chủ sở hữu */}
-                  {isOwner && onUpdateComment && (
-                    <DropdownMenuItem
-                      onClick={() => setIsEditing(true)}
-                      className="cursor-pointer"
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Chỉnh sửa bình luận
-                    </DropdownMenuItem>
-                  )}
-
-                  {isOwner && onDeleteComment && (
-                    <DropdownMenuItem
-                      onClick={handleDelete}
-                      disabled={deleteLoading}
-                      className="cursor-pointer text-red-600 focus:text-red-600"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      {deleteLoading ? "Đang xóa..." : "Xóa bình luận"}
-                    </DropdownMenuItem>
-                  )}
-
-                  {/* Separator nếu có cả owner actions và reply */}
-                  {isOwner && (onUpdateComment || onDeleteComment) && (
-                    <DropdownMenuSeparator />
-                  )}
-
-                  {/* Action reply cho tất cả users */}
-                  <DropdownMenuItem
-                    onClick={() => setShowReply(!showReply)}
-                    className="cursor-pointer"
-                  >
-                    <Reply className="h-4 w-4 mr-2" />
-                    Trả lời
-                  </DropdownMenuItem>
-
-                  {/* Hiển thị reactions summary nếu có */}
-                  {hasReactions && (
+                <DropdownMenuContent align="end">
+                  {isOwner && (
                     <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={showReactionsPopup}
-                        className="cursor-pointer"
-                      >
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        Xem lượt thích & không thích
+                      <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                        <Edit className="mr-2 h-4 w-4" /> Sửa
                       </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={handleDelete}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" /> Xóa
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                     </>
                   )}
+                  <DropdownMenuItem onClick={() => setShowReply(!showReply)}>
+                    <Reply className="mr-2 h-4 w-4" /> Trả lời
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
 
-            {/* Nội dung comment */}
             {isEditing ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <Textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
-                  className="min-h-[100px] resize-none text-sm"
-                  placeholder="Nhập nội dung bình luận..."
+                  className={`min-h-[80px] text-sm ${inputClass}`}
                 />
                 <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={cancelEdit}
-                    disabled={editLoading}
-                    className="h-9"
-                  >
-                    <X className="h-4 w-4 mr-1" />
+                  <Button size="sm" variant="ghost" onClick={cancelEdit}>
                     Hủy
                   </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleEdit}
-                    disabled={!editContent.trim() || editLoading}
-                    className="h-9"
-                  >
-                    <Send className="h-4 w-4 mr-1" />
-                    {editLoading ? "Đang lưu..." : "Lưu"}
+                  <Button size="sm" onClick={handleEdit} disabled={editLoading}>
+                    Lưu
                   </Button>
                 </div>
               </div>
             ) : (
               <>
-                <p className="text-sm leading-relaxed mb-3 whitespace-pre-wrap text-foreground">
+                <p className={`text-sm mb-2 whitespace-pre-wrap ${textClass}`}>
                   {comment.content}
                 </p>
-
-                {/* Actions row với thiết kế giống Facebook */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    {/* Like button */}
-                    <button
-                      className={`flex items-center gap-1.5 transition-all ${
-                        liked
-                          ? "text-green-600 font-medium"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                      onClick={handleLike}
-                      disabled={loading}
-                    >
-                      <ThumbsUp
-                        className="h-4 w-4"
-                        fill={liked ? "currentColor" : "none"}
-                      />
-                      <span className="text-xs">Thích</span>
-                    </button>
-
-                    {/* Dislike button */}
-                    <button
-                      className={`flex items-center gap-1.5 transition-all ${
-                        disliked
-                          ? "text-red-600 font-medium"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                      onClick={handleDislike}
-                      disabled={loading}
-                    >
-                      <ThumbsDown
-                        className="h-4 w-4"
-                        fill={disliked ? "currentColor" : "none"}
-                      />
-                      <span className="text-xs">Không thích</span>
-                    </button>
-
-                    {/* Reply button */}
-                    <button
-                      className="flex items-center gap-1.5 transition-colors text-muted-foreground hover:text-foreground"
-                      onClick={() => setShowReply(!showReply)}
-                    >
-                      <Reply className="h-4 w-4" />
-                      <span className="text-xs">Trả lời</span>
-                    </button>
-                  </div>
-
-                  {/* Reactions summary - Hiển thị tổng số reactions giống Facebook */}
+                <div className="flex items-center gap-4 text-xs">
+                  <button
+                    onClick={handleLike}
+                    className={`flex items-center gap-1 ${
+                      liked ? "text-green-600 font-bold" : subTextClass
+                    } hover:text-foreground transition-colors`}
+                  >
+                    <ThumbsUp
+                      className="h-3.5 w-3.5"
+                      fill={liked ? "currentColor" : "none"}
+                    />
+                    Thích
+                  </button>
+                  <button
+                    onClick={handleDislike}
+                    className={`flex items-center gap-1 ${
+                      disliked ? "text-red-600 font-bold" : subTextClass
+                    } hover:text-foreground transition-colors`}
+                  >
+                    <ThumbsDown
+                      className="h-3.5 w-3.5"
+                      fill={disliked ? "currentColor" : "none"}
+                    />
+                    Không thích
+                  </button>
+                  <button
+                    onClick={() => setShowReply(!showReply)}
+                    className={`flex items-center gap-1 ${subTextClass} hover:text-foreground transition-colors`}
+                  >
+                    <Reply className="h-3.5 w-3.5" /> Trả lời
+                  </button>
                   {hasReactions && (
-                    <button
-                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    <span
                       onClick={showReactionsPopup}
+                      className={`cursor-pointer ml-auto flex items-center gap-1 ${subTextClass} hover:text-foreground`}
                     >
-                      <div className="flex items-center">
-                        {/* Hiển thị icon tương ứng với loại reaction */}
-                        {likeCount > 0 && dislikeCount === 0 && (
-                          <ThumbsUp className="h-3.5 w-3.5 text-green-600" />
-                        )}
-                        {dislikeCount > 0 && likeCount === 0 && (
-                          <ThumbsDown className="h-3.5 w-3.5 text-red-600" />
-                        )}
-                        {likeCount > 0 && dislikeCount > 0 && (
-                          <div className="flex items-center -space-x-1">
-                            <ThumbsUp className="h-3.5 w-3.5 text-green-600" />
-                            <ThumbsDown className="h-3.5 w-3.5 text-red-600" />
-                          </div>
-                        )}
-                      </div>
-                      <span>{getReactionsText()}</span>
-                    </button>
+                      <ThumbsUp className="h-3 w-3" /> {likeCount}
+                    </span>
                   )}
                 </div>
 
-                {/* Reply input */}
                 {showReply && (
-                  <div className="mt-4 pl-4 border-l-2 border-border">
-                    <div className="flex gap-3">
-                      <Avatar className="h-8 w-8 flex-shrink-0 border">
-                        <AvatarFallback className="text-xs bg-muted">
-                          You
-                        </AvatarFallback>
+                  <div className="mt-3 pl-3 border-l-2 border-border">
+                    <div className="flex gap-2">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={user?.avatar || ""} />
+                        <AvatarFallback>Y</AvatarFallback>
                       </Avatar>
-                      <div className="flex-1">
+                      <div className="flex-1 space-y-2">
                         <Textarea
                           value={replyText}
                           onChange={(e) => setReplyText(e.target.value)}
                           placeholder="Viết câu trả lời..."
-                          className="text-sm min-h-[80px] mb-3 resize-none border-muted"
+                          className={`min-h-[60px] text-sm ${inputClass}`}
                         />
                         <div className="flex justify-end gap-2">
                           <Button
-                            variant="outline"
                             size="sm"
-                            className="h-8 text-xs"
+                            variant="ghost"
                             onClick={() => setShowReply(false)}
                           >
                             Hủy
                           </Button>
                           <Button
                             size="sm"
-                            className="h-8 text-xs bg-primary hover:bg-primary/90"
-                            disabled={!replyText.trim()}
+                            onClick={handleSendReply}
+                            disabled={isReplying}
                           >
-                            Gửi
+                            {isReplying ? (
+                              <Loader2 className="animate-spin h-3 w-3" />
+                            ) : (
+                              "Gửi"
+                            )}
                           </Button>
                         </div>
                       </div>
@@ -438,17 +344,42 @@ export function CommentItem({
         </div>
       </div>
 
-      {/* Reactions Popup */}
+      {/* Nested Replies */}
+      {comment.replies && comment.replies.length > 0 && (
+        <div className="pl-8 md:pl-12 flex flex-col gap-2 relative w-full">
+          <div className="absolute left-3.5 top-0 bottom-4 w-px bg-border" />
+          {comment.replies.map(
+            (reply) =>
+              reply?.commentId && (
+                <CommentItem
+                  key={reply.commentId}
+                  comment={reply}
+                  showChapterTag={false}
+                  chapterId={chapterId}
+                  storyId={storyId}
+                  currentUserId={currentUserId}
+                  onUpdateComment={onUpdateComment}
+                  onDeleteComment={onDeleteComment}
+                  onLike={onLike}
+                  onDislike={onDislike}
+                  onRemoveReaction={onRemoveReaction}
+                  onReplySubmit={onReplySubmit}
+                />
+              )
+          )}
+        </div>
+      )}
+
       {comment.chapterId && (
         <ReactionsPopup
           chapterId={comment.chapterId}
           commentId={comment.commentId}
-          likeCount={likeCount}
-          dislikeCount={dislikeCount}
           isOpen={showReactions}
           onClose={() => setShowReactions(false)}
+          likeCount={likeCount}
+          dislikeCount={dislikeCount}
         />
       )}
-    </>
+    </div>
   );
 }

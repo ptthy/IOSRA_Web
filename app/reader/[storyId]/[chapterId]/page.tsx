@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { Navbar } from "@/components/navbar";
+import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
 import {
   ChevronLeft,
@@ -25,6 +25,7 @@ import {
   themeConfigs,
   getHighlights,
   Highlight,
+  applyHighlightsToText,
 } from "@/lib/readerSettings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -37,83 +38,57 @@ import {
   chapterCommentService,
   ChapterComment,
 } from "@/services/chapterCommentService";
+import { useAuth } from "@/context/AuthContext";
 
-// Thêm ContentRenderer component
+// --- ContentRenderer Component ---
 const ContentRenderer: React.FC<{
   content: string;
   className?: string;
   style?: React.CSSProperties;
-}> = ({ content, className = "", style }) => {
-  // Hàm phát hiện định dạng nội dung
+  chapterId?: string; // ← Thêm prop này
+}> = ({ content, className = "", style, chapterId }) => {
   const detectContentType = (text: string): "html" | "markdown" | "plain" => {
     if (!text) return "plain";
-
-    // Kiểm tra HTML tags
     const htmlRegex = /<(?!!--)[^>]*>/;
-    if (htmlRegex.test(text)) {
-      return "html";
-    }
-
-    // Kiểm tra Markdown syntax
+    if (htmlRegex.test(text)) return "html";
     const markdownRegex =
       /(^#{1,6}\s|\*\*.*\*\*|\*.*\*|~~.*~~|> |\- |\d\. |\[.*\]\(.*\))/;
-    if (markdownRegex.test(text)) {
-      return "markdown";
-    }
-
+    if (markdownRegex.test(text)) return "markdown";
     return "plain";
   };
 
-  // Xử lý plain text - thêm paragraph breaks
-  const formatPlainText = (text: string) => {
-    return text.split("\n\n").map((paragraph, index) => (
-      <div
-        key={index}
-        className="mb-6 leading-relaxed transition-opacity duration-300 hover:opacity-90"
-        style={style}
-      >
-        {paragraph}
-      </div>
-    ));
-  };
+  // 🔥 QUAN TRỌNG: Áp dụng highlight trước khi render
+  const processedContent = chapterId
+    ? applyHighlightsToText(content, getHighlights(chapterId))
+    : content;
 
-  // Xử lý HTML - sử dụng dangerouslySetInnerHTML với sanitization cơ bản
+  const contentType = detectContentType(processedContent);
+
+  // Render HTML với highlight đã được chèn
   const renderHTML = (html: string) => {
-    // Basic sanitization
-    const sanitizedHTML = html
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-      .replace(/on\w+="[^"]*"/g, "")
-      .replace(/on\w+='[^']*'/g, "");
-
     return (
       <div
         className="html-content"
-        dangerouslySetInnerHTML={{ __html: sanitizedHTML }}
+        dangerouslySetInnerHTML={{ __html: html }}
         style={style}
       />
     );
   };
 
-  // Xử lý Markdown cơ bản
+  // Markdown và Plain text cũng cần xử lý highlight → dùng HTML
   const renderMarkdown = (markdown: string) => {
-    // Xử lý các định dạng markdown cơ bản
-    const processedContent = markdown
-      // Headers
+    const processed = markdown
       .replace(/^###### (.*$)/gim, "<h6>$1</h6>")
       .replace(/^##### (.*$)/gim, "<h5>$1</h5>")
       .replace(/^#### (.*$)/gim, "<h4>$1</h4>")
       .replace(/^### (.*$)/gim, "<h3>$1</h3>")
       .replace(/^## (.*$)/gim, "<h2>$1</h2>")
       .replace(/^# (.*$)/gim, "<h1>$1</h1>")
-      // Bold, Italic, Strikethrough
       .replace(/\*\*(.*?)\*\*/gim, "<strong>$1</strong>")
       .replace(/\*(.*?)\*/gim, "<em>$1</em>")
       .replace(/~~(.*?)~~/gim, "<del>$1</del>")
-      // Blockquotes
       .replace(/^> (.*$)/gim, "<blockquote>$1</blockquote>")
-      // Line breaks
       .replace(/\n$/gim, "<br />")
-      // Paragraphs (xử lý đoạn văn)
       .split("\n\n")
       .map((paragraph) => {
         if (!paragraph.match(/^<(\/)?(h[1-6]|blockquote)/)) {
@@ -123,43 +98,69 @@ const ContentRenderer: React.FC<{
       })
       .join("");
 
-    return (
-      <div
-        className="markdown-content"
-        dangerouslySetInnerHTML={{ __html: processedContent }}
-        style={style}
-      />
-    );
+    return renderHTML(processed);
   };
 
-  const contentType = detectContentType(content);
+  const formatPlainText = (text: string) => {
+    return text.split("\n\n").map((paragraph, index) => (
+      <div
+        key={index}
+        className="mb-6 leading-relaxed transition-opacity duration-300 hover:opacity-90"
+        style={style}
+        dangerouslySetInnerHTML={{
+          __html: paragraph.replace(/\n/g, "<br />"),
+        }}
+      />
+    ));
+  };
 
   switch (contentType) {
     case "html":
       return (
-        <div className={`html-content ${className}`}>{renderHTML(content)}</div>
+        <div
+          className={`html-content ${className}`}
+          dangerouslySetInnerHTML={{ __html: processedContent }}
+          style={style}
+        />
       );
 
     case "markdown":
+      const htmlFromMarkdown = renderMarkdown(content); // content gốc, chưa có highlight
+      const finalHtml = applyHighlightsToText(
+        htmlFromMarkdown.props.dangerouslySetInnerHTML.__html,
+        getHighlights(chapterId || "")
+      );
       return (
-        <div className={`markdown-content ${className}`}>
-          {renderMarkdown(content)}
-        </div>
+        <div
+          className={`markdown-content ${className}`}
+          dangerouslySetInnerHTML={{ __html: finalHtml }}
+          style={style}
+        />
       );
 
     case "plain":
     default:
+      const plainWithBreaks = content.replace(/\n/g, "<br />");
+      const highlightedPlain = applyHighlightsToText(
+        plainWithBreaks,
+        getHighlights(chapterId || "")
+      );
       return (
-        <div className={`plain-content ${className}`}>
-          {formatPlainText(content)}
-        </div>
+        <div
+          className={`plain-content ${className}`}
+          dangerouslySetInnerHTML={{ __html: highlightedPlain }}
+          style={style}
+        />
       );
   }
 };
 
+// --- Main Page Component ---
 export default function ReaderPage() {
   const router = useRouter();
   const params = useParams();
+  const { user } = useAuth();
+
   const storyId = params.storyId as string;
   const chapterId = params.chapterId as string;
 
@@ -175,16 +176,27 @@ export default function ReaderPage() {
     x: number;
     y: number;
   } | null>(null);
+
   const [comments, setComments] = useState<ChapterComment[]>([]);
+  const [totalComments, setTotalComments] = useState(0);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsPage, setCommentsPage] = useState(1);
   const [hasMoreComments, setHasMoreComments] = useState(true);
+
   const [activeTab, setActiveTab] = useState<"content" | "comments">("content");
   const [scrollProgress, setScrollProgress] = useState(0);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [allChapters, setAllChapters] = useState<ChapterSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-
+  useEffect(() => {
+    if (chapterId) {
+      const loadedHighlights = getHighlights(chapterId);
+      console.log(
+        `Loaded ${loadedHighlights.length} highlights cho chapter ${chapterId}`
+      );
+      setHighlights(loadedHighlights);
+    }
+  }, [chapterId]);
   // Load chapter data
   useEffect(() => {
     const loadData = async () => {
@@ -263,7 +275,7 @@ export default function ReaderPage() {
     setSettings(savedSettings);
   }, []);
 
-  // Load comments từ API
+  // 🔥 FIX: Hàm loadComments sửa lỗi đếm comment
   const loadComments = async (page: number = 1) => {
     if (!chapterId) return;
 
@@ -277,6 +289,8 @@ export default function ReaderPage() {
 
       if (page === 1) {
         setComments(response.items);
+        // 🔥 FIX: Sử dụng total từ response
+        setTotalComments(response.total || response.items.length);
       } else {
         setComments((prev) => [...prev, ...response.items]);
       }
@@ -290,23 +304,73 @@ export default function ReaderPage() {
     }
   };
 
-  // Thêm comment mới
-  const handleAddComment = async (content: string) => {
+  // Thêm comment mới với hỗ trợ reply
+  const handleAddComment = async (
+    content: string,
+    parentCommentId?: string
+  ) => {
     if (!chapterId) return;
 
     try {
       const newComment = await chapterCommentService.createComment(chapterId, {
         content,
+        parentCommentId,
       });
 
-      setComments((prev) => [newComment, ...prev]);
+      if (!parentCommentId) {
+        // Nếu là comment gốc
+        setComments((prev) => [newComment, ...prev]);
+        setTotalComments((prev) => prev + 1);
+      } else {
+        // Nếu là reply, cập nhật comment cha
+        const addReplyRecursive = (
+          comments: ChapterComment[]
+        ): ChapterComment[] => {
+          return comments.map((comment) => {
+            if (comment.commentId === parentCommentId) {
+              return {
+                ...comment,
+                replies: [...(comment.replies || []), newComment],
+              };
+            }
+            if (comment.replies && comment.replies.length > 0) {
+              return {
+                ...comment,
+                replies: addReplyRecursive(comment.replies),
+              };
+            }
+            return comment;
+          });
+        };
+
+        setComments((prev) => addReplyRecursive(prev));
+      }
+
+      return newComment;
     } catch (error) {
       console.error("Error creating comment:", error);
       throw error;
     }
   };
 
-  // Update comment
+  // Update comment với hỗ trợ recursive
+  const updateCommentRecursive = (
+    list: ChapterComment[],
+    id: string,
+    content: string
+  ): ChapterComment[] => {
+    return list.map((c) => {
+      if (c.commentId === id)
+        return { ...c, content, updatedAt: new Date().toISOString() };
+      if (c.replies && c.replies.length > 0)
+        return {
+          ...c,
+          replies: updateCommentRecursive(c.replies, id, content),
+        };
+      return c;
+    });
+  };
+
   const handleUpdateComment = async (commentId: string, content: string) => {
     if (!chapterId) return;
 
@@ -315,150 +379,97 @@ export default function ReaderPage() {
         content,
       });
 
-      // Update local state
-      setComments((prev) =>
-        prev.map((comment) =>
-          comment.commentId === commentId
-            ? { ...comment, content, updatedAt: new Date().toISOString() }
-            : comment
-        )
-      );
+      setComments((prev) => updateCommentRecursive(prev, commentId, content));
     } catch (error) {
       console.error("Error updating comment:", error);
       throw error;
     }
   };
 
-  // Delete comment
+  // Delete comment với hỗ trợ recursive
+  const deleteCommentRecursive = (
+    list: ChapterComment[],
+    id: string
+  ): ChapterComment[] => {
+    return list
+      .filter((c) => c.commentId !== id)
+      .map((c) => {
+        if (c.replies && c.replies.length > 0)
+          return { ...c, replies: deleteCommentRecursive(c.replies, id) };
+        return c;
+      });
+  };
+
   const handleDeleteComment = async (commentId: string) => {
     if (!chapterId) return;
 
     try {
       await chapterCommentService.deleteComment(chapterId, commentId);
 
-      // Update local state
-      setComments((prev) =>
-        prev.filter((comment) => comment.commentId !== commentId)
-      );
+      // Đếm số comment sẽ bị xóa (bao gồm cả replies)
+      const countDeletedComments = (
+        comments: ChapterComment[],
+        targetId: string
+      ): number => {
+        let count = 0;
+        const findAndCount = (commentList: ChapterComment[]) => {
+          commentList.forEach((comment) => {
+            if (comment.commentId === targetId) {
+              count += 1 + (comment.replies ? comment.replies.length : 0);
+            } else if (comment.replies) {
+              findAndCount(comment.replies);
+            }
+          });
+        };
+        findAndCount(comments);
+        return count;
+      };
+
+      const deletedCount = countDeletedComments(comments, commentId);
+      setComments((prev) => deleteCommentRecursive(prev, commentId));
+      setTotalComments((prev) => Math.max(0, prev - deletedCount));
     } catch (error) {
       console.error("Error deleting comment:", error);
       throw error;
     }
   };
 
-  // Like comment
+  // Like comment - tối ưu với reload comments
   const handleLikeComment = async (commentId: string) => {
     if (!chapterId) return;
 
     try {
       await chapterCommentService.likeComment(chapterId, commentId);
-
-      // Update local state
-      setComments((prev) =>
-        prev.map((comment) => {
-          if (comment.commentId === commentId) {
-            const newLikeCount =
-              comment.viewerReaction === "like"
-                ? comment.likeCount - 1
-                : comment.viewerReaction === "dislike"
-                ? comment.likeCount + 1
-                : comment.likeCount + 1;
-
-            const newDislikeCount =
-              comment.viewerReaction === "dislike"
-                ? comment.dislikeCount - 1
-                : comment.dislikeCount;
-
-            return {
-              ...comment,
-              likeCount: newLikeCount,
-              dislikeCount: newDislikeCount,
-              viewerReaction: comment.viewerReaction === "like" ? null : "like",
-            };
-          }
-          return comment;
-        })
-      );
+      // Reload comments để có data mới nhất
+      loadComments(1);
     } catch (error) {
       console.error("Error liking comment:", error);
-      throw error;
     }
   };
 
-  // Dislike comment
+  // Dislike comment - tối ưu với reload comments
   const handleDislikeComment = async (commentId: string) => {
     if (!chapterId) return;
 
     try {
       await chapterCommentService.dislikeComment(chapterId, commentId);
-
-      // Update local state
-      setComments((prev) =>
-        prev.map((comment) => {
-          if (comment.commentId === commentId) {
-            const newDislikeCount =
-              comment.viewerReaction === "dislike"
-                ? comment.dislikeCount - 1
-                : comment.viewerReaction === "like"
-                ? comment.dislikeCount + 1
-                : comment.dislikeCount + 1;
-
-            const newLikeCount =
-              comment.viewerReaction === "like"
-                ? comment.likeCount - 1
-                : comment.likeCount;
-
-            return {
-              ...comment,
-              likeCount: newLikeCount,
-              dislikeCount: newDislikeCount,
-              viewerReaction:
-                comment.viewerReaction === "dislike" ? null : "dislike",
-            };
-          }
-          return comment;
-        })
-      );
+      // Reload comments để có data mới nhất
+      loadComments(1);
     } catch (error) {
       console.error("Error disliking comment:", error);
-      throw error;
     }
   };
 
-  // Remove reaction
+  // Remove reaction - tối ưu với reload comments
   const handleRemoveReaction = async (commentId: string) => {
     if (!chapterId) return;
 
     try {
       await chapterCommentService.removeCommentReaction(chapterId, commentId);
-
-      // Update local state
-      setComments((prev) =>
-        prev.map((comment) => {
-          if (comment.commentId === commentId) {
-            const newLikeCount =
-              comment.viewerReaction === "like"
-                ? comment.likeCount - 1
-                : comment.likeCount;
-
-            const newDislikeCount =
-              comment.viewerReaction === "dislike"
-                ? comment.dislikeCount - 1
-                : comment.dislikeCount;
-
-            return {
-              ...comment,
-              likeCount: newLikeCount,
-              dislikeCount: newDislikeCount,
-              viewerReaction: null,
-            };
-          }
-          return comment;
-        })
-      );
+      // Reload comments để có data mới nhất
+      loadComments(1);
     } catch (error) {
       console.error("Error removing reaction:", error);
-      throw error;
     }
   };
 
@@ -482,9 +493,45 @@ export default function ReaderPage() {
   }, []);
 
   useEffect(() => {
+    //   const handleSelection = () => {
+    //     const selection = window.getSelection();
+    //     const text = selection?.toString().trim();
+
+    //     if (text && text.length > 0 && activeTab === "content") {
+    //       setSelectedText(text);
+    //       const range = selection?.getRangeAt(0);
+    //       const rect = range?.getBoundingClientRect();
+
+    //       if (rect) {
+    //         setSelectionPosition({
+    //           x: rect.left + rect.width / 2,
+    //           y: rect.top - 10,
+    //         });
+    //       }
+    //     } else {
+    //       setSelectedText("");
+    //       setSelectionPosition(null);
+    //     }
+    //   };
+
+    //   document.addEventListener("mouseup", handleSelection);
+    //   document.addEventListener("touchend", handleSelection);
+
+    //   return () => {
+    //     document.removeEventListener("mouseup", handleSelection);
+    //     document.removeEventListener("touchend", handleSelection);
+    //   };
+    // }, [activeTab]);
     const handleSelection = () => {
       const selection = window.getSelection();
       const text = selection?.toString().trim();
+
+      console.log("🔍 Selection detected:", {
+        text,
+        hasText: !!text,
+        activeTab,
+        selectionLength: text?.length,
+      });
 
       if (text && text.length > 0 && activeTab === "content") {
         setSelectedText(text);
@@ -492,10 +539,14 @@ export default function ReaderPage() {
         const rect = range?.getBoundingClientRect();
 
         if (rect) {
-          setSelectionPosition({
-            x: rect.left + rect.width / 2,
-            y: rect.top - 10,
-          });
+          // Tính toán vị trí chính xác hơn
+          const position = {
+            x: rect.left + window.scrollX + rect.width / 2,
+            y: rect.top + window.scrollY - 50, // Đưa lên trên một chút
+          };
+
+          setSelectionPosition(position);
+          console.log("🎯 Popover position set:", position);
         }
       } else {
         setSelectedText("");
@@ -511,7 +562,6 @@ export default function ReaderPage() {
       document.removeEventListener("touchend", handleSelection);
     };
   }, [activeTab]);
-
   const handleNavigate = (
     page: string,
     storyId?: string,
@@ -568,7 +618,6 @@ export default function ReaderPage() {
   if (loading) {
     return (
       <div className="min-h-screen">
-        <Navbar />
         <div
           className="flex items-center justify-center min-h-[60vh]"
           style={{ backgroundColor: themeConfigs.light.bg }}
@@ -591,7 +640,6 @@ export default function ReaderPage() {
   if (error && !loading) {
     return (
       <div className="min-h-screen">
-        <Navbar />
         <div
           className="flex flex-col items-center justify-center min-h-[60vh]"
           style={{ backgroundColor: themeConfigs.light.bg }}
@@ -619,7 +667,6 @@ export default function ReaderPage() {
   if (!chapter) {
     return (
       <div className="min-h-screen">
-        <Navbar />
         <div
           className="flex flex-col items-center justify-center min-h-[60vh]"
           style={{ backgroundColor: themeConfigs.light.bg }}
@@ -661,8 +708,62 @@ export default function ReaderPage() {
     fontSize: `${settings.fontSize}px`,
     lineHeight: settings.lineHeight,
     fontFamily: fontFamilyMap[settings.fontFamily] || fontFamilyMap.serif,
+    color: theme.text,
   };
 
+  //   const contentOverrideStyle = `
+  //   .reader-content p,
+  //   .reader-content div,
+  //   .reader-content h1,
+  //   .reader-content h2,
+  //   .reader-content h3,
+  //   .reader-content h4,
+  //   .reader-content blockquote,
+  //   .plain-content > div,
+  //   .markdown-content p,
+  //   .html-content p {
+  //     line-height: ${settings.lineHeight} !important;
+  //     margin-bottom: 1.5em !important;
+  //   }
+  //   .plain-content > div {
+  //     margin-bottom: 1.5em !important;
+  //   }
+  // `;
+  const contentOverrideStyle = `
+  .reader-content * {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+  }
+  
+  .reader-content p,
+  .reader-content div,
+  .reader-content h1,
+  .reader-content h2,
+  .reader-content h3,
+  .reader-content h4,
+  .reader-content blockquote,
+  .plain-content > div,
+  .markdown-content p,
+  .html-content p {
+    line-height: ${settings.lineHeight} !important;
+    margin-bottom: 1.5em !important;
+    user-select: text !important;
+    -webkit-user-select: text !important;
+  }
+  
+  .plain-content > div {
+    margin-bottom: 1.5em !important;
+    user-select: text !important;
+    -webkit-user-select: text !important;
+  }
+  
+  /* Đảm bảo popover hiển thị trên cùng */
+  .fixed {
+    z-index: 9999 !important;
+  }
+`;
   const isTransparent = settings.theme === "transparent";
   const isDarkTheme = settings.theme === "dark-blue";
 
@@ -684,6 +785,7 @@ export default function ReaderPage() {
         color: theme.text,
       }}
     >
+      <style>{contentOverrideStyle}</style>
       {/* Reading Progress Bar */}
       <div
         className="fixed top-0 left-0 h-0.5 z-50 transition-all duration-300"
@@ -695,7 +797,6 @@ export default function ReaderPage() {
       />
 
       {/* Main Navbar */}
-      <Navbar />
 
       <ReaderToolbar
         chapterNo={chapter.chapterNo}
@@ -754,19 +855,23 @@ export default function ReaderPage() {
               >
                 <MessageSquare className="mr-2 h-4 w-4" />
                 <span className="font-medium">Bình luận</span>
-                {comments.length > 0 && (
+                {totalComments > 0 && (
                   <Badge
-                    className="ml-2 px-2 py-0.5 text-xs font-medium transition-colors duration-200"
+                    className="ml-2 px-2 py-0.5 text-xs font-medium transition-colors duration-200 border"
                     style={{
                       backgroundColor:
                         activeTab === "comments"
                           ? "#00416a"
-                          : `${theme.text}18`,
-                      color:
-                        activeTab === "comments" ? "#FFFFFF" : theme.secondary,
+                          : isDarkTheme
+                          ? "rgba(255, 255, 255, 0.15)"
+                          : "rgba(0, 0, 0, 0.05)",
+                      color: activeTab === "comments" ? "#FFFFFF" : theme.text,
+                      borderColor: isDarkTheme
+                        ? "rgba(255,255,255,0.1)"
+                        : "transparent",
                     }}
                   >
-                    {comments.length}
+                    {totalComments}
                   </Badge>
                 )}
               </TabsTrigger>
@@ -854,16 +959,16 @@ export default function ReaderPage() {
                 </div>
 
                 {/* Premium Content - Chiếm toàn bộ chiều rộng có sẵn */}
-                <div
-                  className="w-full max-w-full select-text transition-all duration-300 px-4"
-                  style={readerStyle}
-                >
+                <div className="reader-content" style={readerStyle}>
                   <ContentRenderer
                     content={chapterContent}
-                    className="w-full max-w-full"
+                    chapterId={chapterId}
+                    className="w-full max-w-full content-text"
                     style={{
                       color: theme.text,
                       textAlign: "justify" as const,
+                      lineHeight: settings.lineHeight,
+                      // fontSize: `${settings.fontSize}px`,
                     }}
                   />
                 </div>
@@ -994,13 +1099,15 @@ export default function ReaderPage() {
                             </div>
                           </div>
                         )}
-                        <div className="flex-1 w-full">
+                        <div className="reader-content" style={readerStyle}>
                           <ContentRenderer
                             content={getPageContent(currentPage)}
+                            chapterId={chapterId}
                             className="w-full"
                             style={{
                               color: theme.text,
                               textAlign: "justify" as const,
+                              lineHeight: settings.lineHeight,
                             }}
                           />
                         </div>
@@ -1042,10 +1149,12 @@ export default function ReaderPage() {
                           <div className="flex-1 w-full">
                             <ContentRenderer
                               content={getPageContent(currentPage + 1)}
+                              chapterId={chapterId}
                               className="w-full"
                               style={{
                                 color: theme.text,
                                 textAlign: "justify" as const,
+                                lineHeight: settings.lineHeight,
                               }}
                             />
                           </div>
@@ -1136,9 +1245,10 @@ export default function ReaderPage() {
                 loading={commentsLoading}
                 hasMore={hasMoreComments}
                 onLoadMore={handleLoadMoreComments}
-                isDarkTheme={isDarkTheme}
                 chapterId={chapterId}
                 storyId={storyId}
+                currentUserId={user?.id}
+                totalCount={totalComments}
               />
             </div>
           </TabsContent>
@@ -1159,7 +1269,7 @@ export default function ReaderPage() {
         </button>
       )}
 
-      {selectedText && selectionPosition && activeTab === "content" && (
+      {/* {selectedText && selectionPosition && activeTab === "content" && (
         <HighlightPopover
           selectedText={selectedText}
           chapterId={chapterId}
@@ -1171,8 +1281,28 @@ export default function ReaderPage() {
             window.getSelection()?.removeAllRanges();
           }}
         />
-      )}
+      )} */}
+      {selectedText && selectionPosition && activeTab === "content" && (
+        <HighlightPopover
+          selectedText={selectedText}
+          chapterId={chapterId}
+          position={selectionPosition}
+          onHighlightCreated={() => {
+            console.log("🟡 Highlight created, refreshing highlights...");
+            const newHighlights = getHighlights(chapterId);
+            setHighlights(newHighlights);
+            console.log("🟡 New highlights:", newHighlights);
 
+            setSelectedText("");
+            setSelectionPosition(null);
+
+            // Clear selection
+            if (window.getSelection) {
+              window.getSelection()?.removeAllRanges();
+            }
+          }}
+        />
+      )}
       <ReaderSettingsDialog
         open={showSettings}
         onOpenChange={setShowSettings}

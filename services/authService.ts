@@ -119,4 +119,7 @@ export const authService = {
     // Không cần body, nhưng vẫn là POST request
     return apiClient.post("/api/Auth/logout");
   },
+  getMyProfile: () => {
+    return apiClient.get("/api/Profile");
+  },
 };

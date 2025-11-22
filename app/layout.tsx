@@ -4,7 +4,10 @@ import { Poppins } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/providers/theme-provider";
-//import { Navbar } from "@/components/navbar";
+import { Navbar } from "@/components/layout/Navbar";
+
+import { AuthProvider } from "@/context/AuthContext";
+
 import { AppProviders } from "@/components/providers/app-providers";
 
 const poppins = Poppins({
@@ -13,17 +16,11 @@ const poppins = Poppins({
   variable: "--font-poppins",
   display: "swap",
 });
-// Dòng này để test save
-// Dòng này để test save
-// Dòng này để test save
 
-// --- Metadata ---
 export const metadata: Metadata = {
   title: "Tora Novel",
   description: "Nền tảng đọc truyện tương tác với AI Voice",
 };
-
-// ------------------------------------------
 
 export default async function RootLayout({
   children,
@@ -43,14 +40,14 @@ export default async function RootLayout({
           isScaled ? "theme-scaled" : ""
         )}
       >
-        {/* ✅ Bọc ThemeProvider ngoài cùng */}
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {/* ✅ AppProviders nếu cần global context */}
-          <AppProviders activeThemeValue={activeThemeValue}>
-            {/* <Navbar /> */}
-            {/* <main className="min-h-screen">{children}</main>*/}
-            {children}
-          </AppProviders>
+          <AuthProvider>
+            <AppProviders activeThemeValue={activeThemeValue}>
+              <Navbar />
+
+              {children}
+            </AppProviders>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
