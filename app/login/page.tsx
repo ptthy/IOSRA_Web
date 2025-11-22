@@ -63,7 +63,14 @@ export default function LoginRoute() {
       const response = await authService.loginWithGoogle({ idToken });
 
       // 4. Xử lý response từ backend
-      const { username, email, token: backendToken, roles } = response.data;
+      const {
+        username,
+        email,
+        token: backendToken,
+        roles,
+        displayName,
+        avatar,
+      } = response.data;
 
       if (backendToken && username && email) {
         // Giải mã token để lấy ID
@@ -73,6 +80,8 @@ export default function LoginRoute() {
           username: username,
           email: email,
           role: roles && roles.length > 0 ? roles[0] : "reader",
+          displayName: displayName || username,
+          avatar: avatar,
         };
         // Gọi setAuthData với user object và token
         setAuthData(userToSet, backendToken);

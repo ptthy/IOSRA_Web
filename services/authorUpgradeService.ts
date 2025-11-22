@@ -1,29 +1,25 @@
+//services/authorUpgradeService.ts
 import apiClient from "./apiClient";
-
 
 export interface AuthorUpgradeRequestPayload {
   commitment: string;
 }
 
-
-export type ApiUpgradeStatus = "PENDING" | "REJECTED" | "APPROVED";
-
+export type ApiUpgradeStatus = "pending" | "rejected" | "approved";
 
 export interface AuthorUpgradeRequestResponse {
   requestId: string;
   requesterId: string;
   requesterUsername: string | null;
   status: ApiUpgradeStatus | string;
-  content: string; // Trường này chứa cả cam kết và lý do từ chối
+  content: string;
   createdAt: string;
   assignedOmodId: string;
 }
 
-
 const submitRequest = (data: AuthorUpgradeRequestPayload) => {
   return apiClient.post("/api/AuthorUpgrade/request", data);
 };
-
 
 const getMyRequests = () => {
   return apiClient.get<AuthorUpgradeRequestResponse[]>(
@@ -31,9 +27,7 @@ const getMyRequests = () => {
   );
 };
 
-
 export const authorUpgradeService = {
   submitRequest,
   getMyRequests,
 };
-

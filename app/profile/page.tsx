@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Navbar } from "@/components/navbar";
+import { Navbar } from "@/components/layout/Navbar";
 import {
   Select,
   SelectContent,
@@ -197,7 +197,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen text-base">
-      <Navbar />
+      
 
       {/* Header với Cover và Avatar */}
       <div className="bg-gradient-to-r">

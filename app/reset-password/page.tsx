@@ -1,21 +1,20 @@
+//app/reset-password/page.tsx
 "use client";
 
 import React, { useState, Suspense } from "react";
-// Khôi phục đường dẫn alias
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  BookOpen,
-  Volume2,
-  Headphones,
   KeyRound,
   Eye,
   EyeOff,
   ArrowLeft,
   RefreshCw,
+  ShieldCheck,
+  Clock,
+  Mail,
 } from "lucide-react";
-// Khôi phục đường dẫn alias
 import { authService } from "@/services/authService";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -35,11 +34,11 @@ export default function ResetPasswordRoute() {
   );
 }
 
-// Component logic và UI (lấy từ ResetPasswordPage gốc)
+// Component logic và UI
 function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const email = searchParams.get("email"); // <-- Get email from URL
+  const email = searchParams.get("email");
 
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -48,6 +47,10 @@ function ResetPasswordForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [imageError, setImageError] = useState(false);
+
+  const ERROR_IMG_SRC =
+    "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,131 +78,121 @@ function ResetPasswordForm() {
       toast.error(
         "Không tìm thấy địa chỉ email. Vui lòng thử lại từ bước Quên mật khẩu."
       );
-      // Optionally redirect back
-      // router.push("/forgot-password");
       return;
     }
     setIsLoading(true);
 
     try {
-      // Call the resetPassword API
       await authService.resetPassword({
-        email, // Use email from URL
+        email,
         otp,
         newPassword,
-        confirmNewPassword: confirmPassword, // API expects confirmNewPassword
+        confirmNewPassword: confirmPassword,
       });
 
       toast.success("Đặt lại mật khẩu thành công! Vui lòng đăng nhập.");
-
-      // Redirect to the login page on success
       router.push("/login");
     } catch (err: any) {
-      // Handle API errors
       const errMsg =
         err.response?.data?.message ||
         "Đặt lại mật khẩu thất bại. Mã OTP có thể sai hoặc hết hạn.";
       setError(errMsg);
       toast.error(errMsg);
-      setIsLoading(false); // Stop loading on error
+      setIsLoading(false);
     }
-    // No need to set isLoading false on success due to redirect
   };
 
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Visual */}
       <div
-        className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center p-12"
+        className="hidden md:flex md:w-1/2 relative overflow-hidden"
         style={{ backgroundColor: "#00416A" }}
       >
-        <div className="relative z-10 max-w-lg text-center">
-          {/* Logo/Brand */}
-          <div className="mb-8">
-            <h1 className="text-5xl mb-4" style={{ color: "#F0EAD6" }}>
-              Tora Novel
-            </h1>
-            <p
-              className="text-xl"
-              style={{ color: "rgba(240, 234, 214, 0.8)" }}
-            >
-              Nền tảng đọc truyện tương tác với AI Voice
-            </p>
+        {/* Background Image with Fallback */}
+        {imageError ? (
+          <div className="w-full h-full flex items-center justify-center bg-gray-900 opacity-20">
+            <img
+              src={ERROR_IMG_SRC}
+              alt="Error loading image"
+              className="w-20 h-20"
+            />
           </div>
+        ) : (
+          <img
+            src="https://images.unsplash.com/photo-1563986768609-322da13575f3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080"
+            alt="Password reset"
+            className="w-full h-full object-cover opacity-20"
+            onError={() => setImageError(true)}
+          />
+        )}
 
-          {/* Visual Icons */}
-          <div className="flex justify-center gap-12 mb-12">
-            <div className="flex flex-col items-center gap-3">
+        {/* Overlay Content */}
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center"
+          style={{ color: "#F0EAD6" }}
+        >
+          <div className="max-w-md space-y-8">
+            {/* Icon */}
+            <div className="flex justify-center">
               <div
-                className="w-20 h-20 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: "rgba(240, 234, 214, 0.15)" }}
+                className="rounded-full p-6"
+                style={{ backgroundColor: "rgba(240, 234, 214, 0.1)" }}
               >
-                <BookOpen className="w-10 h-10" style={{ color: "#F0EAD6" }} />
+                <KeyRound className="w-16 h-16" style={{ color: "#F0EAD6" }} />
               </div>
-              <p
-                className="text-sm"
-                style={{ color: "rgba(240, 234, 214, 0.8)" }}
-              >
-                Đọc truyện
+            </div>
+
+            {/* Title */}
+            <div className="space-y-4">
+              <h1 className="text-4xl">Đặt lại mật khẩu</h1>
+              <p className="text-lg opacity-90">
+                Nhập mã OTP và tạo mật khẩu mới cho tài khoản của bạn
               </p>
             </div>
 
-            <div className="flex flex-col items-center gap-3">
-              <div
-                className="w-20 h-20 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: "rgba(240, 234, 214, 0.15)" }}
-              >
-                <Volume2 className="w-10 h-10" style={{ color: "#F0EAD6" }} />
+            {/* Features */}
+            <div className="space-y-4 text-left">
+              <div className="flex items-start gap-3">
+                <ShieldCheck className="w-6 h-6 mt-1 flex-shrink-0" />
+                <div>
+                  <h3 className="font-medium">Bảo mật tài khoản</h3>
+                  <p className="text-sm opacity-80">
+                    Đảm bảo mật khẩu mới an toàn và dễ nhớ
+                  </p>
+                </div>
               </div>
-              <p
-                className="text-sm"
-                style={{ color: "rgba(240, 234, 214, 0.8)" }}
-              >
-                AI Voice
-              </p>
-            </div>
-
-            <div className="flex flex-col items-center gap-3">
-              <div
-                className="w-20 h-20 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: "rgba(240, 234, 214, 0.15)" }}
-              >
-                <Headphones
-                  className="w-10 h-10"
-                  style={{ color: "#F0EAD6" }}
-                />
+              <div className="flex items-start gap-3">
+                <Clock className="w-6 h-6 mt-1 flex-shrink-0" />
+                <div>
+                  <h3 className="font-medium">Hiệu lực 5 phút</h3>
+                  <p className="text-sm opacity-80">
+                    Mã OTP có hiệu lực trong vòng 5 phút
+                  </p>
+                </div>
               </div>
-              <p
-                className="text-sm"
-                style={{ color: "rgba(240, 234, 214, 0.8)" }}
-              >
-                Audiobook
-              </p>
+              <div className="flex items-start gap-3">
+                <Mail className="w-6 h-6 mt-1 flex-shrink-0" />
+                <div>
+                  <h3 className="font-medium">Gửi đến email</h3>
+                  <p className="text-sm opacity-80">
+                    Mã OTP đã được gửi đến {email || "email của bạn"}
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
-
-          {/* Feature Text */}
-          <div className="space-y-4">
-            <p
-              className="text-lg"
-              style={{ color: "rgba(240, 234, 214, 0.9)" }}
-            >
-              Đặt lại mật khẩu mới
-            </p>
-            <p
-              className="text-sm"
-              style={{ color: "rgba(240, 234, 214, 0.7)" }}
-            >
-              Nhập mã OTP đã gửi đến email và tạo mật khẩu mới của bạn
-            </p>
           </div>
         </div>
 
-        {/* Decorative Background Pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute top-10 left-10 w-64 h-64 rounded-full bg-white blur-3xl" />
-          <div className="absolute bottom-10 right-10 w-96 h-96 rounded-full bg-white blur-3xl" />
-        </div>
+        {/* Decorative circles */}
+        <div
+          className="absolute -top-24 -right-24 w-96 h-96 rounded-full opacity-10"
+          style={{ backgroundColor: "#F0EAD6" }}
+        ></div>
+        <div
+          className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full opacity-10"
+          style={{ backgroundColor: "#F0EAD6" }}
+        ></div>
       </div>
 
       {/* Right Side - Form */}
@@ -208,8 +201,7 @@ function ResetPasswordForm() {
           {/* Back Button */}
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-sm transition-colors hover:opacity-70"
-            style={{ color: "#00416A" }}
+            className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
             disabled={isLoading}
           >
             <ArrowLeft className="w-4 h-4" />
@@ -219,19 +211,14 @@ function ResetPasswordForm() {
           {/* Header */}
           <div className="text-center space-y-2">
             <div className="flex justify-center mb-4">
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: "rgba(0, 65, 106, 0.1)" }}
-              >
-                <KeyRound className="w-8 h-8" style={{ color: "#00416A" }} />
+              <div className="w-16 h-16 rounded-full flex items-center justify-center bg-primary/10">
+                <KeyRound className="w-8 h-8 text-primary" />
               </div>
             </div>
-            <h2 className="text-3xl" style={{ color: "#00416A" }}>
-              Đặt lại mật khẩu
-            </h2>
+            <h2 className="text-3xl text-primary">Đặt lại mật khẩu</h2>
             <p className="text-sm text-muted-foreground">
               Mã OTP đã được gửi đến{" "}
-              <span style={{ color: "#00416A" }}>{email}</span>
+              <span className="text-primary">{email}</span>
             </p>
           </div>
 
@@ -239,9 +226,7 @@ function ResetPasswordForm() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* OTP Field */}
             <div className="space-y-2">
-              <Label htmlFor="otp" style={{ color: "#00416A" }}>
-                Mã OTP (6 chữ số)
-              </Label>
+              <Label htmlFor="otp">Mã OTP (6 chữ số)</Label>
               <Input
                 id="otp"
                 type="text"
@@ -253,18 +238,13 @@ function ResetPasswordForm() {
                 required
                 disabled={isLoading}
                 className="h-11 text-center text-2xl tracking-widest"
-                style={{
-                  borderColor: "rgba(0, 65, 106, 0.2)",
-                }}
                 maxLength={6}
               />
             </div>
 
             {/* New Password Field */}
             <div className="space-y-2">
-              <Label htmlFor="newPassword" style={{ color: "#00416A" }}>
-                Mật khẩu mới
-              </Label>
+              <Label htmlFor="newPassword">Mật khẩu mới</Label>
               <div className="relative">
                 <Input
                   id="newPassword"
@@ -275,9 +255,6 @@ function ResetPasswordForm() {
                   required
                   disabled={isLoading}
                   className="h-11 pr-10"
-                  style={{
-                    borderColor: "rgba(0, 65, 106, 0.2)",
-                  }}
                 />
                 <button
                   type="button"
@@ -296,9 +273,7 @@ function ResetPasswordForm() {
 
             {/* Confirm Password Field */}
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" style={{ color: "#00416A" }}>
-                Xác nhận mật khẩu mới
-              </Label>
+              <Label htmlFor="confirmPassword">Xác nhận mật khẩu mới</Label>
               <div className="relative">
                 <Input
                   id="confirmPassword"
@@ -309,9 +284,6 @@ function ResetPasswordForm() {
                   required
                   disabled={isLoading}
                   className="h-11 pr-10"
-                  style={{
-                    borderColor: "rgba(0, 65, 106, 0.2)",
-                  }}
                 />
                 <button
                   type="button"
@@ -345,15 +317,15 @@ function ResetPasswordForm() {
             {/* Submit Button */}
             <Button
               type="submit"
-              className="w-full h-12 hover:opacity-90"
+              className="w-full h-12 hover:opacity-90 gap-2"
               style={{ backgroundColor: "#F0EAD6", color: "#00416A" }}
               disabled={!otp || !newPassword || !confirmPassword || isLoading}
             >
               {isLoading ? (
-                <div className="flex items-center gap-2">
+                <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
                   Đang xử lý...
-                </div>
+                </>
               ) : (
                 "Đặt lại mật khẩu"
               )}
@@ -361,33 +333,29 @@ function ResetPasswordForm() {
           </form>
 
           {/* Info Box */}
-          <div
-            className="rounded-lg p-4 space-y-2"
-            style={{
-              backgroundColor: "rgba(0, 65, 106, 0.05)",
-              border: "1px solid rgba(0, 65, 106, 0.1)",
-            }}
-          >
-            <p className="text-sm font-medium" style={{ color: "#00416A" }}>
+          <div className="rounded-lg p-4 space-y-2 bg-muted border">
+            <p className="text-sm font-medium text-primary">
               Yêu cầu mật khẩu:
             </p>
             <ul className="text-sm text-muted-foreground space-y-1">
               <li className="flex items-start gap-2">
-                <span style={{ color: "#00416A" }}>•</span>
+                <span className="text-primary">•</span>
                 <span>Ít nhất 6 ký tự</span>
               </li>
               <li className="flex items-start gap-2">
-                <span style={{ color: "#00416A" }}>•</span>
+                <span className="text-primary">•</span>
                 <span>Mã OTP có hiệu lực trong 5 phút</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary">•</span>
+                <span>Đảm bảo mật khẩu xác nhận khớp với mật khẩu mới</span>
               </li>
             </ul>
           </div>
 
           {/* Mobile Logo */}
           <div className="lg:hidden text-center pt-8 border-t">
-            <h3 className="text-2xl mb-2" style={{ color: "#00416A" }}>
-              Tora Novel
-            </h3>
+            <h3 className="text-2xl mb-2 text-primary">Tora Novel</h3>
             <p className="text-sm text-muted-foreground">
               Nền tảng đọc truyện tương tác với AI Voice
             </p>

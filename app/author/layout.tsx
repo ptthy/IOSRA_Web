@@ -1,16 +1,11 @@
-
-
 // app/author/layout.tsx
+
 "use client";
 
 import { Button } from "@/components/ui/button";
 import {
-  Moon,
-  Sun,
-  BookOpen,
   LayoutDashboard,
   FileText,
-  LogOut,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -22,16 +17,9 @@ interface AuthorLayoutProps {
 }
 
 export default function AuthorLayout({ children }: AuthorLayoutProps) {
-  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light";
-    setTheme(newTheme);
-    document.documentElement.classList.toggle("dark");
-  };
 
   const handleNavigate = (page: string) => {
     const routes: Record<string, string> = {
@@ -48,88 +36,56 @@ export default function AuthorLayout({ children }: AuthorLayoutProps) {
     pathname.startsWith("/author/create-story");
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Sidebar */}
+    <div className="min-h-screen bg-background relative">
+      {/* --- SIDEBAR --- */}
       <aside
-        className={`border-r bg-card transition-all duration-300 flex flex-col ${
-          isCollapsed ? "w-16" : "w-64"
-        }`}
+        className={`
+          fixed left-0 z-40 border-r bg-card transition-all duration-300 flex flex-col
+         
+          top-16 
+        
+          h-[calc(100vh-64px)]
+          ${isCollapsed ? "w-16" : "w-64"}
+        `}
       >
         <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="flex items-center justify-between p-4 border-b h-16">
-            {!isCollapsed && (
-              <div
-                className="flex items-center gap-2 cursor-pointer"
-                onClick={() => handleNavigate("home")}
-              >
-                <BookOpen className="h-6 w-6 text-primary" />
-                <span className="text-xl font-bold">ToraNovel</span>
-              </div>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsCollapsed(!isCollapsed)}
-            >
-              {isCollapsed ? (
-                <ChevronRight className="h-5 w-5" />
-              ) : (
-                <ChevronLeft className="h-5 w-5" />
-              )}
-            </Button>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-2">
+          <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
             <Button
               variant={isDashboardActive ? "secondary" : "ghost"}
               className="w-full justify-start"
               onClick={() => handleNavigate("author-dashboard")}
+              title="Dashboard"
             >
-              <LayoutDashboard className="h-5 w-5" />
-              {!isCollapsed && <span className="ml-2">Dashboard</span>}
+              <LayoutDashboard className="h-5 w-5 shrink-0" />
+              {!isCollapsed && <span className="ml-2 truncate">Dashboard</span>}
             </Button>
+
             <Button
               variant={isStoriesActive ? "secondary" : "ghost"}
               className="w-full justify-start"
               onClick={() => handleNavigate("author-stories")}
+              title="Quản lý Truyện"
             >
-              <FileText className="h-5 w-5" />
-              {!isCollapsed && <span className="ml-2">Quản lý Truyện</span>}
+              <FileText className="h-5 w-5 shrink-0" />
+              {!isCollapsed && (
+                <span className="ml-2 truncate">Quản lý Truyện</span>
+              )}
             </Button>
           </nav>
 
-          {/* Footer */}
-          <div className="p-4 border-t space-y-2">
-            <Button
-              variant="ghost"
-              size={isCollapsed ? "icon" : "default"}
-              onClick={toggleTheme}
-              className="w-full justify-start"
-            >
-              {theme === "light" ? (
-                <Moon className="h-5 w-5" />
-              ) : (
-                <Sun className="h-5 w-5" />
-              )}
-              {!isCollapsed && <span className="ml-2">Theme</span>}
-            </Button>
-            <Button
-              variant="ghost"
-              size={isCollapsed ? "icon" : "default"}
-              className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
-              onClick={() => handleNavigate("home")}
-            >
-              <LogOut className="h-5 w-5" />
-              {!isCollapsed && <span className="ml-2">Về trang chủ</span>}
-            </Button>
-          </div>
+          {/* Nút thu gọn (nếu dùng) */}
+          {/* <div className="p-4 border-t mt-auto">...</div> */}
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-auto">
+      {/* --- MAIN CONTENT --- */}
+      <main
+        className={`
+          flex-1 transition-all duration-300 min-h-screen
+          pt-6 
+          ${isCollapsed ? "ml-16" : "ml-64"} 
+        `}
+      >
         <div className="container mx-auto p-6">{children}</div>
       </main>
     </div>

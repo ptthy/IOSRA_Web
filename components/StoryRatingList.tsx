@@ -29,15 +29,40 @@ export function StoryRatingList({ ratings }: StoryRatingListProps) {
           key={`${rating.readerId}-${rating.ratedAt}`}
           className="flex gap-3 p-4 border rounded-lg"
         >
-          <img
-            src={rating.avatarUrl}
-            alt={rating.username}
-            className="w-10 h-10 rounded-full"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src =
-                "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOTk5IiBzdHJva2Utd2lkdGg9IjEuNSI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMTgiLz48cGF0aCBkPSJtMTQgMjYgMi0yIDIgMiA0LTQiLz48Y2lyY2xlIGN4PSIxNSIgY3k9IjE1IiByPSIyIi8+PGNpcmNsZSBjeD0iMjUiIGN5PSIxNSIgcj0iMiIvPjwvc3ZnPg==";
-            }}
-          />
+          {/* Avatar với logic đơn giản giống trang profile */}
+          <div className="flex-shrink-0">
+            <div className="w-10 h-10 rounded-full overflow-hidden border border-border/50 bg-muted">
+              {rating.avatarUrl ? (
+                <img
+                  src={rating.avatarUrl}
+                  alt={rating.username}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // Khi ảnh lỗi, thay thế bằng fallback
+                    const parent = (e.target as HTMLImageElement).parentElement;
+                    if (parent) {
+                      const fallback = document.createElement("div");
+                      fallback.className =
+                        "w-full h-full  flex items-center justify-center";
+                      fallback.innerHTML = `<span class="text-sm font-bold text-primary-foreground">${rating.username
+                        .charAt(0)
+                        .toUpperCase()}</span>`;
+                      parent.appendChild(fallback);
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }
+                  }}
+                />
+              ) : (
+                // Fallback khi không có avatarUrl
+                <div className="w-full h-full  flex items-center justify-center">
+                  <span className="text-sm font-bold text-primary-foreground">
+                    {rating.username.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <span className="font-medium">{rating.username}</span>

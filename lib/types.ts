@@ -3,6 +3,7 @@ export interface StorySummary {
   storyId: string;
   title: string;
   authorUsername: string;
+  authorId?: string;
   coverUrl: string;
   shortDescription: string;
   totalChapters: number;

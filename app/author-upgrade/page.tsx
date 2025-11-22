@@ -136,7 +136,7 @@ export default function AuthorUpgradePage() {
   useEffect(() => {
     if (upgradeRequest.status === "approved") {
       updateUser({ role: "author" });
-      toast.success("Tài khoản của bạn đã được nâng cấp lên tác giả!");
+      // toast.success("Tài khoản của bạn đã được nâng cấp lên tác giả!");
     }
   }, [upgradeRequest.status, updateUser]);
 
@@ -323,7 +323,6 @@ export default function AuthorUpgradePage() {
   if (isLoadingPage) {
     return (
       <>
-        <Navbar />
         <div className="min-h-screen flex items-center justify-center p-4 py-12 bg-background">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -339,7 +338,6 @@ export default function AuthorUpgradePage() {
     STATUS_DISPLAY_CONFIG["default"];
   return (
     <>
-      <Navbar />
       <div className="min-h-screen flex items-center justify-center p-4 py-12 bg-background">
         <div className="w-full max-w-7xl space-y-4">
           {/* BỔ SUNG "CỤC" HIỂN THỊ TRẠNG THÁI HIỆN TẠI */}
