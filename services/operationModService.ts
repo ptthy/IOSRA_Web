@@ -21,3 +21,22 @@ export async function rejectRequest(requestId: string, reason: string) {
   });
   return res.data;
 }
+
+export async function getRankRequests(status?: string) {
+  const res = await apiClient.get("/OperationMod/rank-requests", {
+    params: { status },
+  });
+  return res.data;
+}
+
+export async function approveRankRequest(requestId: string) {
+  const res = await apiClient.post(`/OperationMod/rank-requests/${requestId}/approve`);
+  return res.data;
+}
+
+export async function rejectRankRequest(requestId: string, reason: string) {
+  const res = await apiClient.post(`/OperationMod/rank-requests/${requestId}/reject`, {
+    reason,
+  });
+  return res.data;
+}

@@ -108,8 +108,8 @@ export function AppSidebar({
           </SidebarMenuItem>
         </SidebarMenu>
 
-        {/* ✅ Line phân cách */}
-        <div className="border-t border-gray-300 dark:border-white/20 mx-4 mt-2" />
+    
+        {/* <div className="border-t border-gray-300 dark:border-white/20 mx-4 mt-2" /> */}
       </SidebarHeader>
 
       {/* ===== Menu chính ===== */}

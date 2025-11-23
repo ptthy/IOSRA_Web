@@ -123,7 +123,7 @@ export default function DashboardAnalytics() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         {[
           { title: "Doanh thu hôm nay", value: "10.500.000₫", icon: <DollarSign />, colorVar: "var(--primary)" },
-          { title: "User mới", value: "276", icon: <Users />, colorVar: "var(--secondary)" },
+          { title: "User mới", value: "276", icon: <Users />, colorVar: "#7c3aed" },
           { title: "Active Users", value: "8.432", icon: <Activity />, colorVar: "var(--accent)" },
           { title: "Sponsored Authors", value: "89", icon: <TrendingUp />, colorVar: "var(--chart-2)" },
         ].map((c, idx) => (
@@ -173,7 +173,7 @@ export default function DashboardAnalytics() {
                   />
                   <Legend />
                   <Line type="monotone" dataKey="revenue" stroke="var(--primary)" strokeWidth={3} name="Doanh thu (VNĐ)" dot={{ fill: "var(--primary)" }} />
-                  <Line type="monotone" dataKey="users" stroke="var(--secondary)" strokeWidth={3} name="User mới" dot={{ fill: "var(--secondary)" }} />
+                  <Line type="monotone" dataKey="users" stroke="#7c3aed" strokeWidth={3} name="User mới" dot={{ fill: "#7c3aed" }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -237,7 +237,7 @@ export default function DashboardAnalytics() {
                   }}
                 />
                 <Legend />
-                <Bar dataKey="normal" fill="var(--secondary)" radius={[8, 8, 0, 0]} name="Author thường" />
+                <Bar dataKey="normal" fill="#64748b" radius={[8, 8, 0, 0]} name="Author thường" />
                 <Bar dataKey="sponsored" fill="var(--primary)" radius={[8, 8, 0, 0]} name="Sponsored Author" />
               </BarChart>
             </ResponsiveContainer>
