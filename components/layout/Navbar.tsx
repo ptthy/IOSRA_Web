@@ -441,6 +441,13 @@ export function Navbar() {
     setMounted(true);
   }, []);
 
+  if (pathname && pathname.startsWith("/Op")) {
+    return null;
+  }
+  if (pathname && pathname.startsWith("/Content")) {
+    return null;
+  }
+
   const toggleTheme = () => setTheme(theme === "light" ? "dark" : "light");
   const handleNavigate = (path: string) => router.push(path);
   const isActive = (path: string) => pathname === path;
