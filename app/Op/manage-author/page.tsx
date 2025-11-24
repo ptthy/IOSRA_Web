@@ -158,38 +158,43 @@ export default function AuthorManagement() {
 
   // --- 2. ✅ SỬA: Load Sponsored/Rank Requests (Tab 2 - API Thật) ---
   useEffect(() => {
-    async function fetchRankRequests() {
-      try {
-        // Gọi API mới: GET /api/OperationMod/rank-requests
-        // Lưu ý: Backend có thể trả về cấu trúc khác, cần map dữ liệu nếu cần
-        const data = await getRankRequests("pending"); 
-        
-        // Mapping dữ liệu (Giả sử API trả về các trường tương ứng)
-        // Bạn cần kiểm tra console.log để xem tên trường chính xác từ backend
-        const mappedData: SponsorRequest[] = data.map((item: any) => ({
-          requestId: item.requestId,
-          authorId: item.requesterId, // Hoặc authorId tùy API
-          authorName: item.requesterUsername || "Unknown",
-          email: item.requesterEmail || "No Email",
-          
-          // ⚠️ Cần đảm bảo backend trả về rank và followers
-          // Nếu chưa có, tạm thời để giá trị mặc định để test UI
-          currentRank: item.currentRank || "Casual", 
-          followers: item.followers || 0,
-          
-          createdAt: item.createdAt,
-          reason: item.content || item.reason || "No content",
-          status: item.status
-        }));
+async function fetchRankRequests() {
+  try {
+    setIsLoadingSponsorRequests(true);
+    const data = await getRankRequests("pending");
+    
+    // LOG DATA ĐỂ KIỂM TRA (F12)
+    console.log("Dữ liệu Rank Requests từ API:", data);
 
-        setSponsorRequests(mappedData);
-      } catch (error) {
-        console.error("Failed to fetch rank requests:", error);
-      } finally {
-        setIsLoadingSponsorRequests(false);
-      }
-    }
+    // MAPPING DỮ LIỆU CHUẨN THEO SWAGGER
+    const mappedData: SponsorRequest[] = data.map((item: any) => ({
+      requestId: item.requestId,
+      authorId: item.authorId,
+      
+      // Sửa tên trường theo response JSON
+      authorName: item.authorUsername, // JSON trả về "authorUsername"
+      email: item.authorEmail,         // JSON trả về "authorEmail"
+      
+      // Sửa rank & followers
+      currentRank: item.currentRankName, // JSON trả về "currentRankName"
+      followers: item.totalFollowers,    // JSON trả về "totalFollowers"
+      
+      createdAt: item.createdAt,
+      
+      // ⚠️ QUAN TRỌNG: Nội dung cam kết/lý do nằm ở trường "commitment"
+      reason: item.commitment || "Không có nội dung cam kết", 
+      
+      status: item.status
+    }));
 
+    setSponsorRequests(mappedData);
+  } catch (error) {
+    console.error("Failed to fetch rank requests:", error);
+    // toast.error("Lỗi tải danh sách yêu cầu Sponsored");
+  } finally {
+    setIsLoadingSponsorRequests(false);
+  }
+}
     setIsLoadingSponsorRequests(true);
     fetchRankRequests();
     const interval = setInterval(fetchRankRequests, 30000); // Polling
