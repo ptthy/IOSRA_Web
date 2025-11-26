@@ -122,13 +122,6 @@ export default function ManageStoriesPage() {
                 Bắt đầu viết và chia sẻ câu chuyện của bạn với độc giả
               </CardDescription>
             </div>
-            <Button
-              onClick={() => onNavigate("author-create-story")}
-              disabled={hasActiveStory}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Tạo Truyện Mới
-            </Button>
           </div>
         </CardHeader>
         <CardContent>

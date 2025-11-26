@@ -197,17 +197,51 @@
   padding-left: 1em;
   margin: 1em 0;
   font-style: italic;
+  color: #666;
+}
+
+.dark .rich-text-content blockquote {
+  border-left-color: #5a7a92;
+  color: #d8cfc0;
 }
 
 .rich-text-content ul,
 .rich-text-content ol {
   margin: 1em 0;
   padding-left: 2em;
+  list-style-position: outside;
+}
+
+.rich-text-content ul {
+  list-style-type: disc;
+}
+
+.rich-text-content ol {
+  list-style-type: decimal;
 }
 
 .rich-text-content li {
   margin-bottom: 0.5em;
+  display: list-item;
 }
+
+.rich-text-content a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.rich-text-content a:hover {
+  color: #1d4ed8;
+}
+
+.dark .rich-text-content a {
+  color: #60a5fa;
+}
+
+.dark .rich-text-content a:hover {
+  color: #3b82f6;
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -286,10 +320,20 @@
 .markdown-content ol {
   margin-bottom: 1rem;
   padding-left: 2rem;
+  list-style-position: outside;
+}
+
+.markdown-content ul {
+  list-style-type: disc;
+}
+
+.markdown-content ol {
+  list-style-type: decimal;
 }
 
 .markdown-content li {
   margin-bottom: 0.5rem;
+  display: list-item;
 }
 
 .markdown-content code {
@@ -306,21 +350,94 @@
   line-height: 1.8;
 }
 
-.html-content strong {
+.html-content h1 {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.html-content h2 {
+  font-size: 1.75rem;
+  font-weight: bold;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.html-content h3 {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-top: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.html-content strong,
+.html-content b {
   font-weight: bold;
 }
 
-.html-content em {
+.html-content em,
+.html-content i {
   font-style: italic;
+}
+
+.html-content u {
+  text-decoration: underline;
+}
+
+.html-content s,
+.html-content strike {
+  text-decoration: line-through;
 }
 
 .html-content blockquote {
   border-left: 4px solid #00416a;
   padding-left: 1rem;
-  margin-left: 0;
-  margin-right: 0;
+  margin: 1em 0;
   font-style: italic;
   color: #666;
+}
+
+.html-content ul,
+.html-content ol {
+  margin: 1em 0;
+  padding-left: 2em;
+  list-style-position: outside;
+}
+
+.html-content ul {
+  list-style-type: disc;
+}
+
+.html-content ol {
+  list-style-type: decimal;
+}
+
+.html-content li {
+  margin-bottom: 0.5em;
+  display: list-item;
+}
+
+.html-content a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.html-content a:hover {
+  color: #1d4ed8;
+}
+
+.dark .html-content blockquote {
+  border-left-color: #5a7a92;
+  color: #d8cfc0;
+}
+
+.dark .html-content a {
+  color: #60a5fa;
+}
+
+.dark .html-content a:hover {
+  color: #3b82f6;
 }
 
 /* Plain text content styles */
@@ -329,45 +446,96 @@
   text-align: justify;
   line-height: 1.8;
 }
+
+.plain-content h1 {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.plain-content h2 {
+  font-size: 1.75rem;
+  font-weight: bold;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.plain-content h3 {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-top: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.plain-content strong,
+.plain-content b {
+  font-weight: bold;
+}
+
+.plain-content em,
+.plain-content i {
+  font-style: italic;
+}
+
+.plain-content u {
+  text-decoration: underline;
+}
+
+.plain-content s,
+.plain-content strike {
+  text-decoration: line-through;
+}
+
+.plain-content blockquote {
+  border-left: 4px solid #00416a;
+  padding-left: 1rem;
+  margin: 1em 0;
+  font-style: italic;
+  color: #666;
+}
+
+.plain-content ul,
+.plain-content ol {
+  margin: 1em 0;
+  padding-left: 2em;
+  list-style-position: outside;
+}
+
+.plain-content ul {
+  list-style-type: disc;
+}
+
+.plain-content ol {
+  list-style-type: decimal;
+}
+
+.plain-content li {
+  margin-bottom: 0.5em;
+  display: list-item;
+}
+
+.plain-content a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.plain-content a:hover {
+  color: #1d4ed8;
+}
+
+.dark .plain-content blockquote {
+  border-left-color: #5a7a92;
+  color: #d8cfc0;
+}
+
+.dark .plain-content a {
+  color: #60a5fa;
+}
+
+.dark .plain-content a:hover {
+  color: #3b82f6;
+}
 .ql-editor {
   min-height: 400px;
-}
-.highlight-mark {
-  position: relative;
-  transition: all 0.2s ease;
-}
-
-.highlight-mark:hover {
-  opacity: 0.7;
-  transform: scale(1.02);
-}
-
-.highlight-mark:hover::after {
-  content: attr(data-note);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.85);
-  color: white;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  white-space: nowrap;
-  z-index: 50;
-  pointer-events: none;
-  margin-bottom: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.highlight-mark:hover::before {
-  content: "";
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 6px solid transparent;
-  border-top-color: rgba(0, 0, 0, 0.85);
-  margin-bottom: 0;
-  z-index: 50;
 }

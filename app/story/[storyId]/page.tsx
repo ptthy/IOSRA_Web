@@ -505,7 +505,7 @@ export default function StoryDetailPage() {
               </div>
               <div className="flex-1 space-y-5">
                 <div>
-                  <h1 className="text-3xl md:text-4xl font-bold mb-3">
+                  <h1 className="text-2xl md:text-4xl font-bold mb-3">
                     {story.title}
                   </h1>
                   <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -521,7 +521,7 @@ export default function StoryDetailPage() {
                     </span>
                   </div>
                 </div>
-                {/* Tags & Stats... (Keep your original layout) */}
+
                 <div className="flex flex-wrap gap-2">
                   {story.tags?.map((tag) => (
                     <Badge
@@ -545,6 +545,18 @@ export default function StoryDetailPage() {
                       <p className="font-semibold">{story.totalChapters}</p>
                     </div>
                   </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="h-5 w-5 text-primary" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Xuất bản</p>
+                      <p className="font-semibold">
+                        {new Date(story.publishedAt).toLocaleDateString(
+                          "vi-VN"
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
                   {/* ... more stats ... */}
                 </div>
                 <div>

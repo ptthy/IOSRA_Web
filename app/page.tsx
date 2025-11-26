@@ -1,7 +1,6 @@
-// app/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Navbar } from "@/components/layout/Navbar";
@@ -10,153 +9,176 @@ import { HeroCarousel } from "@/components/ads/hero-carousel";
 import { SecondaryBanner } from "@/components/ads/secondary-banner";
 import { RankBadge } from "@/components/rank-badge";
 import { StoryCard } from "@/components/story-card";
-import { Book, TrendingUp, Clock, ChevronRight } from "lucide-react";
+import { TopUpModal } from "@/components/payment/TopUpModal";
+import {
+  Book,
+  TrendingUp,
+  Sparkles,
+  Clock,
+  ChevronRight,
+  ChevronLeft,
+} from "lucide-react";
 import { storyCatalogApi } from "@/services/storyCatalog";
+import { profileService } from "@/services/profileService"; // Import service lấy ví
 import type { Story, TopWeeklyStory } from "@/services/storyCatalog";
 
 export default function HomePage() {
   const router = useRouter();
   const { isAuthenticated, isPremium } = useAuth();
+
+  // State dữ liệu truyện
   const [topWeekly, setTopWeekly] = useState<TopWeeklyStory[]>([]);
   const [latestStories, setLatestStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // State quản lý Modal & Ví
+  const [showTopUpModal, setShowTopUpModal] = useState(false);
+  const [balance, setBalance] = useState(0); // State lưu số dư kim cương
+
+  // Refs scroll
+  const weeklyScrollRef = useRef<HTMLDivElement | null>(null);
+  const latestScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Hàm scroll
+  const scrollWeeklyByDistance = (distance: number) => {
+    if (!weeklyScrollRef.current) return;
+    weeklyScrollRef.current.scrollBy({ left: distance, behavior: "smooth" });
+  };
+
+  const scrollLatestByDistance = (distance: number) => {
+    if (!latestScrollRef.current) return;
+    latestScrollRef.current.scrollBy({ left: distance, behavior: "smooth" });
+  };
+
+  // 1. Fetch Dữ liệu Truyện (Chạy 1 lần khi load trang)
   useEffect(() => {
-    const loadData = async () => {
+    const loadStories = async () => {
       setLoading(true);
       setError(null);
       try {
-        console.log("🔄 Bắt đầu tải dữ liệu từ API...");
-
         const [weeklyResponse, latestResponse] = await Promise.all([
           storyCatalogApi.getTopWeeklyStories(10),
           storyCatalogApi.getLatestStories(10),
         ]);
 
-        console.log("✅ Dữ liệu nhận được:", {
-          topWeekly: weeklyResponse,
-          latestStories: latestResponse,
-        });
-
-        if (!Array.isArray(weeklyResponse)) {
-          throw new Error("Dữ liệu top weekly không hợp lệ");
-        }
-
-        if (!Array.isArray(latestResponse)) {
-          throw new Error("Dữ liệu latest stories không hợp lệ");
-        }
-
-        setTopWeekly(weeklyResponse);
-        setLatestStories(latestResponse);
+        if (Array.isArray(weeklyResponse)) setTopWeekly(weeklyResponse);
+        if (Array.isArray(latestResponse)) setLatestStories(latestResponse);
       } catch (error: any) {
-        console.error("❌ Lỗi tải dữ liệu:", error);
-
-        if (error.response) {
-          if (error.response.status === 404) {
-            setError(
-              "API endpoints không tồn tại. Vui lòng kiểm tra với quản trị viên."
-            );
-          } else if (error.response.status === 500) {
-            setError("Lỗi server. Vui lòng thử lại sau.");
-          } else {
-            setError(
-              `Lỗi server: ${error.response.status} - ${error.response.statusText}`
-            );
-          }
-        } else if (error.request) {
-          setError(
-            "Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng."
-          );
-        } else {
-          setError(error.message || "Có lỗi xảy ra khi tải dữ liệu.");
-        }
-
-        setTopWeekly([]);
-        setLatestStories([]);
+        console.error("Lỗi tải trang chủ:", error);
+        setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
       } finally {
         setLoading(false);
       }
     };
 
-    loadData();
+    loadStories();
   }, []);
 
+  // 2. Fetch Số dư Ví (Chạy khi người dùng đã đăng nhập)
+  useEffect(() => {
+    const loadWallet = async () => {
+      if (isAuthenticated) {
+        try {
+          // Gọi API lấy ví giống như bên trang Profile
+          const res = await profileService.getWallet();
+          if (res.data) {
+            setBalance(res.data.diaBalance || 0);
+          }
+        } catch (error) {
+          console.error("Không thể tải thông tin ví:", error);
+        }
+      } else {
+        setBalance(0); // Reset về 0 nếu chưa đăng nhập
+      }
+    };
+
+    loadWallet();
+  }, [isAuthenticated]); // Chạy lại khi trạng thái đăng nhập thay đổi
+
   const handleNavigate = (page: string, storyId?: string) => {
-    if (storyId) {
-      router.push(`/${page}/${storyId}`);
-    } else {
-      router.push(`/${page}`);
-    }
+    if (storyId) router.push(`/${page}/${storyId}`);
+    else router.push(`/${page}`);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-muted-foreground">Đang tải...</p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center font-sans">
+        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Book className="h-8 w-8 text-destructive" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">Có lỗi xảy ra</h3>
-            <p className="text-muted-foreground mb-4">{error}</p>
-            <Button onClick={() => window.location.reload()}>Thử lại</Button>
-          </div>
-        </div>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center font-sans">
+        <Book className="h-10 w-10 text-destructive mb-4" />
+        <p className="text-muted-foreground mb-4">{error}</p>
+        <Button onClick={() => window.location.reload()}>Thử lại</Button>
       </div>
     );
   }
 
+  // Style cho nút điều hướng
+  const navigationButtonClass =
+    "absolute top-1/2 -translate-y-1/2 z-20 w-10 h-10 flex items-center justify-center rounded-full " +
+    "bg-card border border-border shadow-lg text-foreground/80 hover:text-primary hover:bg-accent hover:scale-110 transition-all " +
+    "opacity-0 group-hover/carousel:opacity-100 disabled:opacity-0 cursor-pointer";
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background font-sans">
       {/* Hero Carousel */}
-      <div className="animate-fade-in">
+      <div className="animate-fade-in pt-4">
         <div className="container mx-auto px-4">
           <HeroCarousel />
         </div>
       </div>
 
       {/* Top Truyện Tuần */}
-      <section className="py-4 animate-slide-up bg-background">
+      <section className="py-2 animate-slide-up bg-background mt-2">
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10">
-                <TrendingUp className="h-5 w-5 text-primary" />
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10">
+                <TrendingUp className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <h2 className="font-bold text-2xl md:text-3xl">
+                <h2 className="font-bold text-xl md:text-2xl leading-tight">
                   Top Truyện Tuần
                 </h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Những tác phẩm hot nhất tuần này
-                </p>
               </div>
             </div>
             <button
               onClick={() => handleNavigate("search")}
-              className="flex items-center gap-1 text-sm text-primary hover:gap-2 transition-all group"
+              className="flex items-center gap-1 text-xs md:text-sm text-primary hover:gap-2 transition-all group font-medium"
             >
               <span className="hidden sm:inline">Xem tất cả</span>
-              <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              <ChevronRight className="h-3 w-3 md:h-4 md:w-4 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
-          <div className="relative">
-            {/* QUAN TRỌNG: Thêm min-h-[420px] để đảm bảo tất cả card cùng chiều cao */}
-            <div className="flex overflow-x-auto gap-6 pb-4 scrollbar-custom scroll-smooth pt-2 px-2 min-h-[420px]">
+
+          <div className="relative group/carousel">
+            <button
+              aria-label="Previous"
+              onClick={() => scrollWeeklyByDistance(-420)}
+              className={`${navigationButtonClass} -left-3 md:-left-8`}
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+
+            <button
+              aria-label="Next"
+              onClick={() => scrollWeeklyByDistance(420)}
+              className={`${navigationButtonClass} -right-3 md:-right-8`}
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+
+            {/* List Top Weekly */}
+            <div
+              ref={weeklyScrollRef}
+              className="flex overflow-x-auto gap-4 pb-4 pt-2 px-1 min-h-[380px] scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
+            >
               {topWeekly.map((item, index) => (
                 <div
                   key={item.story.storyId}
@@ -176,43 +198,56 @@ export default function HomePage() {
 
       {/* Secondary Banner */}
       {!isPremium && (
-        <div className="container mx-auto px-4 py-2">
-          <SecondaryBanner />
+        <div className="container mx-auto px-4">
+          <SecondaryBanner onClick={() => setShowTopUpModal(true)} />
         </div>
       )}
 
       {/* Truyện Mới Cập Nhật */}
-      <section
-        className="py-4 animate-slide-up"
-        style={{ animationDelay: "0.1s" }}
-      >
+      <section className="py-2 animate-slide-up bg-background mt-2">
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-secondary/10">
-                <Clock className="h-5 w-5 text-secondary" />
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10">
+                <Sparkles className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <h2 className="font-bold text-2xl md:text-3xl">
-                  Truyện Mới Cập Nhật
+                <h2 className="font-bold text-xl md:text-2xl leading-tight">
+                  Mới cập nhật
                 </h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Những chương mới nhất vừa được đăng tải
-                </p>
               </div>
             </div>
             <button
               onClick={() => handleNavigate("search")}
-              className="flex items-center gap-1 text-sm text-primary hover:gap-2 transition-all group"
+              className="flex items-center gap-1 text-xs md:text-sm text-primary hover:gap-2 transition-all group font-medium"
             >
               <span className="hidden sm:inline">Xem tất cả</span>
-              <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              <ChevronRight className="h-3 w-3 md:h-4 md:w-4 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
 
-          <div className="relative">
-            {/* QUAN TRỌNG: Thêm min-h-[420px] để đảm bảo tất cả card cùng chiều cao */}
-            <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-custom scroll-smooth pt-1 px-0 min-h-[420px]">
+          <div className="relative group/carousel">
+            <button
+              aria-label="Previous"
+              onClick={() => scrollLatestByDistance(-420)}
+              className={`${navigationButtonClass} -left-3 md:-left-8`}
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+
+            <button
+              aria-label="Next"
+              onClick={() => scrollLatestByDistance(420)}
+              className={`${navigationButtonClass} -right-3 md:-right-8`}
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+
+            {/* List Latest Stories */}
+            <div
+              ref={latestScrollRef}
+              className="flex overflow-x-auto gap-4 pb-2 pt-1 px-1 min-h-[380px] scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
+            >
               {latestStories.map((story) => (
                 <div key={story.storyId} className="flex-shrink-0">
                   <StoryCard
@@ -226,20 +261,13 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="border-t py-8 bg-muted/50">
-        <div className="container mx-auto px-4 text-center">
-          <div className="max-w-2xl mx-auto">
-            <h2 className="text-3xl font-bold mb-4">
-              Bạn có câu chuyện để kể?
-            </h2>
-            <p className="text-muted-foreground mb-6">
-              Tham gia cộng đồng tác giả của chúng tôi và chia sẻ câu chuyện của
-              bạn với hàng triệu độc giả trên khắp thế giới.
-            </p>
-          </div>
-        </div>
-      </section>
+      {/* MODAL NẠP TIỀN */}
+      <TopUpModal
+        isOpen={showTopUpModal}
+        onClose={() => setShowTopUpModal(false)}
+        // Sử dụng state balance đã được fetch từ API
+        currentBalance={balance}
+      />
     </div>
   );
 }

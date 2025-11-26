@@ -1,7 +1,7 @@
 // app/login/page.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,46 +23,46 @@ import { jwtDecode } from "jwt-decode";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
-// Đổi tên component thành LoginRoute và export default
 export default function LoginRoute() {
-  // --- Toàn bộ logic từ LoginPage được chuyển vào đây ---
   const { login, setAuthData } = useAuth();
   const router = useRouter();
-  const [email, setEmail] = useState("");
+
+  // Đổi tên state từ email -> identifier để rõ nghĩa hơn
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Hàm login bằng email/pass
+  // Đảm bảo khi component mount, các trường này trống (phòng hờ trình duyệt cố tình điền)
+  useEffect(() => {
+    setIdentifier("");
+    setPassword("");
+  }, []);
+
+  // Hàm login
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await login({ identifier: email, password });
+      // Gửi identifier (có thể là username hoặc email) và password
+      await login({ identifier: identifier, password });
       // AuthContext sẽ tự chuyển hướng
     } catch (err: any) {
       setIsLoading(false);
-      // AuthContext (hook 'login') nên tự xử lý toast lỗi
+      // AuthContext thường đã handle toast, nếu chưa thì thêm toast.error ở đây
     }
   };
 
-  // Hàm signInWithGoogle dùng Firebase
   const signInWithGoogle = async () => {
     setIsLoading(true);
     const provider = new GoogleAuthProvider();
     try {
-      // 1. Mở pop-up đăng nhập Google của Firebase
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-
-      // 2. Lấy idToken từ Firebase
       const idToken = await user.getIdToken();
 
-      // 3. Gửi idToken này đến backend
       const response = await authService.loginWithGoogle({ idToken });
-
-      // 4. Xử lý response từ backend
       const {
         username,
         email,
@@ -73,65 +73,43 @@ export default function LoginRoute() {
       } = response.data;
 
       if (backendToken && username && email) {
-        // Giải mã token để lấy ID
         const decodedPayload: any = jwtDecode(backendToken);
         const userToSet = {
-          id: decodedPayload.sub, // Lấy ID từ token (chuẩn JWT là 'sub')
+          id: decodedPayload.sub,
           username: username,
           email: email,
           role: roles && roles.length > 0 ? roles[0] : "reader",
           displayName: displayName || username,
           avatar: avatar,
         };
-        // Gọi setAuthData với user object và token
         setAuthData(userToSet, backendToken);
-        // Context sẽ tự chuyển hướng về home
       } else {
-        toast.error(
-          "Đăng nhập Google thất bại: Dữ liệu trả về từ máy chủ không đầy đủ."
-        );
+        toast.error("Đăng nhập Google thất bại: Dữ liệu thiếu.");
         setIsLoading(false);
       }
     } catch (err: any) {
-      // 5. Xử lý lỗi (từ Firebase hoặc Backend)
       if (err.response?.status === 404) {
-        // CASE B: Lỗi 404 từ backend -> User mới, cần hoàn tất đăng ký
         try {
           const currentUser = auth.currentUser;
           if (currentUser) {
             const idToken = await currentUser.getIdToken();
             const googleEmail = currentUser.email;
-
             if (idToken && googleEmail) {
               toast.info("Tài khoản Google mới, vui lòng hoàn tất đăng ký.");
               router.push(
                 `/google-complete?idToken=${idToken}&email=${googleEmail}`
               );
-            } else {
-              toast.error("Không lấy được thông tin Google sau khi đăng nhập.");
-              setIsLoading(false);
             }
-          } else {
-            toast.error(
-              "Không tìm thấy thông tin người dùng Google sau khi đăng nhập."
-            );
-            setIsLoading(false);
           }
         } catch (innerError) {
-          toast.error("Lỗi khi lấy thông tin để hoàn tất đăng ký.");
-          console.error("Inner Error fetching token/email:", innerError);
           setIsLoading(false);
         }
       } else if (err.code === "auth/popup-closed-by-user") {
-        // Người dùng tự đóng pop-up
         toast.info("Bạn đã đóng cửa sổ đăng nhập Google.");
         setIsLoading(false);
       } else {
-        // Các lỗi khác
         const errMsg =
-          err.response?.data?.message || // Lỗi từ Backend
-          err.message || // Lỗi từ Firebase
-          "Đăng nhập Google thất bại.";
+          err.response?.data?.message || err.message || "Đăng nhập thất bại.";
         toast.error(errMsg);
         setIsLoading(false);
       }
@@ -141,7 +119,6 @@ export default function LoginRoute() {
   const ERROR_IMG_SRC =
     "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==";
 
-  // --- Toàn bộ JSX từ LoginPage được chuyển vào đây ---
   return (
     <div className="min-h-screen flex">
       {/* Left Side */}
@@ -207,22 +184,30 @@ export default function LoginRoute() {
             <div className="space-y-2 text-center lg:text-left">
               <h2 className="text-3xl">Đăng nhập</h2>
               <p className="text-muted-foreground">
-                Nhập email và mật khẩu để tiếp tục
+                Nhập thông tin tài khoản để tiếp tục
               </p>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
+            {/* autoComplete="off" ở form tag giúp chặn trình duyệt cố gắng điền toàn bộ form */}
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-4"
+              autoComplete="off"
+            >
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="identifier">Email hoặc Username của bạn</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="identifier"
+                  // name khác với "email" để trình duyệt không tự điền email cũ vào đây
+                  name="login_identifier"
+                  type="text" // Dùng text để nhập được cả username
+                  placeholder="Nhập email hoặc username"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   required
                   disabled={isLoading}
+                  autoComplete="off" // Chặn gợi ý
                   className="h-11"
                 />
               </div>
@@ -232,12 +217,14 @@ export default function LoginRoute() {
                 <div className="relative">
                   <Input
                     id="password"
+                    name="login_password_new" // Đổi name lạ đi chút để tránh trùng với form đăng ký
                     type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
+                    placeholder="Nhập mật khẩu"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     disabled={isLoading}
+                    autoComplete="new-password" // Trick để trình duyệt nghĩ đây là mk mới, không điền mk cũ
                     className="h-11 pr-10"
                   />
                   <button

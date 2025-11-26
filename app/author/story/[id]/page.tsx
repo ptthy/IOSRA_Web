@@ -23,25 +23,27 @@ import {
   Edit,
   FileText,
   Lightbulb,
+  AlertTriangle,
 } from "lucide-react";
 import { storyService } from "@/services/storyService";
-import { chapterService } from "@/services/chapterService"; // Import chapterService
+import { chapterService } from "@/services/chapterService";
 import type { Story, Chapter } from "@/services/apiTypes";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-
 import { ImageWithFallback } from "@/components/ui/ImageWithFallback";
-const extractVietnameseFeedback = (feedback: string | null): string | null => {
+
+const extractVietnameseFeedback = (
+  feedback: string | null | undefined
+): string | null => {
   if (!feedback) return null;
 
-  // Tìm phần tiếng Việt sau "Tiếng Việt:"
   const vietnameseIndex = feedback.indexOf("Tiếng Việt:");
   if (vietnameseIndex !== -1) {
     return feedback.substring(vietnameseIndex + "Tiếng Việt:".length).trim();
   }
 
-  // Nếu không tìm thấy marker tiếng Việt, trả về toàn bộ feedback
   return feedback;
 };
+
 export default function StoryDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -62,10 +64,8 @@ export default function StoryDetailPage() {
       const data = await storyService.getStoryDetails(storyId);
       setStory(data);
 
-      // Nếu truyện đã published, load chapters
-      if (data.status === "published") {
-        await loadChapters(data.storyId);
-      }
+      // Load chapters cho tất cả trạng thái, không chỉ published
+      await loadChapters(data.storyId);
     } catch (error) {
       console.error("Error loading story:", error);
     } finally {
@@ -76,12 +76,11 @@ export default function StoryDetailPage() {
   const loadChapters = async (storyId: string) => {
     setIsChaptersLoading(true);
     try {
-      // Chỉ lấy chapters có status là "published" để hiển thị cho độc giả
-      const data = await chapterService.getAllChapters(storyId, "published");
+      // Load tất cả chapters, không filter theo status
+      const data = await chapterService.getAllChapters(storyId);
       setChapters(data);
     } catch (error) {
       console.error("Error loading chapters:", error);
-      // Nếu có lỗi, vẫn tiếp tục hiển thị trang nhưng không có chapters
       setChapters([]);
     } finally {
       setIsChaptersLoading(false);
@@ -130,7 +129,6 @@ export default function StoryDetailPage() {
     );
   }
 
-  // Sửa: cập nhật getStatusBadge để dùng status chữ thường
   const getStatusBadge = (status: Story["status"]) => {
     switch (status) {
       case "draft":
@@ -161,6 +159,14 @@ export default function StoryDetailPage() {
           variant: "destructive" as const,
           icon: XCircle,
         };
+      case "completed":
+        return {
+          label: "Đã hoàn thành",
+          variant: "default" as const,
+          icon: CheckCircle2,
+          className:
+            "bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300",
+        };
       default:
         return { label: status, variant: "secondary" as const, icon: BookOpen };
     }
@@ -169,25 +175,70 @@ export default function StoryDetailPage() {
   const statusInfo = getStatusBadge(story.status);
   const StatusIcon = statusInfo.icon;
 
-  // Trang public chỉ hiển thị khi truyện đã published
-  if (story.status !== "published") {
-    return (
-      <div className="flex flex-col items-center justify-center py-16">
-        <BookOpen className="h-16 w-16 mb-4 text-muted-foreground" />
-        <p className="text-muted-foreground mb-4">
-          {story.status === "draft" && "Truyện đang trong giai đoạn bản thảo"}
-          {story.status === "pending" && "Truyện đang chờ duyệt"}
-          {story.status === "rejected" && "Truyện đã bị từ chối"}
-        </p>
-        <Button onClick={() => handleNavigate("home")}>
-          Quay lại Trang Chủ
-        </Button>
-      </div>
-    );
-  }
+  // Hiển thị thông báo đặc biệt cho các trạng thái
+  const getStatusAlert = () => {
+    switch (story.status) {
+      case "draft":
+        return (
+          <Alert className="mb-6 bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+            <Clock className="h-4 w-4 text-amber-600" />
+            <AlertDescription>
+              Truyện đang trong giai đoạn bản thảo. Bạn có thể chỉnh sửa và gửi
+              cho AI đánh giá.
+            </AlertDescription>
+          </Alert>
+        );
+      case "pending":
+        return (
+          <Alert className="mb-6 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+            <Clock className="h-4 w-4 text-blue-600" />
+            <AlertDescription>
+              Truyện đang chờ được AI đánh giá. Vui lòng chờ kết quả.
+            </AlertDescription>
+          </Alert>
+        );
+      case "rejected":
+        const feedbackText = story.aiFeedback
+          ? extractVietnameseFeedback(story.aiFeedback)
+          : "Không đạt yêu cầu của hệ thống AI";
+
+        return (
+          <Alert className="mb-6 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800">
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+            <AlertDescription>
+              <strong>Truyện đã bị từ chối:</strong> {feedbackText}
+            </AlertDescription>
+          </Alert>
+        );
+      case "completed":
+        return (
+          <Alert className="mb-6 bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800">
+            <CheckCircle2 className="h-4 w-4 text-purple-600" />
+            <AlertDescription>
+              Truyện đã được hoàn thành. Cảm ơn bạn đã sáng tác!
+            </AlertDescription>
+          </Alert>
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Filter chapters theo status để hiển thị
+  const getDisplayChapters = () => {
+    if (story.status === "published" || story.status === "completed") {
+      return chapters.filter((ch) => ch.status === "published");
+    }
+    return chapters; // Hiển thị tất cả chapters cho các trạng thái khác
+  };
+
+  const displayChapters = getDisplayChapters();
 
   return (
     <div className="space-y-6 pb-8">
+      {/* Status Alert */}
+      {getStatusAlert()}
+
       {/* Story Info Card */}
       <Card>
         <CardContent className="p-6">
@@ -280,7 +331,6 @@ export default function StoryDetailPage() {
                         Điểm AI
                       </p>
                       <p className="text-sm font-semibold text-primary">
-                        {/* Sửa từ 0-1 sang 1-10 */}
                         {story.aiScore.toFixed(1)} / 10.0
                       </p>
                     </div>
@@ -289,92 +339,162 @@ export default function StoryDetailPage() {
                         Kết quả
                       </p>
                       <p className="text-sm">
-                        {/* Cập nhật ngưỡng từ 0.5 (tương đương 5/10) sang 5 */}
-                        {story.aiScore * 10 >= 5 ? "✅ Đạt" : "❌ Không đạt"}
+                        {story.aiScore >= 5 ? "✅ Đạt" : "❌ Không đạt"}
                       </p>
                     </div>
                   </>
                 )}
               </div>
 
-              {/* AI Message */}
-              {story.aiNote && (
+              {/* AI Feedback - Hiển thị cho tất cả trạng thái */}
+              {story.aiFeedback && (
                 <div className="pt-2">
                   <p className="text-xs text-muted-foreground mb-1 font-bold">
                     Phản hồi AI:
                   </p>
-                  <p className="text-sm italic text-muted-foreground">
-                    "{extractVietnameseFeedback(story.aiNote)}"
-                  </p>
+                  <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                    <AlertDescription className="text-sm whitespace-pre-wrap">
+                      {extractVietnameseFeedback(story.aiFeedback) ||
+                        story.aiFeedback}
+                    </AlertDescription>
+                  </Alert>
                 </div>
               )}
+
+              {/* Action Buttons dựa trên trạng thái */}
+              <div className="flex gap-2 pt-4">
+                {story.status === "draft" && (
+                  <Button
+                    onClick={() => handleNavigate("author-dashboard")}
+                    variant="outline"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Quản lý truyện
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Chapters Section - Hiển thị chapters từ API thật */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Danh sách Chương</CardTitle>
-              <CardDescription>
-                Các chương đã được xuất bản của truyện này
-              </CardDescription>
+      {/* Chapters Section - Hiển thị cho tất cả trạng thái */}
+      {story.status !== "rejected" && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Danh sách Chương</CardTitle>
+                <CardDescription>
+                  {story.status === "published" || story.status === "completed"
+                    ? "Các chương đã được xuất bản của truyện này"
+                    : "Các chương của truyện (chưa xuất bản)"}
+                </CardDescription>
+              </div>
+              <Badge variant="outline">
+                {displayChapters.length} chương
+                {story.status !== "published" &&
+                  story.status !== "completed" &&
+                  ` (${
+                    chapters.filter((ch) => ch.status === "published").length
+                  } đã xuất bản)`}
+              </Badge>
             </div>
-            <Badge variant="outline">{chapters.length} chương</Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isChaptersLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </div>
-          ) : chapters.length > 0 ? (
-            <div className="space-y-3">
-              {chapters.map((chapter, index) => (
-                <div
-                  key={chapter.chapterId}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors group"
-                >
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <span className="text-sm font-semibold text-primary">
-                        {index + 1}
-                      </span>
+          </CardHeader>
+          <CardContent>
+            {isChaptersLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : displayChapters.length > 0 ? (
+              <div className="space-y-3">
+                {displayChapters.map((chapter, index) => (
+                  <div
+                    key={chapter.chapterId}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors group"
+                  >
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-semibold text-primary">
+                          {index + 1}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">
+                          {chapter.title}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge
+                            variant={
+                              chapter.status === "published"
+                                ? "default"
+                                : chapter.status === "pending"
+                                ? "secondary"
+                                : "outline"
+                            }
+                            className="text-xs"
+                          >
+                            {chapter.status === "published"
+                              ? "Đã xuất bản"
+                              : chapter.status === "pending"
+                              ? "Chờ duyệt"
+                              : "Bản nháp"}
+                          </Badge>
+                          <p className="text-xs text-muted-foreground">
+                            {chapter.publishedAt
+                              ? `Xuất bản: ${new Date(
+                                  chapter.publishedAt
+                                ).toLocaleDateString("vi-VN")}`
+                              : "Chưa xuất bản"}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">
-                        {chapter.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {chapter.publishedAt
-                          ? `Xuất bản: ${new Date(
-                              chapter.publishedAt
-                            ).toLocaleDateString("vi-VN")}`
-                          : "Chưa xuất bản"}
-                      </p>
+
+                    <div className="flex items-center gap-2">
+                      {(story.status === "published" ||
+                        story.status === "completed") &&
+                        chapter.status === "published" && (
+                          <Button
+                            size="sm"
+                            onClick={() =>
+                              router.push(
+                                `/author/story/${storyId}/chapter/${chapter.chapterId}/view`
+                              )
+                            }
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Đọc
+                          </Button>
+                        )}
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-2"></div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 border-2 border-dashed rounded-lg">
-              <BookOpen className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-30" />
-              <p className="text-sm text-muted-foreground mb-4">
-                Chưa có chương nào được xuất bản
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Hãy bắt đầu hoàn thiện tác phẩm ...
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                <BookOpen className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-30" />
+                <p className="text-sm text-muted-foreground mb-4">
+                  {story.status === "draft" || story.status === "pending"
+                    ? "Chưa có chương nào được đăng"
+                    : "Chưa có chương nào được xuất bản"}
+                </p>
+                {story.status === "draft" && (
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      handleNavigate("manage-chapters", { storyId })
+                    }
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Quản lý chương
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

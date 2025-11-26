@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import HighlightTooltip from "@/components/reader/HighlightTooltip";
 import { useRouter, useParams } from "next/navigation";
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
@@ -188,6 +189,20 @@ export default function ReaderPage() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [allChapters, setAllChapters] = useState<ChapterSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [highlightRefresh, setHighlightRefresh] = useState(0);
+  const [showHighlightPopover, setShowHighlightPopover] = useState(false); // kiểm soát popover độc lập
+  const [tooltipHighlight, setTooltipHighlight] = useState<Highlight | null>(
+    null
+  );
+  const [tooltipPosition, setTooltipPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [hoveredHighlight, setHoveredHighlight] = useState<{
+    id: string;
+    position: { x: number; y: number };
+  } | null>(null);
+
   useEffect(() => {
     if (chapterId) {
       const loadedHighlights = getHighlights(chapterId);
@@ -196,7 +211,7 @@ export default function ReaderPage() {
       );
       setHighlights(loadedHighlights);
     }
-  }, [chapterId]);
+  }, [chapterId, highlightRefresh]);
   // Load chapter data
   useEffect(() => {
     const loadData = async () => {
@@ -493,35 +508,6 @@ export default function ReaderPage() {
   }, []);
 
   useEffect(() => {
-    //   const handleSelection = () => {
-    //     const selection = window.getSelection();
-    //     const text = selection?.toString().trim();
-
-    //     if (text && text.length > 0 && activeTab === "content") {
-    //       setSelectedText(text);
-    //       const range = selection?.getRangeAt(0);
-    //       const rect = range?.getBoundingClientRect();
-
-    //       if (rect) {
-    //         setSelectionPosition({
-    //           x: rect.left + rect.width / 2,
-    //           y: rect.top - 10,
-    //         });
-    //       }
-    //     } else {
-    //       setSelectedText("");
-    //       setSelectionPosition(null);
-    //     }
-    //   };
-
-    //   document.addEventListener("mouseup", handleSelection);
-    //   document.addEventListener("touchend", handleSelection);
-
-    //   return () => {
-    //     document.removeEventListener("mouseup", handleSelection);
-    //     document.removeEventListener("touchend", handleSelection);
-    //   };
-    // }, [activeTab]);
     const handleSelection = () => {
       const selection = window.getSelection();
       const text = selection?.toString().trim();
@@ -539,18 +525,26 @@ export default function ReaderPage() {
         const rect = range?.getBoundingClientRect();
 
         if (rect) {
-          // Tính toán vị trí chính xác hơn
+          // Tính toán vị trí cho position: fixed (không cần scroll offset)
           const position = {
-            x: rect.left + window.scrollX + rect.width / 2,
-            y: rect.top + window.scrollY - 50, // Đưa lên trên một chút
+            x: rect.left + rect.width / 2,
+            y: rect.top - 10, // Đưa lên trên text một chút
           };
 
           setSelectionPosition(position);
           console.log("🎯 Popover position set:", position);
         }
+        // Hiển thị popover
+        setShowHighlightPopover(true);
+      } else if (!text && showHighlightPopover) {
+        // Giữ nguyên selection trong khi popover mở
+        console.log(
+          "ℹ️ Empty selection detected nhưng popover đang mở - giữ nguyên."
+        );
       } else {
         setSelectedText("");
         setSelectionPosition(null);
+        setShowHighlightPopover(false);
       }
     };
 
@@ -561,7 +555,62 @@ export default function ReaderPage() {
       document.removeEventListener("mouseup", handleSelection);
       document.removeEventListener("touchend", handleSelection);
     };
-  }, [activeTab]);
+  }, [activeTab, showHighlightPopover]);
+  // Show icon on hover, open tooltip on icon click
+  useEffect(() => {
+    const handleMouseOver = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const mark = target.closest(".highlight-mark") as HTMLElement | null;
+      if (mark) {
+        const id = mark.getAttribute("data-highlight-id");
+        if (id) {
+          const rect = mark.getBoundingClientRect();
+          setHoveredHighlight({
+            id,
+            position: { x: rect.right + 4, y: rect.top + rect.height / 2 },
+          });
+          return;
+        }
+      }
+      // Clear if not hovering a highlight
+      if (!target.closest(".highlight-info-icon")) {
+        setHoveredHighlight(null);
+      }
+    };
+    const handleMouseOut = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const relatedTarget = e.relatedTarget as HTMLElement;
+
+      // Don't clear if moving to the icon
+      if (relatedTarget?.closest(".highlight-info-icon")) {
+        return;
+      }
+
+      if (target.classList.contains("highlight-mark")) {
+        setTimeout(() => {
+          setHoveredHighlight(null);
+        }, 100);
+      }
+    };
+    document.addEventListener("mouseover", handleMouseOver);
+    document.addEventListener("mouseout", handleMouseOut);
+    return () => {
+      document.removeEventListener("mouseover", handleMouseOver);
+      document.removeEventListener("mouseout", handleMouseOut);
+    };
+  }, [highlights]);
+
+  // Hide tooltip on scroll for cleanliness
+  useEffect(() => {
+    const onScrollHide = () => {
+      if (tooltipHighlight) {
+        setTooltipHighlight(null);
+        setTooltipPosition(null);
+      }
+    };
+    window.addEventListener("scroll", onScrollHide);
+    return () => window.removeEventListener("scroll", onScrollHide);
+  }, [tooltipHighlight]);
   const handleNavigate = (
     page: string,
     storyId?: string,
@@ -802,10 +851,15 @@ export default function ReaderPage() {
         chapterNo={chapter.chapterNo}
         chapterTitle={chapter.title}
         chapterId={chapterId}
+        storyId={storyId}
+        chapters={allChapters}
         isDarkTheme={isDarkTheme}
         isTransparent={isTransparent}
         onBack={() => handleNavigate("/story", storyId)}
         onSettings={() => setShowSettings(true)}
+        onChapterChange={(newChapterId) =>
+          handleNavigate("/reader", storyId, newChapterId)
+        }
       />
 
       {/* Elegant Tabs */}
@@ -1282,7 +1336,7 @@ export default function ReaderPage() {
           }}
         />
       )} */}
-      {selectedText && selectionPosition && activeTab === "content" && (
+      {showHighlightPopover && selectionPosition && activeTab === "content" && (
         <HighlightPopover
           selectedText={selectedText}
           chapterId={chapterId}
@@ -1295,14 +1349,72 @@ export default function ReaderPage() {
 
             setSelectedText("");
             setSelectionPosition(null);
+            setShowHighlightPopover(false);
 
             // Clear selection
             if (window.getSelection) {
               window.getSelection()?.removeAllRanges();
             }
+
+            // Force re-render bằng cách thay đổi state
+            setHighlightRefresh((prev) => prev + 1);
+          }}
+          onClose={() => {
+            console.log("🔻 Popover closed (onClose)");
+            setShowHighlightPopover(false);
+            setSelectedText("");
+            setSelectionPosition(null);
           }}
         />
       )}
+      {/* Info icon on hover */}
+      {hoveredHighlight && !tooltipHighlight && (
+        <div
+          className="highlight-info-icon fixed z-[9998] cursor-pointer transition-all duration-200 hover:scale-110"
+          style={{
+            left: hoveredHighlight.position.x,
+            top: hoveredHighlight.position.y,
+            transform: "translate(0, -50%)",
+          }}
+          onClick={() => {
+            const hl = highlights.find((h) => h.id === hoveredHighlight.id);
+            if (hl) {
+              setTooltipHighlight(hl);
+              setTooltipPosition(hoveredHighlight.position);
+              setHoveredHighlight(null);
+            }
+          }}
+          onMouseLeave={() => {
+            setTimeout(() => setHoveredHighlight(null), 200);
+          }}
+        >
+          <div className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-fade-in">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+          </div>
+        </div>
+      )}
+      <HighlightTooltip
+        highlight={tooltipHighlight}
+        position={tooltipPosition}
+        onClose={() => {
+          setTooltipHighlight(null);
+          setTooltipPosition(null);
+        }}
+      />
       <ReaderSettingsDialog
         open={showSettings}
         onOpenChange={setShowSettings}
