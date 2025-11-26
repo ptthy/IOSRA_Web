@@ -7,6 +7,7 @@ export interface ChapterSummary {
   title: string;
   isLocked: boolean;
   wordCount: number;
+  charCount: number;
   publishedAt: string;
   languageCode: string;
 }
@@ -18,6 +19,7 @@ export interface ChapterDetail {
   title: string;
   contentUrl: string;
   wordCount: number;
+  charCount: number;
   publishedAt: string;
   isLocked: boolean;
   languageCode: string;

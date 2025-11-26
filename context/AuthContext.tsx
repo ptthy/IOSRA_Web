@@ -257,11 +257,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     updateUser,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {!isLoading && children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = (): AuthContextType => {

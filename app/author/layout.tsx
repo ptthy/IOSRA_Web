@@ -1,16 +1,11 @@
 // app/author/layout.tsx
-
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  LayoutDashboard,
-  FileText,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { LayoutDashboard, FileText, Sparkles } from "lucide-react";
 import React, { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { VoiceTopupModal } from "@/components/payment/VoiceTopupModal";
 
 interface AuthorLayoutProps {
   children: React.ReactNode;
@@ -18,6 +13,8 @@ interface AuthorLayoutProps {
 
 export default function AuthorLayout({ children }: AuthorLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+
   const router = useRouter();
   const pathname = usePathname();
 
@@ -41,14 +38,13 @@ export default function AuthorLayout({ children }: AuthorLayoutProps) {
       <aside
         className={`
           fixed left-0 z-40 border-r bg-card transition-all duration-300 flex flex-col
-         
           top-16 
-        
           h-[calc(100vh-64px)]
           ${isCollapsed ? "w-16" : "w-64"}
         `}
       >
         <div className="flex flex-col h-full">
+          {/* Sửa đoạn nav này: Đưa nút Mua Ký tự vào chung luồng, bỏ div ngăn cách */}
           <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
             <Button
               variant={isDashboardActive ? "secondary" : "ghost"}
@@ -71,10 +67,21 @@ export default function AuthorLayout({ children }: AuthorLayoutProps) {
                 <span className="ml-2 truncate">Quản lý Truyện</span>
               )}
             </Button>
-          </nav>
 
-          {/* Nút thu gọn (nếu dùng) */}
-          {/* <div className="p-4 border-t mt-auto">...</div> */}
+            {/* --- NÚT MUA KÝ TỰ (Đã sửa: Bỏ border, style y chang nút trên) --- */}
+            <Button
+              variant="ghost"
+              className="w-full justify-start"
+              onClick={() => setIsVoiceModalOpen(true)}
+              title="Mua Ký tự AI"
+            >
+              {/* Giữ màu tím cho Icon để nhận diện tính năng AI, hoặc xóa class text-indigo-500 nếu muốn đen hoàn toàn */}
+              <Sparkles className="h-5 w-5 shrink-0 text-indigo-500" />
+              {!isCollapsed && (
+                <span className="ml-2 truncate">Mua Ký tự AI</span>
+              )}
+            </Button>
+          </nav>
         </div>
       </aside>
 
@@ -88,6 +95,13 @@ export default function AuthorLayout({ children }: AuthorLayoutProps) {
       >
         <div className="container mx-auto p-6">{children}</div>
       </main>
+
+      {/* --- MODAL --- */}
+      <VoiceTopupModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        currentTextBalance={0}
+      />
     </div>
   );
 }

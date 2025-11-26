@@ -55,7 +55,7 @@ export const storyService = {
    */
   async createStory(data: CreateStoryRequest): Promise<Story> {
     try {
-      // Kiểm tra trước khi gọi API
+      // Kiểm tra token (giữ nguyên logic cũ của bạn)
       if (typeof window !== "undefined") {
         const token = localStorage.getItem("authToken");
         if (!token) {
@@ -64,18 +64,24 @@ export const storyService = {
       }
 
       console.log("Calling API: POST /api/AuthorStory");
+
       const formData = new FormData();
 
+      // Các field bắt buộc
       formData.append("Title", data.title);
-      formData.append("Description", data.description);
+      formData.append("Description", data.description || ""); // vẫn gửi dù rỗng
+      formData.append("Outline", data.outline); // MỚI – BẮT BUỘC
+      formData.append("LengthPlan", data.lengthPlan); // MỚI – BẮT BUỘC
 
-      // Map coverMode to backend values
+      // TagIds
+      data.tagIds.forEach((tagId) => formData.append("TagIds", tagId));
+
+      // CoverMode: phải đúng "upload" hoặc "generate"
       const backendCoverMode =
         data.coverMode === "upload" ? "upload" : "generate";
       formData.append("CoverMode", backendCoverMode);
 
-      data.tagIds.forEach((tagId) => formData.append("TagIds", tagId));
-
+      // CoverFile hoặc CoverPrompt tùy mode
       if (data.coverFile) {
         formData.append("CoverFile", data.coverFile);
       }
@@ -83,24 +89,33 @@ export const storyService = {
         formData.append("CoverPrompt", data.coverPrompt);
       }
 
-      // Debug FormData
-      console.log("📦 FormData contents:");
+      // Debug FormData – cực kỳ hữu ích khi dev
+      console.log("FormData gửi đi:");
       for (let [key, value] of formData.entries()) {
-        console.log(`  ${key}:`, value);
+        if (value instanceof File) {
+          console.log(`  ${key}: ${value.name} (${value.size} bytes)`);
+        } else {
+          console.log(`  ${key}: ${value}`);
+        }
       }
 
       const response = await apiClient.post<Story>(
         "/api/AuthorStory",
         formData,
         {
-          timeout: 240000,
+          timeout: 300000, // 5 phút – đủ để AI tạo ảnh nếu cần
+          headers: {
+            // Không cần set Content-Type, browser sẽ tự set + boundary
+          },
         }
       );
 
+      console.log("Tạo truyện thành công:", response.data);
       return response.data;
     } catch (error: any) {
-      console.error("❌ Error creating story:", error);
+      console.error("Error creating story:", error);
 
+      // Xử lý lỗi chi tiết từ server
       if (error.response?.status === 403) {
         const errorMessage =
           error.response?.data?.message || "Bạn không có quyền tạo truyện mới";
@@ -109,32 +124,63 @@ export const storyService = {
 
       if (error.response?.status === 400) {
         const errorMessage =
-          error.response?.data?.message || "Dữ liệu không hợp lệ";
+          error.response?.data?.message ||
+          "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại các trường bắt buộc.";
         throw new Error(errorMessage);
       }
 
+      if (error.response?.status === 401) {
+        throw new Error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+      }
+
+      // Các lỗi khác (mạng, timeout, v.v.)
       throw new Error(
-        error.response?.data?.message || "Có lỗi xảy ra khi tạo truyện"
+        error.response?.data?.message ||
+          "Có lỗi xảy ra khi tạo truyện. Vui lòng thử lại sau."
       );
     }
   },
-
-  // === Endpoint 3: POST /api/AuthorStory/{storyId}/cover ===
+  // === Endpoint 3: PUT /api/AuthorStory/{storyId} ===
   /**
-   * Cập nhật ảnh bìa (chỉ khi truyện ở status "draft")
+   * Cập nhật chỉ khi truyện ở status "draft"
+   * Sử dụng PUT /api/AuthorStory/{storyId} thay vì POST /api/AuthorStory/{storyId}/cover
    */
-  async updateStoryCover(storyId: string, coverFile: File): Promise<void> {
-    console.log(`Calling API: POST /api/AuthorStory/${storyId}/cover`);
-    const formData = new FormData();
-    formData.append("CoverFile", coverFile);
+  async replaceDraftCover(storyId: string, coverFile: File): Promise<void> {
+    try {
+      console.log(`Đang cập nhật ảnh bìa cho truyện ${storyId}...`);
 
-    await apiClient.post(`/api/AuthorStory/${storyId}/cover`, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+      const formData = new FormData();
+      formData.append("CoverFile", coverFile);
+      formData.append("CoverMode", "upload"); // Bắt buộc phải gửi để backend biết là upload
+
+      await apiClient.put(`/api/AuthorStory/${storyId}`, formData, {
+        headers: {
+          // Không cần set Content-Type, browser tự thêm boundary
+        },
+        timeout: 60000,
+      });
+
+      console.log("Cập nhật ảnh bìa thành công!");
+    } catch (error: any) {
+      console.error("Lỗi khi cập nhật ảnh bìa:", error);
+
+      if (error.response?.status === 403) {
+        throw new Error("Bạn không có quyền sửa truyện này");
+      }
+
+      if (error.response?.status === 400) {
+        const msg = error.response?.data?.message || "";
+        if (msg.toLowerCase().includes("draft") || msg.includes("status")) {
+          throw new Error(
+            "Chỉ được thay ảnh bìa khi truyện còn ở trạng thái Bản nháp"
+          );
+        }
+        throw new Error(msg || "Dữ liệu ảnh không hợp lệ");
+      }
+
+      throw new Error("Không thể cập nhật ảnh bìa. Vui lòng thử lại.");
+    }
   },
-
   // === Endpoint 4: POST /api/AuthorStory/{storyId}/submit ===
   /**
    * Nộp truyện cho AI chấm điểm.
