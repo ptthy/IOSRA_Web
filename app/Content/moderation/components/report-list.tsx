@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { motion, Variants } from "framer-motion";
 
-import { MOCK_getHandlingReports as getHandlingReports } from "@/services/moderationApi";
+import { getHandlingReports } from "@/services/moderationApi";
 import { ReportActionModal } from "./report-action-modal";
 import { cn } from "@/lib/utils";
 
