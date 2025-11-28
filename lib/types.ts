@@ -32,6 +32,7 @@ export interface ChapterSummary {
   title: string;
   publishedAt: string;
   wordCount: number;
+  charCount: number;
   isPremium: boolean;
 }
 

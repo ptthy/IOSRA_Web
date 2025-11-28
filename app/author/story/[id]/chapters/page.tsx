@@ -40,6 +40,8 @@ import {
   Eye,
   Edit,
   Clock,
+  Globe,
+  FileText,
 } from "lucide-react";
 import { storyService } from "@/services/storyService";
 import { chapterService } from "@/services/chapterService";
@@ -202,45 +204,111 @@ export default function ManageChaptersPage() {
   const canCompleteStory = publishedChapters.length >= 1;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-8">
-      {/* Header */}
+    <div className="max-w-6xl mx-auto space-y-6 pb-8">
+      {/* 1. Header Trang */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl mb-2">Quản lý Chương</h1>
+          <h1 className="text-3xl mb-2 font-bold tracking-tight">
+            Quản lý Chương
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Truyện: <strong>{story.title}</strong>
+            Truyện: <strong className="text-foreground">{story.title}</strong>
           </p>
         </div>
-        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-300 flex-shrink-0">
-          Đã xuất bản
-        </Badge>
       </div>
 
-      {/* Story Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Thông tin truyện</CardTitle>
+      {/* 2. Story Info Card (Giao diện mới) */}
+      <Card className="relative overflow-hidden shadow-sm">
+        {/* Header Card: Chỉnh pb-0 để đường kẻ dính sát lên */}
+        <CardHeader className="pt-2 pb-0">
+          <CardTitle className="text-xl leading-none">
+            Thông tin truyện
+          </CardTitle>
+
+          {/* === PHẦN RUY BĂNG (LÁ CỜ) === */}
+          {(() => {
+            // Cấu hình mặc định
+            let statusConfig = {
+              label: "Bản nháp",
+              bgColor: "bg-slate-500",
+              Icon: FileText,
+            };
+
+            // Logic đổi màu theo trạng thái story
+            if (story.status === "published") {
+              statusConfig = {
+                label: "Đã xuất bản",
+                bgColor: "bg-emerald-600", // Màu xanh Emerald đậm
+                Icon: Globe,
+              };
+            } else if (story.status === "completed") {
+              statusConfig = {
+                label: "Đã hoàn thành",
+                bgColor: "bg-purple-600",
+                Icon: CheckCircle,
+              };
+            }
+
+            return (
+              <div className="absolute top-0 right-8 drop-shadow-md z-10">
+                <div
+                  className={`
+                    relative px-3 pt-3 pb-5 flex flex-col items-center justify-center gap-1 
+                    text-white font-bold text-xs shadow-lg transition-all
+                    ${statusConfig.bgColor}
+                  `}
+                  // Cắt hình đuôi cá
+                  style={{
+                    clipPath:
+                      "polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%)",
+                    minWidth: "70px",
+                  }}
+                >
+                  <statusConfig.Icon className="h-5 w-5 mb-0.5" />
+                  <span className="text-center leading-tight uppercase tracking-wider text-[10px]">
+                    {statusConfig.label}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Tên truyện</p>
-              <p>{story.title}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Thể loại</p>
-              <div className="flex gap-2">
-                {story.tags?.map((tag) => (
-                  <Badge key={tag.tagId} variant="secondary">
-                    {tag.tagName}
-                  </Badge>
-                ))}
+
+        {/* Đường phân cách: Đổi màu theo Theme & Sát lên trên */}
+        <div className="w-full h-[1px]  bg-[#00416a] dark:bg-[#f0ead6] mt-0" />
+
+        {/* Nội dung Card */}
+        <CardContent className="space-y-4 pt-0">
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Cột trái */}
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Tên truyện</p>
+                <p className="font-medium">{story.title}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Thể loại</p>
+                <div className="flex flex-wrap gap-2">
+                  {story.tags?.map((tag) => (
+                    <Badge
+                      key={tag.tagId}
+                      variant="secondary"
+                      className="px-2 py-1 font-normal"
+                    >
+                      {tag.tagName}
+                    </Badge>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">Mô tả</p>
-            <p className="text-sm">{story.description}</p>
+
+            {/* Cột phải (Mô tả) */}
+            <div className="md:col-span-2">
+              <p className="text-sm text-muted-foreground mb-1">Mô tả</p>
+              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                {story.description}
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -301,13 +369,6 @@ export default function ManageChaptersPage() {
               <p className="text-muted-foreground mb-4">
                 Chưa có chương nào được đăng
               </p>
-              <Button
-                variant="outline"
-                onClick={() => handleNavigate("chapter-editor", { storyId })}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Đăng Chương Đầu Tiên
-              </Button>
             </div>
           ) : (
             <Table>

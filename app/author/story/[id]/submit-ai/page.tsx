@@ -75,7 +75,7 @@ export default function SubmitAIPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-8">
+    <div className="max-w-6xl mx-auto space-y-6 pb-8">
       {/* Back Button */}
       <Button
         variant="ghost"
@@ -151,15 +151,15 @@ export default function SubmitAIPage() {
               </p>
               <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1 list-disc list-inside">
                 <li>
-                  <strong>Điểm &gt; 0.7:</strong> Tự động xuất bản, bạn có thể
+                  <strong>Điểm &gt; 7:</strong> Tự động xuất bản, bạn có thể
                   đăng chương ngay
                 </li>
                 <li>
-                  <strong>Điểm 0.5 - 0.7:</strong> Gửi ContentMod xem xét thủ
-                  công (2-5 ngày)
+                  <strong>Điểm 5 - 7:</strong> Gửi ContentMod xem xét thủ công
+                  (2-5 ngày)
                 </li>
                 <li>
-                  <strong>Điểm &lt; 0.5:</strong> Từ chối truyện cần tạo và gửi
+                  <strong>Điểm &lt; 5:</strong> Từ chối truyện cần tạo và gửi
                   lại truyện mới
                 </li>
               </ul>

@@ -1,6 +1,12 @@
-import React, { useState, useEffect } from "react";
+"use client";
+
+import React, { useRef, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Crown, Sparkles, Zap } from "lucide-react";
-import { Button } from "../ui/button";
+
+type Props = {
+  children?: React.ReactNode;
+  className?: string;
+};
 
 const slides = [
   {
@@ -10,7 +16,6 @@ const slides = [
     description: "Không quảng cáo • Đọc offline • Nội dung độc quyền",
     gradient: "from-primary via-primary/90 to-primary/70",
     icon: Crown,
-    buttonText: "Nâng cấp ngay",
   },
   {
     id: 2,
@@ -19,7 +24,6 @@ const slides = [
     description: "Từ kiếm hiệp, tiên hiệp đến khoa huyễn, ngôn tình",
     gradient: "from-blue-600 via-blue-500 to-blue-400",
     icon: Sparkles,
-    buttonText: "Khám phá ngay",
   },
   {
     id: 3,
@@ -28,7 +32,6 @@ const slides = [
     description: "Web • Mobile • Tablet - Đồng bộ tiến độ đọc",
     gradient: "from-purple-600 via-purple-500 to-purple-400",
     icon: Zap,
-    buttonText: "Bắt đầu đọc",
   },
 ];
 
@@ -90,13 +93,6 @@ export function HeroCarousel() {
           </p>
 
           <p className="text-sm text-white/70 mb-6">{slide.description}</p>
-
-          <Button
-            size="lg"
-            className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg hover:shadow-xl transition-all"
-          >
-            {slide.buttonText}
-          </Button>
         </div>
       </div>
 

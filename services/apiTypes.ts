@@ -21,8 +21,9 @@ export interface Story {
   moderatorNote?: string | null;
   totalChapters?: number;
   isPremium?: boolean;
-  publishedAt: string;
-  lengthPlan?: string;
+  publishedAt: string | null;
+  lengthPlan?: "super_short" | "short" | "novel";
+  outline?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,7 +32,9 @@ export interface CreateStoryRequest {
   title: string;
   description: string;
   tagIds: string[];
-  coverMode: "upload" | "ai";
+  outline: string;
+  lengthPlan: "super_short" | "short" | "novel";
+  coverMode: "upload" | "generate";
   coverFile?: File;
   coverPrompt?: string;
 }
@@ -51,14 +54,18 @@ export interface Chapter {
   chapterNo: number;
   title: string;
   wordCount: number;
+  charCount: number;
   languageCode: string;
   languageName: string;
   priceDias: number;
-  status: "draft" | "pending" | "rejected" | "published";
+  status: "draft" | "pending" | "rejected" | "published" | "completed";
   createdAt: string;
   updatedAt: string;
   submittedAt?: string | null;
   publishedAt?: string | null;
+  aiResult?: string | null;
+  moderatorStatus?: string | null;
+  moderatorNote?: string | null;
 }
 
 // Sửa: Gộp hai interface ChapterDetails thành một
@@ -79,6 +86,7 @@ export interface CreateChapterRequest {
   title: string;
   languageCode: "vi-VN" | "en-US" | "zh-CN" | "ja-JP";
   content: string;
+  accessType?: "free" | "dias";
 }
 // --- Public Profile Types ---
 export interface PublicProfile {
@@ -136,6 +144,57 @@ export interface PublicStoriesResponse {
   total: number;
   page: number;
   pageSize: number;
+}
+// --- Voice Chapter Types ---
+
+export interface VoiceItem {
+  voiceId: string;
+  voiceName: string;
+  voiceCode: string;
+  providerVoiceId: string;
+  description: string;
+}
+
+export interface VoiceAudio {
+  voiceId: string;
+  voiceName: string;
+  voiceCode: string;
+  status: "processing" | "ready" | "failed";
+  audioUrl: string;
+  requestedAt: string;
+  completedAt?: string;
+  charCost: number;
+  priceDias: number;
+  errorMessage?: string | null;
+}
+
+export interface VoiceChapterResponse {
+  chapterId: string;
+  storyId: string;
+  chapterTitle: string;
+  voices: VoiceAudio[];
+}
+
+export interface VoiceCharCountResponse {
+  chapterId: string;
+  storyId: string;
+  chapterTitle: string;
+  wordCount: number;
+  characterCount: number; // API trả về cái này
+  charCount?: number; // Có thể API trả về cái này (logic ưu tiên)
+}
+
+export interface OrderVoiceRequest {
+  voiceIds: string[];
+}
+
+export interface OrderVoiceResponse {
+  charactersCharged: number;
+  walletBalance: number;
+  chapterId: string;
+  storyId: string;
+  chapterTitle: string;
+  voices: VoiceAudio[];
 }
 export * from "./storyCatalog";
 export * from "./storyRatingService";

@@ -54,7 +54,7 @@ export default function EmailChangePage() {
 
       toast.success("Mã OTP đã được gửi đến email mới");
       setStep("otp");
-      setCountdown(60);
+      setCountdown(300);
 
       const timer = setInterval(() => {
         setCountdown((prev) => {

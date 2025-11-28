@@ -1,7 +1,7 @@
 // app/author/story/[id]/chapter/[chapterId]/page.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import {
@@ -16,7 +16,6 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -37,45 +36,15 @@ import {
   Download,
   Save,
   X,
-  Bold,
-  Italic,
-  Strikethrough,
-  List,
-  Quote,
+  Pencil,
+  XCircle,
+  Globe,
 } from "lucide-react";
 import { chapterService } from "@/services/chapterService";
 import type { ChapterDetails } from "@/services/apiTypes";
 import { toast } from "sonner";
-import TurndownService from "turndown";
-import { marked } from "marked";
-
-// Base URL cho R2 bucket - có thể move ra file config sau
-const R2_BASE_URL = "https://pub-15618311c0ec468282718f80c66bcc13.r2.dev";
-// Khởi tạo TurndownService
-const turndownService = new TurndownService();
-
-// Hàm chuyển HTML sang Markdown
-const convertHtmlToMarkdown = (html: string): string => {
-  if (!html) return "";
-  try {
-    return turndownService.turndown(html);
-  } catch (error) {
-    console.error("Error converting HTML to Markdown:", error);
-    return html;
-  }
-};
-
-// Hàm chuyển Markdown sang HTML
-const convertMarkdownToHtml = (markdown: string): string => {
-  if (!markdown) return "";
-  try {
-    return marked.parse(markdown) as string;
-  } catch (error) {
-    console.error("Error converting Markdown to HTML:", error);
-    return markdown;
-  }
-};
-
+import TiptapEditor from "@/components/editor/TiptapEditor";
+import VoiceChapterPlayer from "@/components/author/VoiceChapterPlayer";
 // Hàm trích xuất phần tiếng Việt từ AI Feedback
 const extractVietnameseFeedback = (feedback: string | null): string | null => {
   if (!feedback) return null;
@@ -212,6 +181,7 @@ const isHTMLContent = (content: string): boolean => {
 
   return hasHTMLTag || hasClosingTag;
 };
+
 // Hàm hiển thị nội dung HTML từ Rich Text Editor
 const renderHTMLContent = (content: string) => {
   return (
@@ -261,18 +231,20 @@ const renderContent = (content: string) => {
     );
   }
 };
+
 export default function AuthorChapterDetailPage() {
   const params = useParams();
   const router = useRouter();
   const storyId = params.id as string;
   const chapterId = params.chapterId as string;
-
+  const [showModeratorAlert, setShowModeratorAlert] = useState(false);
   const [chapter, setChapter] = useState<ChapterDetails | null>(null);
-  const [chapterContent, setChapterContent] = useState<string | null>(null);
+  const [chapterContent, setChapterContent] = useState<string>("");
+  const [isContentReady, setIsContentReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
   // State mới cho chế độ chỉnh sửa
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -280,163 +252,20 @@ export default function AuthorChapterDetailPage() {
     title: "",
     content: "",
     languageCode: "vi-VN" as "vi-VN" | "en-US" | "zh-CN" | "ja-JP",
+    accessType: "free" as "free" | "dias",
   });
-  const [isMarkdownMode, setIsMarkdownMode] = useState(false);
 
-  // Ref và state cho rich text editor
-  const editorRef = useRef<HTMLDivElement>(null);
-  const selectionRef = useRef<Range | null>(null);
-  const [showPlaceholder, setShowPlaceholder] = useState(true);
+  // State theo dõi thay đổi chưa lưu
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // ========== CÁC HÀM XỬ LÝ EDITOR (lấy từ trang new) ==========
-  useEffect(() => {
-    if (
-      isEditing &&
-      editorRef.current &&
-      editFormData.content &&
-      !isMarkdownMode
-    ) {
-      console.log("🔍 [DEBUG] useEffect: Initializing editor with content");
-
-      // Chỉ set nội dung nếu editor đang trống
-      if (
-        editorRef.current.innerHTML === "" ||
-        editorRef.current.innerHTML === "<br>" ||
-        editorRef.current.innerHTML.includes("Nhập nội dung")
-      ) {
-        editorRef.current.innerHTML = editFormData.content;
-        setShowPlaceholder(!editFormData.content);
-      }
-    }
-  }, [isEditing, isMarkdownMode, editFormData.content]);
-  const applyFormatting = (command: string, value: string = "") => {
-    if (!editorRef.current) return;
-    editorRef.current.focus();
-    document.execCommand(command, false, value);
-    updateContentFromEditor();
-  };
-
-  const updateContentFromEditor = () => {
-    if (!editorRef.current) return;
-    const newContent = editorRef.current.innerHTML;
-    const hasContent =
-      newContent !== "<br>" &&
-      newContent !== "" &&
-      newContent !== "<div><br></div>";
-    setShowPlaceholder(!hasContent);
-    setEditFormData((prev) => ({ ...prev, content: newContent }));
+  // Hàm xử lý thay đổi từ Tiptap Editor
+  const handleEditorChange = (html: string) => {
+    setEditFormData((prev) => ({ ...prev, content: html }));
     setHasUnsavedChanges(true);
   };
 
-  const handleEditorFocus = () => {
-    setShowPlaceholder(false);
-  };
-
-  const handleEditorBlur = () => {
-    if (editorRef.current) {
-      const hasContent =
-        editorRef.current.innerHTML !== "<br>" &&
-        editorRef.current.innerHTML !== "" &&
-        editorRef.current.innerHTML !== "<div><br></div>";
-      setShowPlaceholder(!hasContent);
-    }
-  };
-
-  // Các hàm xử lý định dạng
-  // Các hàm xử lý định dạng
-  const handleBold = () => {
-    applyFormatting("bold");
-    setActiveFormat(activeFormat === "bold" ? null : "bold");
-  };
-
-  const handleItalic = () => {
-    applyFormatting("italic");
-    setActiveFormat(activeFormat === "italic" ? null : "italic");
-  };
-
-  const handleStrikethrough = () => {
-    applyFormatting("strikethrough");
-    setActiveFormat(activeFormat === "strikethrough" ? null : "strikethrough");
-  };
-
-  const handleHeading = (level: number) => {
-    applyFormatting("formatBlock", `<h${level}>`);
-    setActiveFormat(activeFormat === `h${level}` ? null : `h${level}`);
-  };
-
-  const handleList = (type: "bullet" | "number") => {
-    applyFormatting(
-      type === "bullet" ? "insertUnorderedList" : "insertOrderedList"
-    );
-    setActiveFormat(activeFormat === type ? null : type);
-  };
-
-  const handleQuote = () => {
-    applyFormatting("formatBlock", "<blockquote>");
-    setActiveFormat(activeFormat === "quote" ? null : "quote");
-  };
-
-  const handleEditorInput = () => {
-    updateContentFromEditor();
-  };
-
-  // Thêm hàm chuyển đổi chế độ
-  const handleSwitchToMarkdown = () => {
-    if (!isMarkdownMode) {
-      // Đang từ Rich Text -> Markdown
-      const currentContent = editFormData.content;
-
-      if (currentContent && isHTMLContent(currentContent)) {
-        const markdownContent = convertHtmlToMarkdown(currentContent);
-        setEditFormData((prev) => ({ ...prev, content: markdownContent }));
-      }
-
-      setIsMarkdownMode(true);
-      setHasUnsavedChanges(true);
-    }
-  };
-
-  const handleSwitchToRichText = () => {
-    if (isMarkdownMode) {
-      // Đang từ Markdown -> Rich Text
-      const currentContent = editFormData.content;
-
-      if (currentContent && isMarkdownContent(currentContent)) {
-        const htmlContent = convertMarkdownToHtml(currentContent);
-        setEditFormData((prev) => ({ ...prev, content: htmlContent }));
-
-        // Cập nhật editor
-        setTimeout(() => {
-          if (editorRef.current) {
-            editorRef.current.innerHTML = htmlContent;
-            setShowPlaceholder(!htmlContent);
-          }
-        }, 0);
-      }
-
-      setIsMarkdownMode(false);
-      setHasUnsavedChanges(true);
-    }
-  };
-  // State theo dõi thay đổi chưa lưu
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [activeFormat, setActiveFormat] = useState<string | null>(null);
-  // Đồng bộ editor khi chuyển chế độ hoặc nội dung thay đổi
-  useEffect(() => {
-    if (!isMarkdownMode && editorRef.current && editFormData.content) {
-      // Chỉ cập nhật nếu nội dung khác với hiện tại
-      if (editorRef.current.innerHTML !== editFormData.content) {
-        editorRef.current.innerHTML = editFormData.content;
-        setShowPlaceholder(!editFormData.content);
-      }
-    }
-  }, [isMarkdownMode, editFormData.content]);
-  useEffect(() => {
-    loadChapter();
-  }, [storyId, chapterId]);
-
-  const loadChapter = async () => {
-    setIsLoading(true);
+  // Hàm reload không hiển thị loading - ĐÃ ĐƯỢC TỐI ƯU
+  const reloadChapter = async () => {
     try {
       const chapterData = await chapterService.getChapterDetails(
         storyId,
@@ -444,7 +273,7 @@ export default function AuthorChapterDetailPage() {
       );
       setChapter(chapterData);
 
-      // KHỞI TẠO FORM DATA TỪ CHAPTER HIỆN TẠI
+      // Cập nhật form data
       setEditFormData({
         title: chapterData.title,
         content: chapterData.content || "",
@@ -453,19 +282,68 @@ export default function AuthorChapterDetailPage() {
           | "en-US"
           | "zh-CN"
           | "ja-JP",
+        accessType: (chapterData.accessType as "free" | "dias") || "free",
       });
 
-      // ƯU TIÊN SỬ DỤNG NỘI DUNG TỪ DATABASE TRƯỚC
+      // Cập nhật content
       if (chapterData.content) {
         setChapterContent(chapterData.content);
-        console.log("✅ [DEBUG] Using content from database");
       } else if (chapterData.contentPath) {
-        // Chỉ load từ file nếu không có content trong database
-        console.log("📁 [DEBUG] Loading content from file path");
         await loadChapterContent(chapterData.contentPath);
       } else {
-        console.warn("⚠️ [DEBUG] No content available, setting empty content");
-        setChapterContent(""); // Đặt thành chuỗi rỗng thay vì null
+        setChapterContent("");
+      }
+
+      if (chapterData.moderatorNote) {
+        setShowModeratorAlert(true);
+      }
+    } catch (error: any) {
+      console.error("Error reloading chapter:", error);
+      toast.error(error.message || "Không thể tải thông tin chương");
+    }
+  };
+
+  useEffect(() => {
+    loadChapter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storyId, chapterId]);
+
+  const loadChapter = async () => {
+    setIsLoading(true);
+    setIsContentReady(false);
+    try {
+      const chapterData = await chapterService.getChapterDetails(
+        storyId,
+        chapterId
+      );
+      setChapter(chapterData);
+
+      // Khởi tạo form edit (dùng title, language... trước)
+      setEditFormData({
+        title: chapterData.title,
+        content: "", // để trống trước, lát sẽ load từ file
+        languageCode: chapterData.languageCode as any,
+        accessType: (chapterData.accessType as "free" | "dias") || "free",
+      });
+
+      if (chapterData.moderatorNote) {
+        setShowModeratorAlert(true);
+      }
+
+      // ƯU TIÊN CAO NHẤT: DÙ CÓ content TRONG DB HAY KHÔNG → VẪN LẤY TỪ contentPath NẾU CÓ
+      if (chapterData.contentPath) {
+        await loadChapterContent(chapterData.contentPath);
+        setIsContentReady(true);
+      }
+      // Chỉ fallback về content trong DB nếu KHÔNG có contentPath
+      else if (chapterData.content) {
+        setChapterContent(chapterData.content);
+        setIsContentReady(true);
+      }
+      // Không có gì cả
+      else {
+        setChapterContent("");
+        setIsContentReady(true);
       }
     } catch (error: any) {
       console.error("Error loading chapter:", error);
@@ -474,116 +352,48 @@ export default function AuthorChapterDetailPage() {
       setIsLoading(false);
     }
   };
-
   const loadChapterContent = async (contentPath: string) => {
     setIsLoadingContent(true);
     try {
-      const apiUrl = `/api/chapter-content?path=${encodeURIComponent(
-        contentPath
-      )}`;
-      console.log("🔍 [DEBUG] Loading chapter content via API:", apiUrl);
-
-      const response = await fetch(apiUrl);
-
-      console.log("🔍 [DEBUG] API response:", {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-      });
+      const response = await fetch(
+        `/api/chapter-content?path=${encodeURIComponent(contentPath)}`
+      );
 
       if (!response.ok) {
-        // XỬ LÝ LỖI 404 CỤ THỂ
-        if (response.status === 404) {
-          console.warn(
-            "⚠️ [DEBUG] Content file not found in R2, using database content"
-          );
-          // Sử dụng nội dung từ database thay vì từ file
-          if (chapter?.content) {
-            setChapterContent(chapter.content);
-            return; // Thoát sớm để không xử lý tiếp
-          } else {
-            // NẾU KHÔNG CÓ NỘI DUNG TRONG DATABASE, ĐẶT THÀNH CHUỖI RỖNG
-            console.warn(
-              "⚠️ [DEBUG] No content in database either, setting empty content"
-            );
-            setChapterContent("");
-            return; // Thoát sớm, không ném lỗi
-          }
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`Lỗi tải file: ${response.status}`);
       }
 
       const data = await response.json();
+      if (data.error) throw new Error(data.error);
 
-      if (data.error) {
-        throw new Error(data.error);
-      }
+      const fileContent = data.content || "";
 
-      console.log("🔍 [DEBUG] Content loaded via API:", {
-        contentLength: data.content.length,
-        first100Chars: data.content.substring(0, 100),
-        hasContent: data.content.length > 0,
-      });
+      setChapterContent(fileContent);
 
-      // ========== ĐẶT DEBUG CONTENT ANALYSIS Ở ĐÂY ==========
-      console.log("🔍 [DEBUG] Content analysis:", {
-        contentLength: data.content.length,
-        first200Chars: data.content.substring(0, 200),
-        isHTML: isHTMLContent(data.content),
-        isMarkdown: isMarkdownContent(data.content),
-        containsDiv: /<div[^>]*>/i.test(data.content),
-        containsP: /<p[^>]*>/i.test(data.content),
-        containsStrong: /<strong[^>]*>/i.test(data.content),
-        containsBr: /<br[^>]*>/i.test(data.content),
-        containsH1: /<h1[^>]*>/i.test(data.content),
-        containsBlockquote: /<blockquote[^>]*>/i.test(data.content),
-      });
-      // ========== END DEBUG ==========
-
-      setChapterContent(data.content);
-
-      // CẬP NHẬT EDIT FORM DATA KHI CÓ NỘI DUNG MỚI
+      // <<< QUAN TRỌNG: Nếu đang edit → cập nhật luôn vào editor >>>
       if (isEditing) {
-        setEditFormData((prev) => ({ ...prev, content: data.content }));
-        // Cập nhật editor nếu đang trong chế độ chỉnh sửa
-        setTimeout(() => {
-          if (editorRef.current && !isMarkdownMode) {
-            editorRef.current.innerHTML = data.content;
-            setShowPlaceholder(!data.content);
-          }
-        }, 100);
+        setEditFormData((prev) => ({ ...prev, content: fileContent }));
       }
     } catch (error: any) {
-      console.error("❌ [DEBUG] Error loading chapter content:", {
-        error: error,
-        message: error.message,
-        stack: error.stack,
-      });
+      console.error("Load content từ file thất bại:", error);
 
-      // HIỂN THỊ THÔNG BÁO LỖI CỤ THỂ
-      if (
-        error.message.includes("404") ||
-        error.message.includes("not found") ||
-        error.message.includes("Không tìm thấy")
-      ) {
-        // THỬ SỬ DỤNG NỘI DUNG TỪ DATABASE HOẶC ĐẶT THÀNH RỖNG
-        if (chapter?.content) {
-          setChapterContent(chapter.content);
-          toast.warning("Sử dụng nội dung từ database");
-        } else {
-          setChapterContent("");
-          toast.warning(
-            "Chương chưa có nội dung, bạn có thể thêm nội dung mới"
-          );
+      // Fallback về content trong DB (nếu có)
+      if (chapter?.content) {
+        setChapterContent(chapter.content);
+        if (isEditing) {
+          setEditFormData((prev) => ({ ...prev, content: chapter.content }));
         }
+        toast.warning("Không tải được file → dùng nội dung từ database");
       } else {
-        toast.error("Không thể tải nội dung chương");
         setChapterContent("");
+        toast.error("Không thể tải nội dung chương");
       }
     } finally {
       setIsLoadingContent(false);
+      setIsContentReady(true);
     }
   };
+
   const handleDownloadContent = () => {
     if (!chapterContent || !chapter) return;
 
@@ -598,6 +408,7 @@ export default function AuthorChapterDetailPage() {
     URL.revokeObjectURL(url);
   };
 
+  // HÀM SUBMIT ĐÃ ĐƯỢC SỬA - TỰ ĐỘNG RELOAD KHI CÓ LỖI
   const handleSubmitForReview = async () => {
     if (!chapter) return;
 
@@ -605,55 +416,40 @@ export default function AuthorChapterDetailPage() {
     try {
       await chapterService.submitChapterForReview(chapterId);
       toast.success("Đã gửi chương cho AI đánh giá thành công!");
-      // Reload để cập nhật trạng thái mới
-      loadChapter();
+
+      // RELOAD LẠI CHAPTER SAU KHI SUBMIT THÀNH CÔNG
+      await reloadChapter();
     } catch (error: any) {
       console.error("Error submitting chapter:", error);
-      toast.error(error.message || "Có lỗi xảy ra khi gửi chương");
+
+      // QUAN TRỌNG: RELOAD LẠI CHAPTER KHI CÓ LỖI
+      await reloadChapter();
+
+      // Hiển thị thông báo lỗi cụ thể
+      if (error.response?.data?.error?.code === "InvalidChapterState") {
+        toast.error(
+          "Chương không ở trạng thái có thể gửi. Chỉ chương ở trạng thái bản nháp mới được gửi."
+        );
+      } else {
+        toast.error(error.message || "Có lỗi xảy ra khi gửi chương");
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleEditChapter = () => {
+    const currentContent = chapterContent || chapter?.content || "";
+
+    setEditFormData({
+      title: chapter?.title || "",
+      content: currentContent, // ← luôn luôn dùng nội dung đã load
+      languageCode: chapter?.languageCode as any,
+      accessType: (chapter?.accessType as "free" | "dias") || "free",
+    });
+
     setIsEditing(true);
     setHasUnsavedChanges(false);
-
-    // ĐẢM BẢO KHỞI TẠO ĐÚNG NỘI DUNG CHO EDITOR
-    if (chapter) {
-      // Sử dụng chapterContent nếu có, nếu không thì dùng chapter.content
-      const currentContent = chapterContent || chapter.content || "";
-
-      // Xác định chế độ mặc định dựa trên loại nội dung
-      const shouldStartWithMarkdown =
-        isMarkdownContent(currentContent) && !isHTMLContent(currentContent);
-      setIsMarkdownMode(shouldStartWithMarkdown);
-
-      // Cập nhật form data với nội dung hiện tại
-      setEditFormData({
-        title: chapter.title,
-        content: currentContent,
-        languageCode: chapter.languageCode as
-          | "vi-VN"
-          | "en-US"
-          | "zh-CN"
-          | "ja-JP",
-      });
-
-      // Đợi một chút để đảm bảo editor đã render rồi mới set nội dung
-      setTimeout(() => {
-        if (editorRef.current && currentContent && !shouldStartWithMarkdown) {
-          console.log("🔍 [DEBUG] Setting editor content:", {
-            contentLength: currentContent.length,
-            first100Chars: currentContent.substring(0, 100),
-          });
-
-          // Set nội dung cho rich text editor
-          editorRef.current.innerHTML = currentContent;
-          setShowPlaceholder(!currentContent);
-        }
-      }, 100);
-    }
   };
   const handleCancelEdit = () => {
     if (hasUnsavedChanges) {
@@ -663,7 +459,7 @@ export default function AuthorChapterDetailPage() {
       if (!confirmLeave) return;
     }
     setIsEditing(false);
-    // Khôi phục dữ liệu gốc
+    // Khôi phục dữ liệu gốc từ chapter hiện tại
     if (chapter) {
       setEditFormData({
         title: chapter.title,
@@ -673,11 +469,52 @@ export default function AuthorChapterDetailPage() {
           | "en-US"
           | "zh-CN"
           | "ja-JP",
+        accessType: (chapter.accessType as "free" | "dias") || "free",
       });
     }
     setHasUnsavedChanges(false);
   };
 
+  // HÀM WITHDRAW ĐÃ ĐƯỢC SỬA - TỰ ĐỘNG RELOAD
+  const handleWithdraw = async () => {
+    if (chapter?.status !== "rejected") {
+      toast.error("Chỉ có thể rút chương khi bị từ chối");
+      return;
+    }
+
+    if (
+      !confirm("Bạn có chắc muốn rút chương này về bản nháp để sửa lại không?")
+    ) {
+      return;
+    }
+
+    setIsWithdrawing(true);
+    try {
+      await chapterService.withdrawChapter(chapterId);
+
+      // RELOAD LẠI TOÀN BỘ DỮ LIỆU CHAPTER
+      await reloadChapter();
+
+      toast.success("Đã rút chương về bản nháp thành công!");
+      setIsEditing(true); // tự động vào chế độ chỉnh sửa
+      setShowModeratorAlert(false);
+    } catch (err: any) {
+      console.error("Error withdrawing chapter:", err);
+
+      // RELOAD LẠI KHI CÓ LỖI
+      await reloadChapter();
+
+      if (err.response?.data?.error?.code === "WithdrawNotAllowed") {
+        toast.error("Chỉ có thể rút chương khi bị từ chối");
+      } else {
+        toast.error(err.message || "Không thể rút chương");
+      }
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
+
+  // HÀM LƯU ĐÃ ĐƯỢC TỐI ƯU
   const handleSaveEdit = async () => {
     if (!chapter) return;
 
@@ -687,25 +524,31 @@ export default function AuthorChapterDetailPage() {
       return;
     }
 
-    if (!editFormData.content.trim()) {
+    if (!editFormData.content.trim() || editFormData.content === "<p></p>") {
       toast.error("Vui lòng nhập nội dung chương");
       return;
     }
 
     setIsSaving(true);
     try {
-      await chapterService.updateChapter(storyId, chapterId, {
-        title: editFormData.title,
-        content: editFormData.content,
-        languageCode: editFormData.languageCode,
-      });
+      const updatedChapter = await chapterService.updateChapter(
+        storyId,
+        chapterId,
+        {
+          title: editFormData.title,
+          content: editFormData.content,
+          languageCode: editFormData.languageCode,
+          accessType: editFormData.accessType,
+        }
+      );
+
+      // CẬP NHẬT STATE NGAY LẬP TỨC
+      setChapter(updatedChapter);
+      setChapterContent(editFormData.content);
 
       toast.success("Cập nhật chương thành công!");
       setIsEditing(false);
       setHasUnsavedChanges(false);
-
-      // RELOAD LẠI DỮ LIỆU - CÁCH NÀY ĐƠN GIẢN VÀ AN TOÀN HƠN
-      await loadChapter();
     } catch (error: any) {
       console.error("Error updating chapter:", error);
       toast.error(error.message || "Có lỗi xảy ra khi cập nhật chương");
@@ -760,24 +603,15 @@ export default function AuthorChapterDetailPage() {
   const canSubmit = chapter?.status === "draft";
   const isPending = chapter?.status === "pending";
   const isPublished = chapter?.status === "published";
+  const isRejected = chapter?.status === "rejected";
 
   // Trích xuất phần tiếng Việt từ AI Feedback
   const vietnameseFeedback = chapter
     ? extractVietnameseFeedback(chapter.aiFeedback ?? null)
     : null;
 
-  // Xác định loại nội dung để hiển thị thông báo
-  const getContentType = () => {
-    if (!chapterContent) return "";
-    if (isMarkdownContent(chapterContent))
-      return "Đang hiển thị ở chế độ Markdown";
-    if (isHTMLContent(chapterContent))
-      return "Đang hiển thị ở chế độ Rich Text";
-    return "Đang hiển thị ở chế độ văn bản thuần";
-  };
-
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-8">
+    <div className="max-w-6xl mx-auto space-y-6 pb-8">
       {/* Header - Thêm trạng thái chỉnh sửa */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" onClick={handleBackToChapters}>
@@ -795,17 +629,82 @@ export default function AuthorChapterDetailPage() {
           </p>
         </div>
         {isEditing && (
-          <Badge variant="destructive" className="ml-auto">
-            Đang chỉnh sửa
+          <Badge className="ml-auto bg-orange-500 hover:bg-orange-600 text-white border-none flex items-center gap-x-2 px-3 py-1.5 text-sm font-medium transition-all">
+            <Pencil className="h-4 w-4" />
+            <span>Đang chỉnh sửa</span>
           </Badge>
         )}
       </div>
+      {/* Thông báo Moderator Rejection - HIỂN THỊ KHI CÓ moderatorNote */}
+      {chapter?.status === "completed" && (
+        <Card className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-700 dark:text-green-300">
+              <CheckCircle className="h-5 w-5" />
+              Chương đã được duyệt
+            </CardTitle>
+            <CardDescription className="text-green-600 dark:text-green-400">
+              Chương này đã vượt qua kiểm duyệt và đang hiển thị công khai với
+              độc giả.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Bạn không cần thực hiện thêm hành động nào.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+      {/* Nút rút lại chương - HIỂN THỊ KHI BỊ REJECTED (cả AI và Moderator) */}
+      {chapter?.status === "rejected" && (
+        <Card className="border-orange-200 dark:border-orange-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+              <AlertTriangle className="h-5 w-5" />
+              Chương bị từ chối
+            </CardTitle>
+            <CardDescription>
+              Chương này đã bị từ chối. Bạn có thể rút về bản nháp để chỉnh sửa.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-3 flex-wrap">
+              <Button
+                variant="destructive"
+                onClick={handleWithdraw}
+                disabled={isWithdrawing}
+                className="min-w-[160px]"
+              >
+                {isWithdrawing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Đang rút...
+                  </>
+                ) : (
+                  <>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Rút về bản nháp để sửa
+                  </>
+                )}
+              </Button>
+            </div>
 
+            {chapter.moderatorNote && (
+              <Alert className="mt-4 bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+                <AlertDescription className="text-sm">
+                  <strong>Góp ý từ Moderator:</strong> {chapter.moderatorNote}
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
       {/* Chapter Info - Chuyển thành form khi chỉnh sửa */}
-      <Card>
-        <CardHeader>
+      <Card className="relative overflow-hidden">
+        <CardHeader className="pt-0 pb-2">
+          {/* Bỏ relative ở đây đi */}
           <div className="flex items-start justify-between">
-            <div className="w-full">
+            <div className="w-full pr-24">
               {isEditing ? (
                 <div className="space-y-2">
                   <Label htmlFor="title">Tiêu đề chương *</Label>
@@ -820,50 +719,116 @@ export default function AuthorChapterDetailPage() {
                   />
                 </div>
               ) : (
-                <>
-                  <CardTitle className="text-xl">{chapter?.title}</CardTitle>
-                  <CardDescription>Chương {chapter?.chapterNo}</CardDescription>
-                </>
+                <div className="space-y-1">
+                  {" "}
+                  {/* Thêm space-y-1 để khoảng cách giữa 2 dòng khít hơn */}
+                  {/* Dòng Tên truyện */}
+                  <CardTitle className="text-xl flex items-center gap-2">
+                    <span className="text-base font-normal text-slate-400">
+                      Tên truyện:
+                    </span>
+                    <span>{chapter.title}</span>
+                  </CardTitle>
+                  {/* Dòng Số chương */}
+                  <CardDescription className="flex items-center gap-2 text-base">
+                    <span className="text-slate-400">Số chương:</span>
+                    <span className="text-l flex items-center gap-2">
+                      {chapter.chapterNo}
+                    </span>
+                  </CardDescription>
+                </div>
               )}
             </div>
-            {!isEditing && (
-              <Badge
-                variant={
-                  chapter.status === "published"
-                    ? "default"
-                    : chapter.status === "pending"
-                    ? "secondary"
-                    : "outline"
+
+            {/* === PHẦN RUY BĂNG (RIBBON) === */}
+            {!isEditing &&
+              (() => {
+                let statusConfig = {
+                  label: "Bản nháp",
+                  bgColor: "bg-slate-500",
+                  shadowColor: "text-slate-700",
+                  Icon: FileText,
+                };
+
+                if (chapter.status === "published") {
+                  statusConfig = {
+                    label: "Đã xuất bản",
+                    bgColor: "bg-green-600",
+                    shadowColor: "text-blue-800",
+                    Icon: Globe,
+                  };
+                } else if (chapter.status === "pending") {
+                  statusConfig = {
+                    label: "Chờ duyệt",
+                    bgColor: "bg-yellow-500",
+                    shadowColor: "text-yellow-700",
+                    Icon: Clock,
+                  };
+                } else if (chapter.status === "rejected") {
+                  statusConfig = {
+                    label: "Bị từ chối",
+                    bgColor: "bg-red-600",
+                    shadowColor: "text-red-800",
+                    Icon: XCircle,
+                  };
                 }
-              >
-                {chapter.status === "published"
-                  ? "Đã xuất bản"
-                  : chapter.status === "pending"
-                  ? "Chờ duyệt"
-                  : "Bản nháp"}
-              </Badge>
-            )}
+
+                return (
+                  // Đã sửa: top-0 và right-8 (cách lề phải 32px)
+                  <div className="absolute top-0 right-8 drop-shadow-md z-10">
+                    {/* Phần thân ruy băng */}
+                    <div
+                      className={`
+                relative px-3 pt-3 pb-5 flex flex-col items-center justify-center gap-1 
+                text-white font-bold text-xs shadow-lg transition-all
+                ${statusConfig.bgColor}
+              `}
+                      // Cắt hình đuôi cá
+                      style={{
+                        clipPath:
+                          "polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%)",
+                        minWidth: "70px",
+                      }}
+                    >
+                      <statusConfig.Icon className="h-5 w-5 mb-0.5" />
+                      <span className="text-center leading-tight uppercase tracking-wider text-[10px]">
+                        {statusConfig.label}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
           </div>
         </CardHeader>
+        <div className="w-full h-[1px] -mt-6 bg-[#00416a] dark:bg-[#f0ead6]" />
         <CardContent className="grid md:grid-cols-3 gap-x-4 gap-y-6">
           {/* === CỘT 1 === */}
           <div className="space-y-6">
             {/* Số từ */}
             <div>
               <p className="text-sm text-slate-400 mb-1">Số từ</p>
-              <p className="font-medium">{chapter?.wordCount} từ</p>
+              <p className="font-medium">{chapter.wordCount} từ</p>
             </div>
             {/* Tạo lúc */}
             <div className="text-sm">
               <p className="text-slate-400 mb-1">Tạo lúc</p>
-              <p>
-                {chapter && new Date(chapter.createdAt).toLocaleString("vi-VN")}
-              </p>
+              <p>{new Date(chapter.createdAt).toLocaleString("vi-VN")}</p>
             </div>
-          </div>
 
+            {/* Xuất bản lúc */}
+            {chapter.publishedAt && (
+              <div className="text-sm">
+                <p className="text-slate-400 mb-1">Xuất bản lúc</p>
+                <p>{new Date(chapter.publishedAt).toLocaleString("vi-VN")}</p>
+              </div>
+            )}
+          </div>
           {/* === CỘT 2 === */}
           <div className="space-y-6">
+            <div>
+              <p className="text-sm text-slate-400 mb-1">Số kí tự</p>
+              <p className="font-medium">{chapter.charCount} từ</p>
+            </div>
             {/* Ngôn ngữ */}
             <div>
               <p className="text-sm text-slate-400 mb-1">Ngôn ngữ</p>
@@ -885,16 +850,36 @@ export default function AuthorChapterDetailPage() {
                   </SelectContent>
                 </Select>
               ) : (
-                <p className="font-medium">{chapter?.languageName}</p>
+                <p className="font-medium">{chapter.languageName}</p>
               )}
             </div>
-            {/* Xuất bản lúc */}
-            {chapter.publishedAt && (
-              <div className="text-sm">
-                <p className="text-slate-400 mb-1">Xuất bản lúc</p>
-                <p>{new Date(chapter.publishedAt).toLocaleString("vi-VN")}</p>
-              </div>
-            )}
+
+            {/* Loại truy cập */}
+            <div>
+              <p className="text-sm text-slate-400 mb-1">Loại truy cập</p>
+              {isEditing ? (
+                <Select
+                  value={editFormData.accessType}
+                  onValueChange={(v: "free" | "dias") =>
+                    setEditFormData((prev) => ({ ...prev, accessType: v }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="free">Miễn phí</SelectItem>
+                    <SelectItem value="dias">Trả phí (Kim cương)</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="font-medium">
+                  {chapter.accessType === "free"
+                    ? "Miễn phí"
+                    : "Trả phí (Kim cương)"}
+                </p>
+              )}
+            </div>
           </div>
 
           {/* === CỘT 3 === */}
@@ -908,10 +893,56 @@ export default function AuthorChapterDetailPage() {
                   : `${chapter.priceDias} Dias`}
               </p>
             </div>
+
+            {/* Trạng thái AI */}
+            {chapter.aiResult && (
+              <div>
+                <p className="text-sm text-slate-400 mb-1">Trạng thái chương</p>
+
+                {(() => {
+                  // Cấu hình mặc định (Đang chờ - Màu vàng)
+                  let statusConfig = {
+                    label: "Đang chờ",
+                    className: "bg-yellow-500 hover:bg-yellow-600 text-white",
+                    Icon: Clock,
+                  };
+
+                  // Cấu hình khi Đã duyệt (Màu xanh lá)
+                  if (chapter.aiResult === "approved") {
+                    statusConfig = {
+                      label: "Đã duyệt",
+                      className: "bg-green-500 hover:bg-green-600 text-white",
+                      Icon: CheckCircle,
+                    };
+                  }
+                  // Cấu hình khi Từ chối (Màu đỏ)
+                  else if (chapter.aiResult === "rejected") {
+                    statusConfig = {
+                      label: "Từ chối",
+                      className: "bg-red-500 hover:bg-red-600 text-white",
+                      Icon: XCircle,
+                    };
+                  }
+
+                  return (
+                    <Badge
+                      className={`border-none px-3 py-1.5 text-sm font-medium flex items-center w-fit gap-x-2 transition-all ${statusConfig.className}`}
+                    >
+                      <statusConfig.Icon className="h-4 w-4" />
+                      <span>{statusConfig.label}</span>
+                    </Badge>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
-
+      {/* Chapter Voice - Tác giả chọn số lượng giọng */}
+      {chapter &&
+        (chapter.status === "published" || chapter.status === "completed") && (
+          <VoiceChapterPlayer chapterId={chapterId} />
+        )}{" "}
       {/* AI Assessment */}
       {chapter && (chapter.aiScore !== undefined || vietnameseFeedback) && (
         <Card className="border-blue-200 dark:border-blue-800">
@@ -924,14 +955,14 @@ export default function AuthorChapterDetailPage() {
               Phân tích và đánh giá tự động từ hệ thống AI
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
+            {/* Điểm số */}
             {chapter.aiScore != null && (
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Star className="h-5 w-5 text-yellow-500" />
                   <span className="font-medium">Điểm AI:</span>
                 </div>
-                {/* Chuyển đổi từ thang 0-1 sang 1-10 */}
                 <Badge
                   variant={
                     chapter.aiScore >= 8
@@ -945,61 +976,124 @@ export default function AuthorChapterDetailPage() {
                   {chapter.aiScore.toFixed(1)}/10
                 </Badge>
                 <div className="flex-1">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    {/* Chuyển đổi phần trăm từ thang 1-10 */}
+                  <div className="w-full bg-gray-200 rounded-full h-3 dark:bg-gray-700">
                     <div
-                      className="bg-green-500 h-2 rounded-full"
+                      className={`h-3 rounded-full transition-all ${
+                        chapter.aiScore >= 8
+                          ? "bg-green-500"
+                          : chapter.aiScore >= 6
+                          ? "bg-yellow-500"
+                          : "bg-red-500"
+                      }`}
                       style={{ width: `${(chapter.aiScore / 10) * 100}%` }}
-                    ></div>
+                    />
                   </div>
                 </div>
               </div>
             )}
+
+            {/* Feedback tiếng Việt - HIỂN THỊ ĐẦY ĐỦ */}
             {vietnameseFeedback && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <MessageSquare className="h-4 w-4 text-blue-500" />
-                  <span className="font-medium">Nhận xét AI:</span>
+              <div className="mt-6 p-5 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                <p className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-3">
+                  Góp ý chi tiết từ AI:
+                </p>
+                <div className="prose prose-sm dark:prose-invert max-w-none text-gray-800 dark:text-gray-200 leading-relaxed">
+                  {renderContent(vietnameseFeedback)}{" "}
+                  {/* Dùng renderContent để hỗ trợ xuống dòng, in đậm... */}
                 </div>
-                <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
-                  <AlertDescription className="whitespace-pre-wrap text-sm">
-                    {vietnameseFeedback}
-                  </AlertDescription>
-                </Alert>
               </div>
+            )}
+
+            {/* Nếu không có feedback tiếng Việt */}
+            {!vietnameseFeedback && chapter?.aiFeedback && (
+              <Alert>
+                <AlertDescription className="text-sm">
+                  AI đã đánh giá chương nhưng chưa có phản hồi tiếng Việt.
+                </AlertDescription>
+              </Alert>
             )}
           </CardContent>
         </Card>
       )}
-
-      {/* Actions */}
+      {/* Action Buttons */}
       <Card>
         <CardHeader>
-          <CardTitle>Trạng thái chương</CardTitle>
+          <CardTitle className="text-lg">Trạng thái</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex gap-3 flex-wrap">
-            {!isEditing && canEdit && !isLoadingContent && (
-              <Button onClick={handleEditChapter}>
-                <Edit className="h-4 w-4 mr-2" />
-                Chỉnh sửa
-              </Button>
+            {!isEditing && (
+              <>
+                {/* Chương draft - có thể chỉnh sửa và gửi duyệt */}
+                {chapter?.status === "draft" && (
+                  <>
+                    <Button onClick={handleEditChapter}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Chỉnh sửa
+                    </Button>
+                    <Button
+                      onClick={handleSubmitForReview}
+                      disabled={isSubmitting}
+                      variant="default"
+                    >
+                      {isSubmitting ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Gửi kiểm duyệt
+                    </Button>
+                  </>
+                )}
+
+                {/* Chương rejected - có thể rút về draft */}
+                {chapter?.status === "rejected" && (
+                  <div className="text-sm text-muted-foreground bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                    <p className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-600" />
+                      <strong>Hướng dẫn:</strong>
+                    </p>
+                    <p>
+                      Hãy lên đầu trang và bấm nút{" "}
+                      <strong>"Rút về bản nháp"</strong> để chỉnh sửa chương và
+                      gửi lại.
+                    </p>
+                  </div>
+                )}
+
+                {/* Chương pending - đang chờ duyệt */}
+                {chapter?.status === "pending" && (
+                  <Button variant="secondary" disabled>
+                    <Clock className="h-4 w-4 mr-2" />
+                    Đang chờ duyệt từ Content mod của ToraNovel
+                  </Button>
+                )}
+
+                {/* Chương published - đã xuất bản */}
+                {chapter?.status === "published" && (
+                  <Button variant="secondary" disabled>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Đã xuất bản
+                  </Button>
+                )}
+              </>
             )}
 
+            {/* Khi đang chỉnh sửa */}
             {isEditing && (
-              <>
-                <Button onClick={handleSaveEdit} disabled={isSaving}>
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleSaveEdit}
+                  disabled={isSaving}
+                  variant="default"
+                >
                   {isSaving ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Đang lưu...
-                    </>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
-                    <>
-                      <Save className="h-4 w-4 mr-2" />
-                      Lưu thay đổi
-                    </>
+                    <Save className="h-4 w-4 mr-2" />
                   )}
+                  Lưu thay đổi
                 </Button>
                 <Button
                   onClick={handleCancelEdit}
@@ -1009,60 +1103,11 @@ export default function AuthorChapterDetailPage() {
                   <X className="h-4 w-4 mr-2" />
                   Hủy
                 </Button>
-              </>
-            )}
-
-            {!isEditing && canSubmit && (
-              <Button
-                onClick={handleSubmitForReview}
-                disabled={isSubmitting}
-                variant="outline"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Đang gửi...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Gửi cho AI đánh giá
-                  </>
-                )}
-              </Button>
-            )}
-
-            {isPending && (
-              <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
-                <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                <AlertDescription>
-                  Chương đang chờ được AI đánh giá và duyệt
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {isPublished && (
-              <Alert className="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
-                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                <AlertDescription>
-                  Chương đã được xuất bản thành công
-                </AlertDescription>
-              </Alert>
+              </div>
             )}
           </div>
-
-          {isEditing && hasUnsavedChanges && (
-            <Alert className="mt-4 bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-sm">
-                Bạn có thay đổi chưa lưu. Nhấn <strong>"Lưu thay đổi"</strong>{" "}
-                để lưu lại.
-              </AlertDescription>
-            </Alert>
-          )}
         </CardContent>
       </Card>
-
       {/* Content Preview/Editor */}
       <Card>
         <CardHeader>
@@ -1074,230 +1119,69 @@ export default function AuthorChapterDetailPage() {
               </CardTitle>
               <CardDescription>
                 {isEditing
-                  ? isMarkdownMode
-                    ? "Đang sử dụng Markdown"
-                    : "Đang sử dụng Rich Text Editor"
-                  : getContentType()}
+                  ? "Sử dụng Tiptap Editor chuyên nghiệp"
+                  : "Xem trước nội dung chương"}
               </CardDescription>
             </div>
-            <div className="flex gap-2">
-              {!isEditing && chapterContent && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownloadContent}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Tải xuống
-                </Button>
-              )}
-              {isEditing && (
-                <Button
-                  type="button"
-                  variant={isMarkdownMode ? "default" : "outline"}
-                  size="sm"
-                  onClick={
-                    isMarkdownMode
-                      ? handleSwitchToRichText
-                      : handleSwitchToMarkdown
-                  }
-                >
-                  {isMarkdownMode
-                    ? "Chuyển sang Rich Text"
-                    : "Chuyển sang Markdown"}
-                </Button>
-              )}
-            </div>
+            {!isEditing && chapterContent && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadContent}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Tải xuống
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
-          <div className="bg-muted/50 rounded-lg p-6 min-h-[200px] max-h-[600px] overflow-y-auto">
-            {isEditing ? (
-              // EDITOR MODE
-              <div className="space-y-4">
-                {/* Rich Text Toolbar */}
-                {!isMarkdownMode && (
-                  <div className="border rounded-lg p-3 bg-background">
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      <Button
-                        type="button"
-                        variant={
-                          activeFormat === "bold" ? "default" : "outline"
-                        }
-                        size="sm"
-                        onClick={handleBold}
-                        title="In đậm"
-                        className="h-8 w-8 p-0"
-                      >
-                        <Bold className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={
-                          activeFormat === "italic" ? "default" : "outline"
-                        }
-                        size="sm"
-                        onClick={handleItalic}
-                        title="In nghiêng"
-                        className="h-8 w-8 p-0"
-                      >
-                        <Italic className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={
-                          activeFormat === "strikethrough"
-                            ? "default"
-                            : "outline"
-                        }
-                        size="sm"
-                        onClick={handleStrikethrough}
-                        title="Gạch ngang"
-                        className="h-8 w-8 p-0"
-                      >
-                        <Strikethrough className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={activeFormat === "h1" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => handleHeading(1)}
-                        title="Tiêu đề 1"
-                        className="h-8 px-2"
-                      >
-                        H1
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={activeFormat === "h2" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => handleHeading(2)}
-                        title="Tiêu đề 2"
-                        className="h-8 px-2"
-                      >
-                        H2
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={activeFormat === "h3" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => handleHeading(3)}
-                        title="Tiêu đề 3"
-                        className="h-8 px-2"
-                      >
-                        H3
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={
-                          activeFormat === "bullet" ? "default" : "outline"
-                        }
-                        size="sm"
-                        onClick={() => handleList("bullet")}
-                        title="Danh sách không thứ tự"
-                        className="h-8 w-8 p-0"
-                      >
-                        <List className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={
-                          activeFormat === "number" ? "default" : "outline"
-                        }
-                        size="sm"
-                        onClick={() => handleList("number")}
-                        title="Danh sách có thứ tự"
-                        className="h-8 px-2"
-                      >
-                        1.
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={
-                          activeFormat === "quote" ? "default" : "outline"
-                        }
-                        size="sm"
-                        onClick={handleQuote}
-                        title="Trích dẫn"
-                        className="h-8 w-8 p-0"
-                      >
-                        <Quote className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Editor Area */}
-                {!isMarkdownMode ? (
-                  // Rich Text Editor
-                  <div className="relative">
-                    <div
-                      ref={editorRef}
-                      contentEditable
-                      onInput={handleEditorInput}
-                      onFocus={handleEditorFocus}
-                      onBlur={handleEditorBlur}
-                      className="min-h-[400px] resize-y border-2 p-3 rounded-md overflow-auto bg-background border-primary/30 focus-visible:border-primary"
-                      style={{
-                        whiteSpace: "pre-wrap",
-                        wordWrap: "break-word",
-                      }}
-                    />
-                    {showPlaceholder && (
-                      <div className="absolute top-3 left-3 text-muted-foreground pointer-events-none">
-                        Nhập nội dung chương tại đây...
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  // Markdown Editor
-                  <Textarea
-                    value={editFormData.content}
-                    onChange={handleInputChange}
-                    name="content"
-                    placeholder="Nhập nội dung chương tại đây..."
-                    className="min-h-[400px] resize-y border-2 border-primary/30 focus-visible:border-primary"
-                  />
-                )}
-              </div>
-            ) : (
-              // PREVIEW MODE (giữ nguyên)
-              <>
-                {isLoadingContent ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <span className="ml-2 text-sm text-muted-foreground">
-                      Đang tải nội dung...
-                    </span>
-                  </div>
-                ) : chapterContent ? (
-                  renderContent(chapterContent)
-                ) : (
-                  <div className="text-center py-8">
-                    <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-muted-foreground text-sm">
-                      {isPublished
-                        ? "Nội dung đã được xuất bản và có thể xem bởi độc giả"
-                        : "Không thể tải nội dung chương"}
-                    </p>
-                    {chapter?.contentPath && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-2"
-                        onClick={() =>
-                          chapter.contentPath &&
-                          loadChapterContent(chapter.contentPath!)
-                        }
-                      >
-                        Thử tải lại
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+          {isEditing ? (
+            // EDITOR MODE - Sử dụng TiptapEditor
+            <TiptapEditor
+              content={editFormData.content}
+              onChange={handleEditorChange}
+              placeholder="Nhập nội dung chương tại đây..."
+              maxLength={50000}
+              disabled={isSaving}
+            />
+          ) : (
+            // PREVIEW MODE
+            <div className="bg-muted/50 rounded-lg p-6 min-h-[200px] max-h-[600px] overflow-y-auto">
+              {isLoadingContent ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <span className="ml-2 text-sm text-muted-foreground">
+                    Đang tải nội dung...
+                  </span>
+                </div>
+              ) : chapterContent ? (
+                renderContent(chapterContent)
+              ) : (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground text-sm">
+                    {isPublished
+                      ? "Nội dung đã được xuất bản và có thể xem bởi độc giả"
+                      : "Không thể tải nội dung chương"}
+                  </p>
+                  {chapter?.contentPath && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() =>
+                        chapter.contentPath &&
+                        loadChapterContent(chapter.contentPath!)
+                      }
+                    >
+                      Thử tải lại
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
