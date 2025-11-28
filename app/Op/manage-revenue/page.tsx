@@ -1,14 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import OpLayout from "@/components/OpLayout";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -19,8 +19,6 @@ import {
 import {
   BarChart,
   Bar,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -31,346 +29,174 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { DollarSign, TrendingUp, Download, FileText } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-import OpLayout from "@/components/OpLayout";
+// Import API
+import { getSystemRevenue } from "@/services/operationModStatService";
 
-const monthlyRevenue = [
-  { month: "T1", revenue: 45000000, expenses: 12000000, profit: 33000000 },
-  { month: "T2", revenue: 52000000, expenses: 13500000, profit: 38500000 },
-  { month: "T3", revenue: 48000000, expenses: 11800000, profit: 36200000 },
-  { month: "T4", revenue: 61000000, expenses: 14200000, profit: 46800000 },
-  { month: "T5", revenue: 55000000, expenses: 13000000, profit: 42000000 },
-  { month: "T6", revenue: 72000000, expenses: 15500000, profit: 56500000 },
-  { month: "T7", revenue: 68000000, expenses: 14800000, profit: 53200000 },
-  { month: "T8", revenue: 81000000, expenses: 16200000, profit: 64800000 },
-  { month: "T9", revenue: 75000000, expenses: 15000000, profit: 60000000 },
-  { month: "T10", revenue: 92000000, expenses: 17500000, profit: 74500000 },
-];
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 
-const revenueBySource = [
-  { name: "Nạp xu", value: 45000000, percentage: 48.9 },
-  { name: "Sponsored Author", value: 28000000, percentage: 30.4 },
-  { name: "Quảng cáo", value: 12000000, percentage: 13.0 },
-  { name: "Premium", value: 7000000, percentage: 7.6 },
-];
+export default function ManageRevenuePage() {
+  const [period, setPeriod] = useState("month");
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<any>(null);
 
-const COLORS = ["#3A506B", "#9FB4C7", "#B6A77B", "#DAD2BC"];
-
-const dailyRevenue = [
-  { date: "01/10", amount: 2800000 },
-  { date: "02/10", amount: 3200000 },
-  { date: "03/10", amount: 2950000 },
-  { date: "04/10", amount: 3800000 },
-  { date: "05/10", amount: 3400000 },
-  { date: "06/10", amount: 4200000 },
-  { date: "07/10", amount: 3900000 },
-  { date: "08/10", amount: 4500000 },
-  { date: "09/10", amount: 4100000 },
-  { date: "10/10", amount: 4800000 },
-  { date: "11/10", amount: 4600000 },
-  { date: "12/10", amount: 5200000 },
-];
-
-export default function RevenueReportsPage() {
-  const [period, setPeriod] = useState("monthly");
-  const [exportFormat, setExportFormat] = useState("excel");
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        // Map period sang đúng format API yêu cầu (day, month, year)
+        const apiPeriod = period === 'daily' ? 'day' : period === 'yearly' ? 'year' : 'month';
+        const res = await getSystemRevenue(apiPeriod);
+        setData(res);
+      } catch (error) {
+        console.error(error);
+        toast.error("Lỗi tải dữ liệu doanh thu");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [period]);
 
   const handleExport = () => {
-    const formatName = exportFormat === "excel" ? "Excel" : "PDF";
-    toast.success(`Đang xuất báo cáo dạng ${formatName}...`);
+    toast.success("Tính năng xuất báo cáo đang phát triển...");
   };
 
-  const totalRevenue = monthlyRevenue.reduce(
-    (sum, item) => sum + item.revenue,
-    0
-  );
-  const totalProfit = monthlyRevenue.reduce(
-    (sum, item) => sum + item.profit,
-    0
-  );
-  const avgMonthlyRevenue = totalRevenue / monthlyRevenue.length;
+  // --- Xử lý dữ liệu ---
+  // 1. Data cho Pie Chart (Nguồn thu)
+  const pieData = data ? [
+    { name: "Nạp Kim Cương", value: data.diaTopup },
+    { name: "Gói Hội Viên", value: data.subscription },
+    { name: "Voice Topup", value: data.voiceTopup },
+  ].filter(i => i.value > 0) : [];
+
+  // 2. Data cho Bar Chart (Chi tiết theo mốc thời gian)
+  const barData = data?.points?.map((p: any) => ({
+    name: p.periodLabel,
+    value: p.value
+  })) || [];
+
+  const totalRevenue = pieData.reduce((acc, curr) => acc + curr.value, 0);
 
   return (
     <OpLayout>
-      <main className="p-6 min-h-[calc(100vh-4rem)] bg-[var(--background)] text-[var(--foreground)] transition-colors duration-300">
-        {/* Header section */}
-        <div className="flex items-center justify-between mb-6">
+      <main className="p-6 space-y-6">
+        {/* Header & Filter */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-[var(--primary)]">
-              Quản lý Doanh thu & Báo cáo
+              Quản lý Doanh thu
             </h1>
-            <p className="text-sm text-[var(--muted-foreground)] mt-2">
-              Thống kê tổng quan về doanh thu hệ thống
+            <p className="text-sm text-[var(--muted-foreground)]">
+              Báo cáo tài chính chi tiết theo kỳ
             </p>
           </div>
-          <div className="flex gap-3">
+          
+          <div className="flex gap-2">
             <Select value={period} onValueChange={setPeriod}>
-              <SelectTrigger className="w-40 bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)]">
-                <SelectValue placeholder="Chọn kỳ" />
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)]">
+              <SelectContent>
                 <SelectItem value="daily">Theo ngày</SelectItem>
                 <SelectItem value="monthly">Theo tháng</SelectItem>
                 <SelectItem value="yearly">Theo năm</SelectItem>
               </SelectContent>
             </Select>
-
-            <Select value={exportFormat} onValueChange={setExportFormat}>
-              <SelectTrigger className="w-32 bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)]">
-                <SelectValue placeholder="Định dạng" />
-              </SelectTrigger>
-              <SelectContent className="bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)]">
-                <SelectItem value="excel">Excel</SelectItem>
-                <SelectItem value="pdf">PDF</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Button
-              onClick={handleExport}
-              className="bg-[var(--primary)] hover:bg-[color-mix(in_srgb,var(--primary)_75%,black)] text-[var(--primary-foreground)]"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Xuất báo cáo
+            <Button onClick={handleExport} variant="outline">
+              <Download className="w-4 h-4 mr-2" /> Xuất Excel
             </Button>
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <Card className="border border-[var(--border)] bg-[var(--card)] text-[var(--card-foreground)] shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm">Tổng doanh thu</CardTitle>
-              <DollarSign className="w-5 h-5 text-[var(--primary)]" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-semibold">
-                {totalRevenue.toLocaleString()}₫
-              </div>
-              <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                10 tháng
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-[var(--border)] bg-[var(--card)] text-[var(--card-foreground)] shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm">Lợi nhuận</CardTitle>
-              <TrendingUp className="w-5 h-5 text-[var(--secondary)]" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-semibold">
-                {totalProfit.toLocaleString()}₫
-              </div>
-              <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                <span className="text-green-500">+15.3%</span> so với kỳ trước
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-[var(--border)] bg-[var(--card)] text-[var(--card-foreground)] shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm">TB tháng</CardTitle>
-              <FileText className="w-5 h-5 text-[var(--accent)]" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-semibold">
-                {avgMonthlyRevenue.toLocaleString()}₫
-              </div>
-              <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                doanh thu trung bình
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-[var(--border)] bg-[var(--card)] text-[var(--card-foreground)] shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm">Tháng này</CardTitle>
-              <DollarSign className="w-5 h-5 text-[var(--chart-2)]" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-semibold">92.000.000₫</div>
-              <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                <span className="text-green-500">+22.7%</span> so với T9
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Charts */}
-        <Card className="border border-[var(--border)] bg-[var(--card)] shadow-sm mb-6">
-          <CardHeader>
-            <CardTitle className="text-[var(--primary)]">
-              Doanh thu theo tháng
-            </CardTitle>
-            <CardDescription className="text-[var(--muted-foreground)]">
-              So sánh doanh thu, chi phí và lợi nhuận
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={monthlyRevenue}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="month" stroke="var(--foreground)" />
-                <YAxis stroke="var(--foreground)" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "var(--card)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "12px",
-                    color: "var(--foreground)",
-                  }}
-                  formatter={(value: number) => `${value.toLocaleString()}₫`}
-                />
-                <Legend />
-                <Bar
-                  dataKey="revenue"
-                  fill="#3A506B"
-                  radius={[8, 8, 0, 0]}
-                  name="Doanh thu"
-                />
-                <Bar
-                  dataKey="expenses"
-                  fill="#9FB4C7"
-                  radius={[8, 8, 0, 0]}
-                  name="Chi phí"
-                />
-                <Bar
-                  dataKey="profit"
-                  fill="#DAD2BC"
-                  radius={[8, 8, 0, 0]}
-                  name="Lợi nhuận"
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Row charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <Card className="border border-[var(--border)] bg-[var(--card)] shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-[var(--primary)]">
-                Doanh thu theo ngày
-              </CardTitle>
-              <CardDescription className="text-[var(--muted-foreground)]">
-                12 ngày gần nhất
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={dailyRevenue}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="var(--border)"
-                  />
-                  <XAxis dataKey="date" stroke="var(--foreground)" />
-                  <YAxis stroke="var(--foreground)" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--card)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "12px",
-                      color: "var(--foreground)",
-                    }}
-                    formatter={(value: number) => `${value.toLocaleString()}₫`}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="amount"
-                    stroke="var(--primary)"
-                    strokeWidth={3}
-                    name="Doanh thu"
-                    dot={{ fill: "var(--primary)", r: 5 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-[var(--border)] bg-[var(--card)] shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-[var(--primary)]">
-                Nguồn doanh thu
-              </CardTitle>
-              <CardDescription className="text-[var(--muted-foreground)]">
-                Phân bổ theo nguồn thu
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={revenueBySource}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percentage }) =>
-                      `${name}: ${percentage}%`
-                    }
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {revenueBySource.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
+        {loading ? (
+          <div className="h-96 flex items-center justify-center"><Loader2 className="animate-spin w-10 h-10 text-gray-400" /></div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* 1. Bar Chart: Chi tiết theo thời gian */}
+            <Card className="lg:col-span-2 shadow-sm">
+              <CardHeader>
+                <CardTitle>Biến động Doanh thu ({period})</CardTitle>
+                <CardDescription>Tổng thu: {totalRevenue.toLocaleString()}₫</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={barData}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <XAxis dataKey="name" fontSize={12} />
+                      <YAxis fontSize={12} tickFormatter={(val) => `${val/1000000}M`} />
+                      <Tooltip 
+                        cursor={{fill: 'transparent'}}
+                        formatter={(val: number) => val.toLocaleString() + "₫"} 
                       />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: number) => `${value.toLocaleString()}₫`}
-                    contentStyle={{
-                      backgroundColor: "var(--card)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "12px",
-                      color: "var(--foreground)",
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
+                      <Legend />
+                      <Bar dataKey="value" name="Doanh thu" fill="#3A506B" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Revenue Breakdown */}
-        <Card className="border border-[var(--border)] bg-[var(--card)]">
-          <CardHeader>
-            <CardTitle className="text-[var(--primary)]">
-              Chi tiết nguồn doanh thu
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {revenueBySource.map((source, index) => (
-                <div
-                  key={source.name}
-                  className="flex items-center justify-between p-4 bg-[var(--muted)] rounded-xl"
-                >
-                  <div className="flex items-center gap-4">
-                    <div
-                      className="w-4 h-4 rounded"
-                      style={{ backgroundColor: COLORS[index] }}
-                    />
-                    <div>
-                      <p className="text-[var(--foreground)]">{source.name}</p>
-                      <p className="text-sm text-[var(--muted-foreground)]">
-                        {source.percentage}% tổng doanh thu
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[var(--foreground)]">
-                      {source.value.toLocaleString()}₫
-                    </p>
+            {/* 2. Pie Chart: Nguồn thu */}
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle>Cơ cấu Nguồn thu</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[400px] flex flex-col items-center">
+                  <ResponsiveContainer width="100%" height="60%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%" cy="50%"
+                        innerRadius={60} outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(val: number) => val.toLocaleString() + "₫"} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  
+                  {/* Custom Legend */}
+                  <div className="w-full space-y-3 mt-4">
+                    {pieData.map((item, index) => (
+                      <div key={index} className="flex justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{backgroundColor: COLORS[index % COLORS.length]}}></div>
+                          <span>{item.name}</span>
+                        </div>
+                        <span className="font-semibold">{item.value.toLocaleString()}₫</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+        
+        {/* Placeholder cho bảng Transaction nếu sau này có API */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Lịch sử giao dịch</CardTitle>
+            <CardDescription>Danh sách chi tiết các giao dịch (Đang cập nhật API...)</CardDescription>
+          </CardHeader>
+          <CardContent>
+             <div className="text-center py-8 text-muted-foreground italic">
+                Chưa có API lấy danh sách transaction chi tiết.
+             </div>
           </CardContent>
         </Card>
+
       </main>
     </OpLayout>
   );
