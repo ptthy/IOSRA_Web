@@ -1,249 +1,291 @@
-"use client"
+"use client";
 
-import React, { useEffect, useState } from "react"
-// [ĐÃ XÓA] Các import layout thừa
+import React, { useState, useEffect } from "react";
+import OpLayout from "@/components/OpLayout";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription,
-} from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+} from "@/components/ui/card";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
-  LineChart,
-  Line,
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   CartesianGrid,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  Legend,
-} from "recharts"
-import { Download, DollarSign, Users, Activity, TrendingUp } from "lucide-react"
+} from "recharts";
+import {
+  DollarSign,
+  Users,
+  TrendingUp,
+  Zap,
+  Loader2,
+  Star,
+  Wallet,
+  Calendar,
+} from "lucide-react";
 
-/* ---------------- sample data ---------------- */
-const revenueData = [
-  { date: "1/10", revenue: 4500000, users: 120 },
-  { date: "2/10", revenue: 5200000, users: 145 },
-  { date: "3/10", revenue: 4800000, users: 132 },
-  { date: "4/10", revenue: 6100000, users: 168 },
-  { date: "5/10", revenue: 5500000, users: 155 },
-  { date: "6/10", revenue: 7200000, users: 192 },
-  { date: "7/10", revenue: 6800000, users: 178 },
-  { date: "8/10", revenue: 8100000, users: 215 },
-  { date: "9/10", revenue: 7500000, users: 198 },
-  { date: "10/10", revenue: 8900000, users: 234 },
-  { date: "11/10", revenue: 9200000, users: 248 },
-  { date: "12/10", revenue: 10500000, users: 276 },
-]
+// Import API
+import {
+  getSystemRevenue,
+  getRequestStats,
+} from "@/services/operationModStatService";
 
-const trafficData = [
-  { hour: "00:00", visits: 120 },
-  { hour: "03:00", visits: 80 },
-  { hour: "06:00", visits: 150 },
-  { hour: "09:00", visits: 420 },
-  { hour: "12:00", visits: 680 },
-  { hour: "15:00", visits: 520 },
-  { hour: "18:00", visits: 750 },
-  { hour: "21:00", visits: 580 },
-]
-
-const conversionData = [
-  { month: "T6", normal: 245, sponsored: 32 },
-  { month: "T7", normal: 312, sponsored: 45 },
-  { month: "T8", normal: 298, sponsored: 52 },
-  { month: "T9", normal: 356, sponsored: 68 },
-  { month: "T10", normal: 423, sponsored: 89 },
-]
-
-/* ---------------- component ---------------- */
 export default function DashboardAnalytics() {
-  const [reportPeriod, setReportPeriod] = useState<"daily" | "weekly" | "monthly">(
-    "monthly"
-  )
+  const [loading, setLoading] = useState(true);
   
-  // [ĐÃ XÓA] State và useEffect của DarkMode (OpLayout sẽ quản lý)
-  
-  const handleExportReport = () => {
-    alert(
-      `Đang xuất báo cáo ${
-        reportPeriod === "daily" ? "hàng ngày" : reportPeriod === "weekly" ? "hàng tuần" : "hàng tháng"
-      }...`
-    )
-  }
+  // State quản lý thời gian lọc (Mặc định là month)
+  const [period, setPeriod] = useState("month");
+
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    becomeAuthorRequests: 0, // Type: become_author
+    rankUpRequests: 0,       // Type: rank_up
+    withdrawRequests: 0,     // Type: withdraw
+    revenueTrend: [] as any[],
+  });
+
+  // Hàm mapping label hiển thị cho đẹp
+  const getPeriodLabel = () => {
+    switch (period) {
+      case "day": return "Hôm nay";
+      case "week": return "Tuần này";
+      case "month": return "Tháng này";
+      case "year": return "Năm nay";
+      default: return "";
+    }
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+
+        // Gọi song song 4 API với tham số period được chọn
+        const [
+          revenueRes, 
+          becomeAuthorRes, 
+          rankUpRes, 
+          withdrawRes
+        ] = await Promise.all([
+          getSystemRevenue(period),                 
+          getRequestStats("become_author", period), 
+          getRequestStats("rank_up", period),       
+          getRequestStats("withdraw", period)       
+        ]);
+
+        // 1. Tính tổng doanh thu (3 nguồn)
+        const totalRev =
+          (revenueRes.diaTopup || 0) +
+          (revenueRes.subscription || 0) +
+          (revenueRes.voiceTopup || 0);
+
+        // 2. Map dữ liệu biểu đồ
+        const chartData = revenueRes.points?.map((p: any) => ({
+          name: p.periodLabel, // VD: "2025-11-28" hoặc "2025-11"
+          revenue: p.value,
+        })) || [];
+
+        setStats({
+          totalRevenue: totalRev,
+          // Lấy field .total từ API trả về
+          becomeAuthorRequests: becomeAuthorRes?.total || 0,
+          rankUpRequests: rankUpRes?.total || 0,
+          withdrawRequests: withdrawRes?.total || 0,
+          revenueTrend: chartData,
+        });
+      } catch (error) {
+        console.error("Dashboard fetch error:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [period]); 
 
   return (
-    // [ĐÃ XÓA] <SidebarProvider>, <AppSidebar>, <SidebarInset>, <SiteHeader>
-    // Chỉ trả về nội dung của trang
-    <>
-      {/* header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-[var(--primary)]">Dashboard Analytics</h1>
-          <p className="text-sm text-[var(--muted-foreground)]">Thống kê thời gian thực</p>
+    
+      <main className="p-6 space-y-6">
+        {/* Header & Filter */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-[var(--primary)]">
+              Tổng quan hệ thống
+            </h1>
+            <p className="text-sm text-[var(--muted-foreground)]">
+              Thống kê dữ liệu: <span className="font-semibold text-foreground">{getPeriodLabel()}</span>
+            </p>
+          </div>
+
+          {/* Nút Select chọn kỳ thống kê */}
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-muted-foreground" />
+            <Select value={period} onValueChange={setPeriod}>
+              <SelectTrigger className="w-[150px] bg-background">
+                <SelectValue placeholder="Chọn thời gian" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="day">Theo Ngày</SelectItem>
+                <SelectItem value="week">Theo Tuần</SelectItem>
+                <SelectItem value="month">Theo Tháng</SelectItem>
+                <SelectItem value="year">Theo Năm</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Select value={reportPeriod} onValueChange={(v: any) => setReportPeriod(v)}>
-            <SelectTrigger
-              className="w-40 bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)]"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)]">
-              <SelectItem value="daily">Theo ngày</SelectItem>
-              <SelectItem value="monthly">Theo tháng</SelectItem>
-              <SelectItem value="yearly">Theo năm</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button
-            onClick={handleExportReport}
-            className="bg-[var(--primary)] hover:bg-[color-mix(in srgb, var(--primary) 75%, black)] text-[var(--primary-foreground)]"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Xuất báo cáo
-          </Button>
-        </div>
-      </div>
-
-      {/* stat cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        {[
-          { title: "Doanh thu hôm nay", value: "10.500.000₫", icon: <DollarSign />, colorVar: "var(--primary)" },
-          { title: "User mới", value: "276", icon: <Users />, colorVar: "#7c3aed" },
-          { title: "Active Users", value: "8.432", icon: <Activity />, colorVar: "var(--accent)" },
-          { title: "Sponsored Authors", value: "89", icon: <TrendingUp />, colorVar: "var(--chart-2)" },
-        ].map((c, idx) => (
-          <Card key={idx} className="border border-[var(--border)] bg-[var(--card)] text-[var(--card-foreground)] shadow-sm">
-            <CardHeader className="flex items-center justify-between pb-2">
-              <div>
-                <CardTitle className="text-sm">{c.title}</CardTitle>
-              </div>
-              <div style={{ color: c.colorVar }} className="flex items-center">
-                {React.cloneElement(c.icon as any, { className: "w-5 h-5" })}
+        {/* 1. Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          
+          {/* Card 1: Doanh thu */}
+          <Card className="shadow-sm border-l-4 border-l-green-500">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Doanh thu</CardTitle>
+              <div className="p-2 bg-green-100 rounded-full text-green-600">
+                <DollarSign className="w-4 h-4" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold">{c.value}</div>
-              <p className="text-xs text-[var(--muted-foreground)] mt-1">
-              <span className="text-green-600 font-medium">
-                +14%
-              </span> so với kỳ trước
+              <div className="text-2xl font-bold">
+                {loading ? "..." : `${stats.totalRevenue.toLocaleString()}₫`}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Tổng thu nhập {getPeriodLabel().toLowerCase()}
               </p>
             </CardContent>
           </Card>
-        ))}
-      </div>
 
-      {/* charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Line chart */}
-        <Card className="border border-[var(--border)] bg-[var(--card)]">
+          {/* Card 2: Đơn đăng ký Author (type: become_author) */}
+          <Card className="shadow-sm border-l-4 border-l-blue-500">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Yêu cầu lên Author</CardTitle>
+              <div className="p-2 bg-blue-100 rounded-full text-blue-600">
+                <Users className="w-4 h-4" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {loading ? "..." : stats.becomeAuthorRequests}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                User đăng ký mới
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Card 3: Đơn nâng hạng (type: rank_up) - Thay cho Active Authors cũ */}
+          <Card className="shadow-sm border-l-4 border-l-yellow-500">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Yêu cầu Nâng hạng</CardTitle>
+              <div className="p-2 bg-yellow-100 rounded-full text-yellow-600">
+                <Star className="w-4 h-4" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {loading ? "..." : stats.rankUpRequests}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Author xin lên Sponsored
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Card 4: Đơn rút tiền (type: withdraw) */}
+          <Card className="shadow-sm border-l-4 border-l-purple-500">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Yêu cầu Rút tiền</CardTitle>
+              <div className="p-2 bg-purple-100 rounded-full text-purple-600">
+                <Wallet className="w-4 h-4" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {loading ? "..." : stats.withdrawRequests}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Số đơn cần xử lý
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* 2. Main Chart: Revenue Trend */}
+        <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle className="text-[var(--primary)]">Doanh thu & User mới</CardTitle>
-            <CardDescription className="text-[var(--muted-foreground)]">12 ngày gần nhất</CardDescription>
+            <CardTitle className="text-[var(--primary)] flex items-center gap-2">
+              <Zap className="w-4 h-4 text-yellow-500" /> Xu hướng Doanh thu
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div style={{ height: 300 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={revenueData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="date" stroke="var(--foreground)" />
-                  <YAxis stroke="var(--foreground)" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--popover)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 12,
-                      color: "var(--popover-foreground)",
-                    }}
-                  />
-                  <Legend />
-                  <Line type="monotone" dataKey="revenue" stroke="var(--primary)" strokeWidth={3} name="Doanh thu (VNĐ)" dot={{ fill: "var(--primary)" }} />
-                  <Line type="monotone" dataKey="users" stroke="#7c3aed" strokeWidth={3} name="User mới" dot={{ fill: "#7c3aed" }} />
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="h-[350px]">
+              {loading ? (
+                <div className="h-full flex items-center justify-center">
+                  <Loader2 className="animate-spin w-8 h-8 text-gray-400" />
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={stats.revenueTrend}>
+                    <defs>
+                      <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                        <stop
+                          offset="5%"
+                          stopColor="var(--primary)"
+                          stopOpacity={0.8}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="var(--primary)"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <XAxis 
+                      dataKey="name" 
+                      fontSize={12} 
+                      // Format lại ngày tháng cho gọn nếu quá dài
+                      tickFormatter={(val) => {
+                        if(period === 'day') return val.split(' ')[1] || val; // VD lấy giờ
+                        return val;
+                      }}
+                    />
+                    <YAxis
+                      fontSize={12}
+                      tickFormatter={(val) => `${val / 1000000}M`}
+                    />
+                    <Tooltip
+                      formatter={(value: number) =>
+                        `${value.toLocaleString()}₫`
+                      }
+                      contentStyle={{ borderRadius: "8px" }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="var(--primary)"
+                      fillOpacity={1}
+                      fill="url(#colorRev)"
+                      name="Doanh thu"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
-
-        {/* Area chart */}
-        <Card className="border border-[var(--border)] bg-[var(--card)]">
-          <CardHeader>
-            <CardTitle className="text-[var(--primary)]">Traffic Realtime</CardTitle>
-            <CardDescription className="text-[var(--muted-foreground)]">Lượt truy cập theo giờ</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div style={{ height: 300 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trafficData}>
-                  <defs>
-                    <linearGradient id="fillVar" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.7} />
-                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="hour" stroke="var(--foreground)" />
-                  <YAxis stroke="var(--foreground)" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--popover)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 12,
-                      color: "var(--popover-foreground)",
-                    }}
-                  />
-                  <Area type="monotone" dataKey="visits" stroke="var(--primary)" fill="url(#fillVar)" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* conversion */}
-      <Card className="border border-[var(--border)] bg-[var(--card)] mt-6">
-        <CardHeader>
-          <CardTitle className="text-[var(--primary)]">Tỉ lệ chuyển đổi Sponsored Author</CardTitle>
-          <CardDescription className="text-[var(--muted-foreground)]">So sánh tác giả thường và Sponsored</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div style={{ height: 360 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={conversionData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="month" stroke="var(--foreground)" />
-                <YAxis stroke="var(--foreground)" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "var(--popover)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 12,
-                    color: "var(--popover-foreground)",
-                  }}
-                />
-                <Legend />
-                <Bar dataKey="normal" fill="#64748b" radius={[8, 8, 0, 0]} name="Author thường" />
-                <Bar dataKey="sponsored" fill="var(--primary)" radius={[8, 8, 0, 0]} name="Sponsored Author" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-    </>
-  )
+      </main>
+  
+  );
 }
