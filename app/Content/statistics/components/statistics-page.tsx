@@ -1,167 +1,280 @@
+// app/content/statistics/page.tsx
 "use client";
 
-import { Card } from "@/components/ui/card";
-import { motion } from "framer-motion";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
 } from "recharts";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
+import { Download, Loader2 } from "lucide-react";
+import { getContentModStats, getViolationBreakdown, StatSeriesResponse, ViolationStatsResponse } from "@/services/moderationApi";
 
-export default function StatisticsDashboard() {
-  const weeklyData = [
-    { day: "T2", approved: 45, rejected: 12 },
-    { day: "T3", approved: 52, rejected: 15 },
-    { day: "T4", approved: 38, rejected: 8 },
-    { day: "T5", approved: 62, rejected: 18 },
-    { day: "T6", approved: 48, rejected: 10 },
-    { day: "T7", approved: 35, rejected: 7 },
-    { day: "CN", approved: 28, rejected: 5 },
-  ];
+type Period = "day" | "week" | "month" | "year";
+type Endpoint = "stories" | "chapters" | "story-decisions" | "reports" | "reports/handled";
 
-  const violationData = [
-    { name: "Spam", value: 145, color: "var(--chart-1)" },
-    { name: "Nội dung nhạy cảm", value: 89, color: "var(--chart-2)" },
-    { name: "Bản quyền", value: 43, color: "var(--chart-3)" },
-    { name: "Quấy rối", value: 67, color: "var(--chart-4)" },
-    { name: "Khác", value: 34, color: "var(--chart-5)" },
-  ];
+const ENDPOINTS: { label: string; value: Endpoint }[] = [
+  { label: "Truyện (published)", value: "stories" },
+  { label: "Chương (published)", value: "chapters" },
+  { label: "Quyết định (duyệt/từ chối)", value: "story-decisions" },
+  { label: "Báo cáo mới", value: "reports" },
+  { label: "Báo cáo đã xử lý", value: "reports/handled" },
+];
 
-  const COLORS = [
-    "var(--chart-1)",
-    "var(--chart-2)", 
-    "var(--chart-3)",
-    "var(--chart-4)",
-    "var(--chart-5)"
-  ];
+const PERIODS: { label: string; value: Period }[] = [
+  { label: "Theo ngày", value: "day" },
+  { label: "Theo tuần", value: "week" },
+  { label: "Theo tháng", value: "month" },
+  { label: "Theo năm", value: "year" },
+];
 
-   return (
-    <div className="min-h-screen bg-[var(--background)] p-8 transition-colors duration-300">
-      {/* Header - Updated to match ReportsList */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
-        <h1 className="text-3xl font-bold text-[var(--primary)] mb-2">
-          Thống kê kiểm duyệt
-        </h1>
-        <p className="text-[var(--muted-foreground)]">
-          Tổng hợp hoạt động kiểm duyệt và loại vi phạm gần đây
-        </p>
-      </motion.div>
+const PIE_COLORS = ["#8B5FBF", "#5D3FD3", "#A97FE3", "#E0D4EE", "#B6A77B", "#FF7F50", "#4682B4", "#3CB371"];
 
-        {/* Charts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Biểu đồ cột */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <Card className="p-6 border border-[var(--border)] bg-[var(--card)] text-[var(--card-foreground)] shadow-sm hover:shadow-md transition-all duration-300">
-              <h3 className="text-lg font-medium text-[var(--primary)] mb-6">
-                Hoạt động 7 ngày qua
-              </h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={weeklyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis
-                    dataKey="day"
-                    stroke="var(--muted-foreground)"
-                    fontSize={12}
-                  />
-                  <YAxis stroke="var(--muted-foreground)" fontSize={12} />
-                  <Tooltip
-                    cursor={{ fill: "var(--muted)", opacity: 0.2 }}
-                    contentStyle={{
-                      backgroundColor: "var(--card)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "8px",
-                      color: "var(--foreground)",
-                    }}
-                  />
-                  <Bar
-                    dataKey="approved"
-                    fill="var(--chart-3)"
-                    name="Đã duyệt"
-                    radius={[8, 8, 0, 0]}
-                    barSize={24}
-                  />
-                  <Bar
-                    dataKey="rejected"
-                    fill="var(--chart-4)"
-                    name="Từ chối"
-                    radius={[8, 8, 0, 0]}
-                    barSize={24}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </Card>
-          </motion.div>
+export default function StatisticsPage(): JSX.Element {
+  const [endpoint, setEndpoint] = useState<Endpoint>("stories");
+  const [period, setPeriod] = useState<Period>("month");
+  const [from, setFrom] = useState<string | undefined>(undefined);
+  const [to, setTo] = useState<string | undefined>(undefined);
 
-          {/* Biểu đồ tròn */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <Card className="p-6 border border-[var(--border)] bg-[var(--card)] text-[var(--card-foreground)] shadow-sm hover:shadow-md transition-all duration-300">
-              <h3 className="text-lg font-medium text-[var(--primary)] mb-6">
-                Phân loại vi phạm
-              </h3>
-              <div className="flex items-center justify-center">
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={violationData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={2}
-                      dataKey="value"
-                    >
-                      {violationData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "var(--card)",
-                        border: "1px solid var(--border)",
-                        borderRadius: "8px",
-                        color: "var(--foreground)",
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+  const [series, setSeries] = useState<StatSeriesResponse | null>(null);
+  const [seriesLoading, setSeriesLoading] = useState<boolean>(false);
+  const [seriesError, setSeriesError] = useState<string | null>(null);
 
-              {/* Legend */}
-              <div className="mt-6 space-y-2">
-                {violationData.map((item, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between text-sm"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                      />
-                      <span className="text-[var(--muted-foreground)]">
-                        {item.name}
-                      </span>
-                    </div>
-                    <span className="text-[var(--foreground)] font-medium">
-                      {item.value}
-                     </span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </motion.div>
+  const [violation, setViolation] = useState<ViolationStatsResponse | null>(null);
+  const [violationLoading, setViolationLoading] = useState<boolean>(false);
+
+  // Fetch series
+  const fetchSeries = useCallback(async () => {
+    setSeriesLoading(true);
+    setSeriesError(null);
+    try {
+      const q: { period?: Period; from?: string; to?: string } = { period };
+      if (from) q.from = from;
+      if (to) q.to = to;
+      const res = await getContentModStats(endpoint, q);
+      setSeries(res);
+    } catch (err: unknown) {
+      console.error(err);
+      setSeries(null);
+      setSeriesError("Không lấy được dữ liệu biểu đồ. Thử lại sau.");
+    } finally {
+      setSeriesLoading(false);
+    }
+  }, [endpoint, period, from, to]);
+
+  // Fetch violation breakdown
+  const fetchViolation = useCallback(async () => {
+    setViolationLoading(true);
+    try {
+      const res = await getViolationBreakdown();
+      setViolation(res);
+    } catch (err) {
+      console.error("Lỗi violation", err);
+      setViolation(null);
+    } finally {
+      setViolationLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSeries();
+    fetchViolation();
+  }, [fetchSeries, fetchViolation]);
+
+  const exportCsv = () => {
+    alert("Tải CSV (tạm) - tích hợp export backend nếu cần");
+  };
+
+  return (
+    <main className="p-8 min-h-screen bg-[var(--background)]">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-[var(--primary)]">Thống Kê Kiểm Duyệt</h1>
+          <p className="text-[var(--muted-foreground)]">Phân tích theo khoảng thời gian</p>
+        </div>
+        <Button className="bg-[var(--primary)] text-[var(--primary-foreground)]" onClick={exportCsv}>
+          <Download className="w-4 h-4 mr-2" /> Xuất CSV
+        </Button>
       </div>
-    </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
+        {/* Left: Bar Chart */}
+        <div className="lg:col-span-3 space-y-4">
+          <div className="flex flex-wrap gap-3">
+            <Select value={endpoint} onValueChange={(v) => setEndpoint(v as Endpoint)}>
+              <SelectTrigger className="w-64 bg-[var(--card)] border border-[var(--border)]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-[var(--card)] border border-[var(--border)]">
+                {ENDPOINTS.map((e) => (
+                  <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
+              <SelectTrigger className="w-40 bg-[var(--card)] border border-[var(--border)]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-[var(--card)] border border-[var(--border)]">
+                {PERIODS.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-[var(--muted-foreground)]">Từ</label>
+              <input
+                type="date"
+                className="px-3 py-2 rounded border border-[var(--border)] bg-[var(--card)] text-sm"
+                onChange={(e) => setFrom(e.target.value || undefined)}
+                value={from ?? ""}
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-[var(--muted-foreground)]">Đến</label>
+              <input
+                type="date"
+                className="px-3 py-2 rounded border border-[var(--border)] bg-[var(--card)] text-sm"
+                onChange={(e) => setTo(e.target.value || undefined)}
+                value={to ?? ""}
+              />
+            </div>
+
+            <Button onClick={fetchSeries}>Áp dụng</Button>
+          </div>
+
+          <Card className="border border-[var(--border)] bg-[var(--card)]">
+            <CardHeader>
+              <CardTitle className="text-[var(--primary)]">
+                {ENDPOINTS.find((e) => e.value === endpoint)?.label} — Tổng: {series?.total?.toLocaleString() ?? "..."}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {seriesLoading && (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
+                </div>
+              )}
+
+              {seriesError && <div className="text-red-600 py-6 text-center">{seriesError}</div>}
+
+              {!seriesLoading && !seriesError && series && series.points.length > 0 && (
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={series.points} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="periodLabel" stroke="var(--foreground)" />
+                      <YAxis stroke="var(--foreground)" tickFormatter={(v) => v.toLocaleString()} />
+                      <Tooltip formatter={(v: number) => v.toLocaleString()} />
+                      <Bar dataKey="value" name="Số lượng" fill="var(--primary)" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {!seriesLoading && !seriesError && (!series || series.points.length === 0) && (
+                <div className="py-12 text-center text-[var(--muted-foreground)]">Không có dữ liệu để hiển thị.</div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right: Pie Chart - ĐÃ SỬA HOÀN HẢO */}
+        <div className="h-full flex flex-col">
+          <Card className="border border-[var(--border)] bg-[var(--card)] flex flex-col h-full">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-[var(--primary)] text-lg">Phân loại vi phạm</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col">
+              {violationLoading && (
+                <div className="flex-1 flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 animate-spin" />
+                </div>
+              )}
+
+              {!violationLoading && violation && violation.breakdown.length > 0 && (
+                <>
+                  <div className="min-h-80 flex-1">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                        <Pie
+                          data={violation.breakdown}
+                          dataKey="count"
+                          nameKey="violationType"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius="80%"
+                          innerRadius="45%"
+                          paddingAngle={3}
+                          cornerRadius={8}
+                        >
+                          {violation.breakdown.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={PIE_COLORS[index % PIE_COLORS.length]}
+                              stroke="var(--card)"
+                              strokeWidth={4}
+                            />
+                          ))}
+                        </Pie>
+
+                        <Tooltip
+                          formatter={(value: number) => value.toLocaleString()}
+                          contentStyle={{
+                            backgroundColor: "var(--background)",
+                            border: "1px solid var(--border)",
+                            borderRadius: "8px",
+                            fontSize: "14px",
+                          }}
+                        />
+
+                        {/* Legend nằm dưới, đẹp trên mọi kích thước */}
+                        <Legend
+                          layout="horizontal"
+                          verticalAlign="bottom"
+                          align="center"
+                          height={60}
+                          iconType="circle"
+                          formatter={(value) => <span className="text-sm">{value}</span>}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="mt-4 text-center">
+                    <p className="text-sm text-[var(--muted-foreground)]">
+                      Tổng báo cáo:{" "}
+                      <span className="font-semibold text-foreground">
+                        {violation.totalReports.toLocaleString()}
+                      </span>
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {!violationLoading && (!violation || violation.breakdown.length === 0) && (
+                <div className="flex-1 flex items-center justify-center text-[var(--muted-foreground)]">
+                  Không có dữ liệu phân loại vi phạm.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </main>
   );
 }
