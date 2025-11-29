@@ -160,10 +160,6 @@ export default function AuthorDashboardPage() {
                   Bắt đầu viết và chia sẻ câu chuyện của bạn với độc giả
                 </CardDescription>
               </div>
-              <Button onClick={() => onNavigate("author-create-story")}>
-                <Plus className="h-4 w-4 mr-2" />
-                Tạo Truyện Mới
-              </Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -173,6 +169,10 @@ export default function AuthorDashboardPage() {
                 Bạn chưa có truyện nào đang viết
               </p>
               <Button
+                className="h-12 px-10 text-base font-medium min-w-[220px]
+    border-2 border-[#F0EAD6] 
+    text-[#00416A] dark:text-[#F0EAD6]
+    dark:border-[#F0EAD6]"
                 variant="outline"
                 onClick={() => onNavigate("author-create-story")}
               >

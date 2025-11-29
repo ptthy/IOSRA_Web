@@ -58,7 +58,7 @@ export interface Chapter {
   languageCode: string;
   languageName: string;
   priceDias: number;
-  status: "draft" | "pending" | "rejected" | "published" | "completed";
+  status: "draft" | "pending" | "rejected" | "published";
   createdAt: string;
   updatedAt: string;
   submittedAt?: string | null;
@@ -80,6 +80,7 @@ export interface ChapterDetails extends Chapter {
   accessType?: string;
   contentPath?: string;
   readingTime?: number;
+  rankName?: "Casual" | "Bronze" | "Gold" | "Diamond" | string;
 }
 
 export interface CreateChapterRequest {

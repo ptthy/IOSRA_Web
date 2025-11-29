@@ -242,7 +242,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // ✅ LOGIC NAVBAR
-  const isAuthor = user?.isAuthorApproved || false;
+  const isAuthor =
+    user?.roles?.includes("author") ?? user?.isAuthorApproved ?? false;
 
   const value: AuthContextType = {
     user,

@@ -89,15 +89,11 @@ export function ReceiptSection({
 
         {/* Amount Box */}
         <div className={`${bgClass} p-4 rounded-lg border ${borderClass} mt-4`}>
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-xs text-gray-600">
-              {isSuccess ? "Số tiền nạp" : "Số tiền hủy"}
-            </span>
-            <span className={`text-xl font-black ${colorClass}`}>
-              {amount ? Number(amount).toLocaleString() : "0"} đ
-            </span>
-          </div>
-          <div className="text-xs text-gray-500 flex items-center gap-1">
+          <div
+            className={`text-xl font-bold flex items-center gap-1 ${
+              isSuccess ? "text-green-600" : "text-red-600"
+            }`}
+          >
             <span>{isSuccess ? "✓ Đã thanh toán" : "✕ Giao dịch bị hủy"}</span>
           </div>
         </div>

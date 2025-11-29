@@ -34,6 +34,8 @@ export interface ChapterSummary {
   wordCount: number;
   charCount: number;
   isPremium: boolean;
+  accessType: "free" | "dias";
+  priceDias: number;
 }
 
 export interface ChapterDetail extends ChapterSummary {

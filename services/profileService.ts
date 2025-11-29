@@ -8,7 +8,12 @@ interface UpdateProfileData {
   gender?: "M" | "F" | "other" | "unspecified";
   birthday?: string;
 }
-
+interface ProfileResponse {
+  author?: {
+    rankName: string; // "Casual" | "Bronze" | "Silver" | "Gold" | "Diamond"
+    // các field khác nếu có
+  };
+}
 export const profileService = {
   /**
    * Lấy thông tin hồ sơ chung
@@ -49,5 +54,16 @@ export const profileService = {
 
   verifyEmailChange: (otp: string) => {
     return apiClient.post("/api/Profile/email/verify", { otp });
+  },
+
+  getAuthorRank: async (): Promise<string> => {
+    try {
+      const res = await profileService.getProfile();
+      // API trả về author?.rankName
+      return res.data.author?.rankName || "Casual";
+    } catch (error) {
+      console.error("Lỗi lấy rank tác giả:", error);
+      return "Casual"; // an toàn, không có quyền = Casual
+    }
   },
 };
