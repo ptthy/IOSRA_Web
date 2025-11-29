@@ -261,11 +261,11 @@ export default function StoryDetailPage() {
             </div>
 
             {/* Story Info */}
-            <div className="flex-1 space-y-4">
+            <div className="flex-1 space-y-5">
               {/* Title & Status */}
               <div>
                 <h1 className="text-2xl mb-2 font-bold">{story.title}</h1>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Badge
                     variant={statusInfo.variant}
                     className={statusInfo.className}
@@ -273,6 +273,16 @@ export default function StoryDetailPage() {
                     <StatusIcon className="h-3 w-3 mr-1" />
                     {statusInfo.label}
                   </Badge>
+
+                  {/* isPremium */}
+                  {story.isPremium && (
+                    <Badge
+                      variant="default"
+                      className="bg-amber-500 text-white"
+                    >
+                      Premium
+                    </Badge>
+                  )}
                 </div>
               </div>
 
@@ -306,8 +316,43 @@ export default function StoryDetailPage() {
                 </p>
               </div>
 
-              {/* Metadata Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t">
+              {/* Độ dài dự kiến – THEO HÌNH BẠN GỬI */}
+              {story.lengthPlan && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1.5 font-bold">
+                    Độ dài dự kiến
+                  </p>
+                  <div className="flex items-center gap-3">
+                    {story.lengthPlan === "super_short" && (
+                      <Badge
+                        variant="secondary"
+                        className="bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300"
+                      >
+                        Siêu ngắn (từ 1-5 chương)
+                      </Badge>
+                    )}
+                    {story.lengthPlan === "short" && (
+                      <Badge
+                        variant="secondary"
+                        className="bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
+                      >
+                        Ngắn (từ 5-20 chương)
+                      </Badge>
+                    )}
+                    {story.lengthPlan === "novel" && (
+                      <Badge
+                        variant="secondary"
+                        className="bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300"
+                      >
+                        Dài (trên 20 chương)
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Metadata Grid – thêm aiResult, moderatorStatus, moderatorNote */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t">
                 <div>
                   <p className="text-xs text-muted-foreground mb-0.5 font-bold">
                     Ngày tạo
@@ -324,6 +369,8 @@ export default function StoryDetailPage() {
                     {new Date(story.updatedAt).toLocaleDateString("vi-VN")}
                   </p>
                 </div>
+
+                {/* Điểm AI + Kết quả AI */}
                 {story.aiScore !== undefined && (
                   <>
                     <div>
@@ -336,17 +383,49 @@ export default function StoryDetailPage() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground mb-0.5 font-bold">
-                        Kết quả
+                        Kết quả AI
                       </p>
                       <p className="text-sm">
-                        {story.aiScore >= 5 ? "✅ Đạt" : "❌ Không đạt"}
+                        {story.aiResult === "approved" ? "Đạt" : "Không đạt"}
+                        {story.aiResult &&
+                          story.aiResult !== "approved" &&
+                          ` (${story.aiResult})`}
                       </p>
                     </div>
                   </>
                 )}
+
+                {/* Moderator Status & Note (nếu có) */}
+                {story.moderatorStatus && (
+                  <div className="md:col-span-2">
+                    <p className="text-xs text-muted-foreground mb-0.5 font-bold">
+                      Trạng thái duyệt thủ công
+                    </p>
+                    <Badge
+                      variant={
+                        story.moderatorStatus === "approved"
+                          ? "default"
+                          : "destructive"
+                      }
+                    >
+                      {story.moderatorStatus === "approved"
+                        ? "Đã duyệt"
+                        : "Bị từ chối"}
+                    </Badge>
+                  </div>
+                )}
               </div>
 
-              {/* AI Feedback - Hiển thị cho tất cả trạng thái */}
+              {/* Moderator Note – nếu có */}
+              {story.moderatorNote && (
+                <Alert className="bg-orange-50 dark:bg-orange-950/30 border-orange-200">
+                  <AlertDescription className="text-sm">
+                    <strong>Ghi chú từ Moderator:</strong> {story.moderatorNote}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* AI Feedback */}
               {story.aiFeedback && (
                 <div className="pt-2">
                   <p className="text-xs text-muted-foreground mb-1 font-bold">
@@ -361,7 +440,37 @@ export default function StoryDetailPage() {
                 </div>
               )}
 
-              {/* Action Buttons dựa trên trạng thái */}
+              {/* Dàn ý chi tiết – rút gọn + nút xem đầy đủ */}
+              {story.outline && (
+                <div className="pt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-muted-foreground font-bold flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      Dàn ý chi tiết
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        router.push(`/author/story/${story.storyId}/outline`)
+                      }
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Chỉnh sửa dàn ý chi tiết
+                    </Button>
+                  </div>
+                  <Card className="bg-muted/40 border-dashed">
+                    <CardContent className="pt-4 text-sm text-muted-foreground max-h-60 overflow-y-auto whitespace-pre-line leading-relaxed">
+                      {story.outline.length > 800
+                        ? story.outline.substring(0, 800) +
+                          "\n\n... (xem tiếp ở trang dàn ý)"
+                        : story.outline}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {/* Action Buttons */}
               <div className="flex gap-2 pt-4">
                 {story.status === "draft" && (
                   <Button

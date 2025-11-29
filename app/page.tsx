@@ -246,7 +246,7 @@ export default function HomePage() {
             {/* List Latest Stories */}
             <div
               ref={latestScrollRef}
-              className="flex overflow-x-auto gap-4 pb-2 pt-1 px-1 min-h-[380px] scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
+              className="flex overflow-x-auto gap-4 py-4 px-1 min-h-[380px] scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
             >
               {latestStories.map((story) => (
                 <div key={story.storyId} className="flex-shrink-0">

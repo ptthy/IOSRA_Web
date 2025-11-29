@@ -40,7 +40,7 @@ interface CommentItemProps {
   onRemoveReaction?: (commentId: string) => Promise<void>;
   currentUserId?: string;
   onReplySubmit?: (content: string, parentId: string) => Promise<void>;
-  // ❌ KHÔNG CẦN prop isDarkTheme NỮA
+  theme?: any;
 }
 
 export function CommentItem({
@@ -55,6 +55,7 @@ export function CommentItem({
   onRemoveReaction,
   currentUserId,
   onReplySubmit,
+  theme,
 }: CommentItemProps) {
   const { user } = useAuth();
 
@@ -75,18 +76,28 @@ export function CommentItem({
   const [showReactions, setShowReactions] = useState(false);
 
   const isOwner = currentUserId === comment.readerId;
+  const isDarkTheme = theme?.text === "#f0ead6";
 
-  // --- 🔥 CHUẨN TAILWIND DARK MODE (như file mẫu) ---
-  // Mặc định (Light): Chữ đen, nền trắng
-  // Dark (dark:): Chữ trắng, nền tối
+  // Màu nền tĩnh (Static): Trắng mờ 5% (tối) hoặc Đen mờ 3% (sáng)
+  const itemBgColor = theme
+    ? isDarkTheme
+      ? "rgba(255, 255, 255, 0.05)"
+      : "rgba(0, 0, 0, 0.03)"
+    : undefined;
 
-  const containerClass =
-    "bg-card border-border hover:bg-accent/50 transition-colors border rounded-lg p-4";
-  const textClass = "text-foreground"; // Tự động đen/trắng theo theme hệ thống
-  const subTextClass = "text-muted-foreground";
+  // Màu viền
+  const borderColor = theme
+    ? isDarkTheme
+      ? "rgba(255, 255, 255, 0.1)"
+      : "rgba(0, 0, 0, 0.08)"
+    : undefined;
 
-  const inputClass =
-    "bg-background border-input text-foreground placeholder:text-muted-foreground focus-visible:ring-ring";
+  // Style cho chữ
+  const textStyle = theme ? { color: theme.text } : {};
+  const subTextStyle = theme ? { color: theme.text, opacity: 0.7 } : {};
+
+  // Class container: Xóa bg-card và hover effects để tránh đổi màu lung tung
+  const containerClass = "transition-colors border rounded-lg p-4";
 
   const handleSendReply = async () => {
     if (!replyText.trim() || !onReplySubmit) return;
@@ -184,24 +195,47 @@ export function CommentItem({
 
   return (
     <div className="flex flex-col gap-2 w-full">
-      <div className={containerClass}>
+      <div
+        className={containerClass}
+        // 🔥 Áp dụng style cứng
+        style={{
+          backgroundColor: itemBgColor,
+          borderColor: borderColor,
+        }}
+      >
         <div className="flex gap-3">
-          <Avatar className="h-10 w-10 border">
+          <Avatar
+            className="h-10 w-10 border"
+            style={{ borderColor: borderColor }}
+          >
             <AvatarImage src={comment.avatarUrl || ""} />
-            <AvatarFallback>U</AvatarFallback>
+            <AvatarFallback
+              style={{ backgroundColor: theme?.bg, color: theme?.text }}
+            >
+              U
+            </AvatarFallback>
           </Avatar>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 mb-1">
               <div className="flex items-center gap-2">
-                <span className={`text-sm font-semibold ${textClass}`}>
+                <span className="text-sm font-semibold" style={textStyle}>
                   {comment.username}
                 </span>
-                <span className={`text-xs ${subTextClass}`}>
+                <span className="text-xs" style={subTextStyle}>
                   {timeAgo(comment.createdAt)}
                 </span>
                 {showChapterTag && comment.chapterNo && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 rounded border"
+                    style={{
+                      backgroundColor: isDarkTheme
+                        ? "rgba(255,255,255,0.1)"
+                        : "rgba(0,0,0,0.05)",
+                      color: theme?.text,
+                      borderColor: borderColor,
+                    }}
+                  >
                     Ch.{comment.chapterNo}
                   </span>
                 )}
@@ -211,7 +245,8 @@ export function CommentItem({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                    className="h-6 w-6"
+                    style={{ color: theme?.text, opacity: 0.7 }}
                   >
                     <MoreVertical className="h-4 w-4" />
                   </Button>
@@ -243,10 +278,20 @@ export function CommentItem({
                 <Textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
-                  className={`min-h-[80px] text-sm ${inputClass}`}
+                  className="min-h-[80px] text-sm"
+                  style={{
+                    backgroundColor: itemBgColor,
+                    color: theme?.text,
+                    borderColor: borderColor,
+                  }}
                 />
                 <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="ghost" onClick={cancelEdit}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={cancelEdit}
+                    style={{ color: theme?.text }}
+                  >
                     Hủy
                   </Button>
                   <Button size="sm" onClick={handleEdit} disabled={editLoading}>
@@ -256,15 +301,20 @@ export function CommentItem({
               </div>
             ) : (
               <>
-                <p className={`text-sm mb-2 whitespace-pre-wrap ${textClass}`}>
+                <p
+                  className="text-sm mb-2 whitespace-pre-wrap"
+                  style={textStyle}
+                >
                   {comment.content}
                 </p>
                 <div className="flex items-center gap-4 text-xs">
                   <button
                     onClick={handleLike}
-                    className={`flex items-center gap-1 ${
-                      liked ? "text-green-600 font-bold" : subTextClass
-                    } hover:text-foreground transition-colors`}
+                    className="flex items-center gap-1 transition-colors hover:opacity-80"
+                    style={{
+                      color: liked ? "#16a34a" : theme?.text,
+                      opacity: liked ? 1 : 0.7,
+                    }}
                   >
                     <ThumbsUp
                       className="h-3.5 w-3.5"
@@ -274,9 +324,11 @@ export function CommentItem({
                   </button>
                   <button
                     onClick={handleDislike}
-                    className={`flex items-center gap-1 ${
-                      disliked ? "text-red-600 font-bold" : subTextClass
-                    } hover:text-foreground transition-colors`}
+                    className="flex items-center gap-1 transition-colors hover:opacity-80"
+                    style={{
+                      color: disliked ? "#dc2626" : theme?.text,
+                      opacity: disliked ? 1 : 0.7,
+                    }}
                   >
                     <ThumbsDown
                       className="h-3.5 w-3.5"
@@ -286,14 +338,16 @@ export function CommentItem({
                   </button>
                   <button
                     onClick={() => setShowReply(!showReply)}
-                    className={`flex items-center gap-1 ${subTextClass} hover:text-foreground transition-colors`}
+                    className="flex items-center gap-1 transition-colors hover:opacity-80"
+                    style={subTextStyle}
                   >
                     <Reply className="h-3.5 w-3.5" /> Trả lời
                   </button>
                   {hasReactions && (
                     <span
                       onClick={showReactionsPopup}
-                      className={`cursor-pointer ml-auto flex items-center gap-1 ${subTextClass} hover:text-foreground`}
+                      className="cursor-pointer ml-auto flex items-center gap-1 hover:opacity-80"
+                      style={subTextStyle}
                     >
                       <ThumbsUp className="h-3 w-3" /> {likeCount}
                     </span>
@@ -301,7 +355,10 @@ export function CommentItem({
                 </div>
 
                 {showReply && (
-                  <div className="mt-3 pl-3 border-l-2 border-border">
+                  <div
+                    className="mt-3 pl-3 border-l-2"
+                    style={{ borderColor: borderColor }}
+                  >
                     <div className="flex gap-2">
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={user?.avatar || ""} />
@@ -312,13 +369,19 @@ export function CommentItem({
                           value={replyText}
                           onChange={(e) => setReplyText(e.target.value)}
                           placeholder="Viết câu trả lời..."
-                          className={`min-h-[60px] text-sm ${inputClass}`}
+                          className="min-h-[60px] text-sm"
+                          style={{
+                            backgroundColor: itemBgColor,
+                            color: theme?.text,
+                            borderColor: borderColor,
+                          }}
                         />
                         <div className="flex justify-end gap-2">
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => setShowReply(false)}
+                            style={{ color: theme?.text }}
                           >
                             Hủy
                           </Button>
@@ -347,7 +410,10 @@ export function CommentItem({
       {/* Nested Replies */}
       {comment.replies && comment.replies.length > 0 && (
         <div className="pl-8 md:pl-12 flex flex-col gap-2 relative w-full">
-          <div className="absolute left-3.5 top-0 bottom-4 w-px bg-border" />
+          <div
+            className="absolute left-3.5 top-0 bottom-4 w-px"
+            style={{ backgroundColor: borderColor }}
+          />
           {comment.replies.map(
             (reply) =>
               reply?.commentId && (
@@ -364,6 +430,7 @@ export function CommentItem({
                   onDislike={onDislike}
                   onRemoveReaction={onRemoveReaction}
                   onReplySubmit={onReplySubmit}
+                  theme={theme}
                 />
               )
           )}

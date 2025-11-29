@@ -10,6 +10,13 @@ import { CommentItem } from "./CommentItem";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
+// Interface cho Theme
+interface ReaderTheme {
+  bg: string;
+  text: string;
+  secondary?: string;
+}
+
 interface CommentSectionProps {
   comments: ChapterComment[];
   onAddComment: (
@@ -28,11 +35,11 @@ interface CommentSectionProps {
   chapters?: Array<{ chapterId: string; chapterNo: number; title: string }>;
   selectedChapter?: string;
   onChapterFilterChange?: (chapterId: string) => void;
-  // ❌ KHÔNG CẦN isDarkTheme
   chapterId?: string;
   storyId?: string;
   currentUserId?: string;
   totalCount?: number;
+  theme?: ReaderTheme; // Nhận theme từ props
 }
 
 export function CommentSection({
@@ -54,6 +61,7 @@ export function CommentSection({
   storyId,
   currentUserId,
   totalCount = 0,
+  theme,
 }: CommentSectionProps) {
   const [localComments, setLocalComments] =
     useState<ChapterComment[]>(initialComments);
@@ -116,14 +124,6 @@ export function CommentSection({
     }
   };
 
-  // 🔥 CLASS TAILWIND CHUẨN (Tự đổi màu theo theme hệ thống)
-  const textClass = "text-foreground"; // Tự động đen/trắng
-  const subTextClass = "text-muted-foreground"; // Tự động xám đậm/nhạt
-  const inputClass =
-    "bg-background border-input text-foreground placeholder:text-muted-foreground focus-visible:ring-ring";
-  const selectClass = "bg-background border-input text-foreground";
-
-  // Handler giữ nguyên...
   const handleUpdateComment = async (commentId: string, content: string) => {
     if (onUpdateComment) await onUpdateComment(commentId, content);
   };
@@ -140,26 +140,51 @@ export function CommentSection({
     if (onRemoveReaction) await onRemoveReaction(commentId);
   };
 
+  // --- STYLE LOGIC ---
+  const dynamicTextStyle = theme ? { color: theme.text } : {};
+  const dynamicSubTextStyle = theme ? { color: theme.text, opacity: 0.7 } : {};
+
+  // Nếu theme tối (text #f0ead6) -> nền input sáng mờ. Theme sáng -> nền đen mờ.
+  const isDarkTheme = theme?.text === "#f0ead6";
+  const inputBgColor = theme
+    ? isDarkTheme
+      ? "rgba(255, 255, 255, 0.08)"
+      : "rgba(0, 0, 0, 0.04)"
+    : undefined;
+
+  const inputBorderColor = theme
+    ? isDarkTheme
+      ? "rgba(255, 255, 255, 0.15)"
+      : "rgba(0, 0, 0, 0.1)"
+    : undefined;
+
   return (
     <div className="space-y-6">
       <div className="space-y-4">
         <div className="flex items-center gap-2">
-          <MessageSquare className={`h-5 w-5 ${textClass}`} />
-          <h3 className={`text-lg font-semibold ${textClass}`}>Bình luận</h3>
-          <span className={`text-sm ${subTextClass}`}>
+          <MessageSquare className="h-5 w-5" style={dynamicTextStyle} />
+          <h3 className="text-lg font-semibold" style={dynamicTextStyle}>
+            Bình luận
+          </h3>
+          <span className="text-sm" style={dynamicSubTextStyle}>
             ({totalCount > 0 ? totalCount : localComments.length})
           </span>
         </div>
 
         {showChapterFilter && chapters.length > 0 && (
           <div className="flex items-center gap-2">
-            <label className={`text-sm ${subTextClass}`}>
+            <label className="text-sm" style={dynamicSubTextStyle}>
               Lọc theo chương:
             </label>
             <select
               value={selectedChapter}
               onChange={(e) => onChapterFilterChange?.(e.target.value)}
-              className={`border rounded-md px-3 py-1 text-sm ${selectClass}`}
+              className="border rounded-md px-3 py-1 text-sm"
+              style={{
+                backgroundColor: inputBgColor || "transparent",
+                color: theme?.text,
+                borderColor: inputBorderColor,
+              }}
             >
               {chapters.map((chapter) => (
                 <option
@@ -176,12 +201,18 @@ export function CommentSection({
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="flex gap-3">
-            <Avatar className="h-10 w-10 border">
+            <Avatar
+              className="h-10 w-10 border"
+              style={{ borderColor: inputBorderColor }}
+            >
               <AvatarImage src={user?.avatar || ""} />
-              <AvatarFallback>U</AvatarFallback>
+              <AvatarFallback
+                style={{ color: theme?.text, backgroundColor: inputBgColor }}
+              >
+                U
+              </AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              {/* 🔥 Input dùng class chuẩn */}
               <Textarea
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
@@ -190,12 +221,18 @@ export function CommentSection({
                     ? `Bình luận dưới tên ${user.displayName}...`
                     : "Viết bình luận..."
                 }
-                className={`min-h-[100px] resize-none ${inputClass}`}
+                className="min-h-[100px] resize-none focus-visible:ring-1 focus-visible:ring-offset-0 border"
+                style={{
+                  backgroundColor: inputBgColor,
+                  color: theme?.text,
+                  borderColor: inputBorderColor,
+                }}
               />
               <div className="flex justify-end gap-2 mt-3">
                 <Button
                   type="submit"
                   disabled={!newComment.trim() || isSubmitting}
+                  className="bg-blue-600 hover:bg-blue-700 text-white border-none"
                 >
                   <Send className="h-4 w-4 mr-2" />{" "}
                   {isSubmitting ? "Đang gửi..." : "Gửi bình luận"}
@@ -209,10 +246,13 @@ export function CommentSection({
       <div className="space-y-4">
         {loading && localComments.length === 0 ? (
           <div className="flex justify-center py-8">
-            <Loader2 className={`h-6 w-6 animate-spin ${textClass}`} />
+            <Loader2
+              className="h-6 w-6 animate-spin"
+              style={dynamicTextStyle}
+            />
           </div>
         ) : localComments.length === 0 ? (
-          <div className={`text-center py-8 ${subTextClass}`}>
+          <div className="text-center py-8" style={dynamicSubTextStyle}>
             <p>Chưa có bình luận nào</p>
           </div>
         ) : (
@@ -231,6 +271,7 @@ export function CommentSection({
                 onRemoveReaction={handleRemoveReaction}
                 currentUserId={currentUserId}
                 onReplySubmit={handleReplySubmitWrapper}
+                theme={theme}
               />
             ))}
             {hasMore && onLoadMore && (
@@ -240,6 +281,11 @@ export function CommentSection({
                   onClick={onLoadMore}
                   disabled={loading}
                   className="flex items-center gap-2"
+                  style={{
+                    backgroundColor: "transparent",
+                    color: theme?.text,
+                    borderColor: inputBorderColor,
+                  }}
                 >
                   {loading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

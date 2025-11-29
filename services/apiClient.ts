@@ -43,24 +43,39 @@ apiClient.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 403) {
-      const errorMessage = error.response?.data?.message?.toLowerCase();
+      const errorCode = error.response?.data?.error?.code;
+      const errorMessage = error.response?.data?.error?.message?.toLowerCase();
 
-      // Phân biệt các loại 403
-      if (
+      // 🔥 PHÂN BIỆT CÁC LOẠI 403:
+
+      // 1. 403 ChapterLocked -> KHÔNG đá ra login, để component xử lý
+      if (errorCode === "ChapterLocked") {
+        console.log("🎯 Chapter bị khóa - giữ nguyên trên trang reader");
+        return Promise.reject(error); // Giữ nguyên lỗi để component xử lý
+      }
+      //  2. 403 SubscriptionRequired -> KHÔNG đá ra login
+      else if (errorCode === "SubscriptionRequired") {
+        console.log("🎯 Cần gói Premium - giữ nguyên trên trang");
+        return Promise.reject(error);
+      }
+      // 2. 403 do không có quyền author
+      else if (
         errorMessage?.includes("author") ||
-        errorMessage?.includes("tác giả")
+        errorMessage?.includes("tác giả") ||
+        errorCode?.includes("Author")
       ) {
-        // Lỗi do không có quyền author
         if (
           typeof window !== "undefined" &&
           !window.location.pathname.includes("author-upgrade")
         ) {
           window.location.href = "/author-upgrade";
         }
-      } else {
-        // Lỗi 403 khác (token invalid, etc.)
+      }
+      // 3. 403 khác (token invalid, etc.) -> đá ra login
+      else {
         if (typeof window !== "undefined") {
           localStorage.removeItem("authToken");
+          localStorage.removeItem("authUser");
           window.location.href = "/login";
         }
       }

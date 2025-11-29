@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -39,12 +39,16 @@ import {
   Pencil,
   XCircle,
   Globe,
+  Sparkles,
+  AlertCircle,
 } from "lucide-react";
 import { chapterService } from "@/services/chapterService";
 import type { ChapterDetails } from "@/services/apiTypes";
 import { toast } from "sonner";
 import TiptapEditor from "@/components/editor/TiptapEditor";
 import VoiceChapterPlayer from "@/components/author/VoiceChapterPlayer";
+import { profileService } from "@/services/profileService";
+
 // Hàm trích xuất phần tiếng Việt từ AI Feedback
 const extractVietnameseFeedback = (feedback: string | null): string | null => {
   if (!feedback) return null;
@@ -245,6 +249,8 @@ export default function AuthorChapterDetailPage() {
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [authorRank, setAuthorRank] = useState<string>("Casual");
+  const [rankLoading, setRankLoading] = useState(true);
   // State mới cho chế độ chỉnh sửa
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -302,7 +308,12 @@ export default function AuthorChapterDetailPage() {
       toast.error(error.message || "Không thể tải thông tin chương");
     }
   };
-
+  useEffect(() => {
+    profileService.getAuthorRank().then((rank) => {
+      setAuthorRank(rank);
+      setRankLoading(false);
+    });
+  }, []);
   useEffect(() => {
     loadChapter();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -430,6 +441,10 @@ export default function AuthorChapterDetailPage() {
         toast.error(
           "Chương không ở trạng thái có thể gửi. Chỉ chương ở trạng thái bản nháp mới được gửi."
         );
+      } else if (error.response?.data?.error?.code === "ChapterRejectedByAi") {
+        toast.error(
+          "Chương bị từ chối bởi hệ thống kiểm duyệt tự động của ToraNovel"
+        );
       } else {
         toast.error(error.message || "Có lỗi xảy ra khi gửi chương");
       }
@@ -490,18 +505,52 @@ export default function AuthorChapterDetailPage() {
 
     setIsWithdrawing(true);
     try {
+      // 1. Gọi API rút chương
       await chapterService.withdrawChapter(chapterId);
 
-      // RELOAD LẠI TOÀN BỘ DỮ LIỆU CHAPTER
-      await reloadChapter();
+      // 2. Tự tay lấy lại dữ liệu mới nhất (Không dùng reloadChapter để tránh lằng nhằng)
+      const freshChapterData = await chapterService.getChapterDetails(
+        storyId,
+        chapterId
+      );
+
+      // 3. Tải nội dung mới nhất (nếu có path)
+      let freshContent = "";
+      if (freshChapterData.contentPath) {
+        // Gọi api tải content trực tiếp ở đây
+        const res = await fetch(
+          `/api/chapter-content?path=${encodeURIComponent(
+            freshChapterData.contentPath
+          )}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          freshContent = data.content || "";
+        }
+      } else {
+        freshContent = freshChapterData.content || "";
+      }
+
+      // 4. CẬP NHẬT ĐỒNG LOẠT UI (Quan trọng nhất bước này)
+      setChapter(freshChapterData); // Cập nhật state gốc
+      setChapterContent(freshContent); // Cập nhật state hiển thị
+      setShowModeratorAlert(false); // Tắt cảnh báo
+
+      // 5. Nạp dữ liệu vào Form Edit TRƯỚC khi bật chế độ edit
+      setEditFormData({
+        title: freshChapterData.title,
+        content: freshContent, // <--- Đảm bảo content mới nhất được nạp vào đây
+        languageCode: freshChapterData.languageCode as any,
+        accessType: (freshChapterData.accessType as "free" | "dias") || "free",
+      });
+
+      // 6. Cuối cùng mới bật màn hình Edit
+      setIsEditing(true);
 
       toast.success("Đã rút chương về bản nháp thành công!");
-      setIsEditing(true); // tự động vào chế độ chỉnh sửa
-      setShowModeratorAlert(false);
     } catch (err: any) {
       console.error("Error withdrawing chapter:", err);
-
-      // RELOAD LẠI KHI CÓ LỖI
+      // Nếu lỗi thì mới dùng reloadChapter để cứu vớt UI
       await reloadChapter();
 
       if (err.response?.data?.error?.code === "WithdrawNotAllowed") {
@@ -513,7 +562,6 @@ export default function AuthorChapterDetailPage() {
       setIsWithdrawing(false);
     }
   };
-
   // HÀM LƯU ĐÃ ĐƯỢC TỐI ƯU
   const handleSaveEdit = async () => {
     if (!chapter) return;
@@ -636,25 +684,6 @@ export default function AuthorChapterDetailPage() {
         )}
       </div>
       {/* Thông báo Moderator Rejection - HIỂN THỊ KHI CÓ moderatorNote */}
-      {chapter?.status === "completed" && (
-        <Card className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-green-700 dark:text-green-300">
-              <CheckCircle className="h-5 w-5" />
-              Chương đã được duyệt
-            </CardTitle>
-            <CardDescription className="text-green-600 dark:text-green-400">
-              Chương này đã vượt qua kiểm duyệt và đang hiển thị công khai với
-              độc giả.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Bạn không cần thực hiện thêm hành động nào.
-            </p>
-          </CardContent>
-        </Card>
-      )}
       {/* Nút rút lại chương - HIỂN THỊ KHI BỊ REJECTED (cả AI và Moderator) */}
       {chapter?.status === "rejected" && (
         <Card className="border-orange-200 dark:border-orange-800">
@@ -886,12 +915,9 @@ export default function AuthorChapterDetailPage() {
           <div className="space-y-6">
             {/* Giá */}
             <div>
-              <p className="text-sm text-slate-400 mb-1">Giá</p>
-              <p className="font-medium">
-                {chapter.accessType === "free"
-                  ? "Miễn phí"
-                  : `${chapter.priceDias} Dias`}
-              </p>
+              <p className="text-sm text-slate-400 mb-1">Giá (Dias)</p>
+              {/* Luôn hiển thị giá trị Dias gốc từ hệ thống */}
+              <p className="font-medium">{chapter.priceDias} Dias</p>
             </div>
 
             {/* Trạng thái AI */}
@@ -939,10 +965,51 @@ export default function AuthorChapterDetailPage() {
         </CardContent>
       </Card>
       {/* Chapter Voice - Tác giả chọn số lượng giọng */}
-      {chapter &&
-        (chapter.status === "published" || chapter.status === "completed") && (
-          <VoiceChapterPlayer chapterId={chapterId} />
-        )}{" "}
+      {/* CHỈ HIỆN KHI: Đã xuất bản VÀ Rank không phải là Casual */}
+      {chapter && chapter.status === "published" && (
+        <>
+          {rankLoading ? (
+            <div className="py-8 text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+            </div>
+          ) : authorRank !== "Casual" ? (
+            <VoiceChapterPlayer chapterId={chapterId} />
+          ) : (
+            <Card className="my-6 border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20">
+              <CardContent className="p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                {/* PHẦN TRÁI: Tiêu đề + Nội dung text */}
+                <div className="flex items-center gap-3 text-sm text-orange-900 dark:text-orange-100 w-full sm:w-auto">
+                  <div className="flex items-center gap-2 font-bold text-orange-700 whitespace-nowrap shrink-0">
+                    <Sparkles className="h-5 w-5" />
+                    Tính năng Audio AI
+                  </div>
+
+                  {/* Dấu gạch đứng ngăn cách (chỉ hiện trên desktop) */}
+                  <div className="hidden sm:block h-4 w-[1px] bg-orange-300 dark:bg-orange-700 mx-1" />
+
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <AlertCircle className="h-4 w-4 text-orange-600 shrink-0" />
+                    <span>
+                      Chưa đủ điều kiện. Chỉ tác giả từ{" "}
+                      <strong>rank Bronze</strong> trở lên.
+                    </span>
+                  </div>
+                </div>
+
+                {/* PHẦN PHẢI: Nút bấm */}
+                <Button
+                  size="sm"
+                  onClick={() => router.push("/author/author-upgrade-rank")}
+                  className="bg-orange-600 hover:bg-orange-700 shrink-0 w-full sm:w-auto"
+                >
+                  <Sparkles className="h-3 w-3 mr-2" />
+                  Nâng cấp ngay
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
       {/* AI Assessment */}
       {chapter && (chapter.aiScore !== undefined || vietnameseFeedback) && (
         <Card className="border-blue-200 dark:border-blue-800">
@@ -1018,10 +1085,7 @@ export default function AuthorChapterDetailPage() {
       )}
       {/* Action Buttons */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Trạng thái</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <div className="flex gap-3 flex-wrap">
             {!isEditing && (
               <>
@@ -1063,19 +1127,25 @@ export default function AuthorChapterDetailPage() {
                 )}
 
                 {/* Chương pending - đang chờ duyệt */}
-                {chapter?.status === "pending" && (
-                  <Button variant="secondary" disabled>
-                    <Clock className="h-4 w-4 mr-2" />
-                    Đang chờ duyệt từ Content mod của ToraNovel
-                  </Button>
+                {chapter.status === "pending" && (
+                  <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+                    <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    <AlertDescription>
+                      Trạng thái: Chương đang chờ được Content mod đánh giá và
+                      duyệt
+                    </AlertDescription>
+                  </Alert>
                 )}
 
                 {/* Chương published - đã xuất bản */}
-                {chapter?.status === "published" && (
-                  <Button variant="secondary" disabled>
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Đã xuất bản
-                  </Button>
+                {chapter.status === "published" && (
+                  <Alert className="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+
+                    <AlertDescription>
+                      Trạng thái: Chương đã được xuất bản thành công
+                    </AlertDescription>
+                  </Alert>
                 )}
               </>
             )}

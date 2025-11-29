@@ -20,6 +20,7 @@ import {
   MessageSquare,
   Star,
   ArrowUpDown,
+  Lock,
 } from "lucide-react";
 import { storyCatalogApi, Story } from "@/services/storyCatalog";
 import {
@@ -192,7 +193,11 @@ export default function StoryDetailPage() {
       try {
         const [storyData, chaptersData, ratingData] = await Promise.all([
           storyCatalogApi.getStoryById(storyId),
-          chapterCatalogApi.getChapters({ storyId, page: 1, pageSize: 50 }),
+          chapterCatalogApi.getChapters({
+            StoryId: storyId,
+            Page: 1,
+            PageSize: 50,
+          }),
           storyRatingApi.getStoryRating(storyId),
         ]);
 
@@ -673,7 +678,24 @@ export default function StoryDetailPage() {
                           </div>
                         </div>
                         {chapter.isLocked && (
-                          <Badge variant="secondary">Premium</Badge>
+                          <Lock className="h-4 w-4 text-orange-500" />
+                        )}
+
+                        {/* 2. Hiển thị Badge: Miễn phí hoặc Giá tiền */}
+                        {chapter.accessType === "dias" ? (
+                          <Badge
+                            variant="outline"
+                            className="border-yellow-500 text-yellow-600 font-bold"
+                          >
+                            {chapter.priceDias} Dias
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="secondary"
+                            className="bg-green-100 text-green-700 hover:bg-green-200"
+                          >
+                            Miễn phí
+                          </Badge>
                         )}
                       </div>
                     ))}

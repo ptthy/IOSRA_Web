@@ -1,677 +1,714 @@
-import React, { useState, useEffect } from "react";
-import { Button } from "../ui/button";
-import { Slider } from "../ui/slider";
+"use client";
+
+import React, { useState, useEffect, useRef } from "react";
 import {
+  ArrowLeft,
+  Settings,
+  ChevronDown,
+  Lock,
+  Check,
+  ShoppingCart,
   Play,
   Pause,
+  SkipBack,
+  SkipForward,
   Volume2,
-  Highlighter,
-  Settings,
-  ArrowLeft,
-  BookOpen,
-  ChevronDown,
-  Headphones,
+  VolumeX,
+  Loader2,
+  AlertCircle,
+  Gem,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "../ui/dropdown-menu";
-import { ScrollArea } from "../ui/scroll-area";
-import {
-  VoiceSettings,
-  voiceNames,
-  speedOptions,
-  getVoiceSettings,
-  saveVoiceSettings,
-  getHighlights,
-} from "../../lib/readerSettings";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  ChapterSummary,
+  chapterCatalogApi,
+  ChapterVoice,
+} from "@/services/chapterCatalogService";
+import { cn } from "@/lib/utils";
+import {
+  VoiceSettings,
+  getVoiceSettings,
+  saveVoiceSettings,
+  voiceNames,
+  speedOptions,
+} from "@/lib/readerSettings";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { chapterPurchaseApi } from "@/services/chapterPurchaseService";
+import { toast } from "sonner";
+import { TopUpModal } from "@/components/payment/TopUpModal";
+const AUDIO_BASE_URL = "https://pub-15618311c0ec468282718f80c66bcc13.r2.dev/";
 
 interface ReaderToolbarProps {
   chapterNo: number;
   chapterTitle: string;
   chapterId: string;
   storyId: string;
-  chapters?: Array<{
-    chapterId: string;
-    chapterNo: number;
-    title: string;
-    isLocked: boolean;
-  }>;
+  chapters: ChapterSummary[];
   isDarkTheme?: boolean;
   isTransparent?: boolean;
   onBack: () => void;
   onSettings: () => void;
-  onChapterChange?: (chapterId: string) => void;
+  onChapterChange: (chapterId: string) => void;
+  children?: React.ReactNode;
+  autoPlayAfterUnlock?: boolean; // 🔥 PROP MỚI: Tự động phát sau khi mở khóa
+  setShowTopUpModal: (show: boolean) => void;
 }
 
-export function ReaderToolbar({
+export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
   chapterNo,
   chapterTitle,
   chapterId,
   storyId,
-  chapters = [],
-  isDarkTheme = false,
-  isTransparent = false,
+  chapters,
+  isDarkTheme,
+  isTransparent,
   onBack,
   onSettings,
   onChapterChange,
-}: ReaderToolbarProps) {
-  const [settings, setSettings] = useState<VoiceSettings>(getVoiceSettings());
-  const [showVolume, setShowVolume] = useState(false);
-  const [highlightCount, setHighlightCount] = useState(0);
-  // Fake song data (title + artist)
-  // Updated music list data from image
-  const audioSources = [
-    {
-      id: "song_1",
-      title: "Waterfall",
-      artist: "William King",
-      locked: false,
-      number: 2,
-    },
-    {
-      id: "song_2",
-      title: "The Cradle Of Your Soul",
-      artist: "Max Zansta",
-      locked: false,
-      number: 3,
-    },
-    {
-      id: "song_3",
-      title: "Science Documentary",
-      artist: "RomanBelov",
-      locked: false,
-      number: 4,
-    },
-    {
-      id: "song_4",
-      title: "Sad Soul Chasing A Feeling",
-      artist: "AlexGrohl",
-      locked: false,
-      number: 5,
-    },
-    {
-      id: "song_5",
-      title: "Price Of Freedom",
-      artist: "Unknown Artist",
-      locked: false,
-      number: 6,
-    },
-    {
-      id: "song_6",
-      title: "Piano Moment",
-      artist: "Tomomi Kato",
-      locked: false,
-      number: 7,
-    },
-  ];
-  const [selectedAudio, setSelectedAudio] = useState<string>(
-    audioSources[0].id
+  children,
+  autoPlayAfterUnlock = false, // 🔥 Mặc định là false
+  setShowTopUpModal,
+}) => {
+  const [openChapterList, setOpenChapterList] = useState(false);
+  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(
+    getVoiceSettings()
   );
+  const [showVolume, setShowVolume] = useState(false);
 
-  useEffect(() => {
-    saveVoiceSettings(settings);
-  }, [settings]);
+  const [voices, setVoices] = useState<ChapterVoice[]>([]);
+  const [currentVoice, setCurrentVoice] = useState<ChapterVoice | null>(null);
+  const [isLoadingVoice, setIsLoadingVoice] = useState(false);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
 
-  useEffect(() => {
-    setHighlightCount(getHighlights(chapterId).length);
-  }, [chapterId]);
+  const [voiceToBuy, setVoiceToBuy] = useState<ChapterVoice | null>(null);
+  const [isBuying, setIsBuying] = useState(false);
 
-  const togglePlay = () => {
-    setSettings((prev) => ({ ...prev, isPlaying: !prev.isPlaying }));
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const getFullAudioUrl = (path: string | undefined | null) => {
+    if (!path) return "";
+    if (path.startsWith("http")) return path;
+    const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+    return `${AUDIO_BASE_URL}${cleanPath}`;
   };
 
-  const skipTime = (seconds: number) => {
-    setSettings((prev) => ({
-      ...prev,
-      currentTime: Math.max(
-        0,
-        Math.min(prev.duration, prev.currentTime + seconds)
-      ),
-    }));
-  };
+  const fetchVoices = async () => {
+    setIsLoadingVoice(true);
+    try {
+      const data = await chapterCatalogApi.getChapterVoices(chapterId);
+      console.log("🎯 VOICES DATA:", data);
+      setVoices(data);
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const getColors = () => {
-    if (isDarkTheme) {
-      return {
-        bg: "#003454",
-        border: "rgba(240, 234, 214, 0.15)",
-        text: "#f0ead6",
-        textSecondary: "rgba(240, 234, 214, 0.6)",
-        hover: "rgba(240, 234, 214, 0.08)",
-        accent: "#f0ead6",
-      };
-    } else if (isTransparent) {
-      return {
-        bg: "rgba(255, 255, 255, 0.95)",
-        border: "rgba(0, 65, 106, 0.1)",
-        text: "#00416a",
-        textSecondary: "rgba(0, 65, 106, 0.5)",
-        hover: "rgba(0, 65, 106, 0.05)",
-        accent: "#00416a",
-      };
-    } else {
-      return {
-        bg: "#ffffff",
-        border: "rgba(0, 0, 0, 0.08)",
-        text: "#1a1a1a",
-        textSecondary: "rgba(0, 0, 0, 0.5)",
-        hover: "rgba(0, 0, 0, 0.04)",
-        accent: "#00416a",
-      };
+      // 🔥 QUAN TRỌNG: Nếu có autoPlayAfterUnlock, chọn giọng đầu tiên và phát ngay
+      if (autoPlayAfterUnlock && data.length > 0) {
+        const firstOwnedVoice = data.find((v) => v.owned);
+        if (firstOwnedVoice) {
+          console.log("🎯 AUTO PLAYING VOICE AFTER UNLOCK:", firstOwnedVoice);
+          setCurrentVoice(firstOwnedVoice);
+          setVoiceSettings((prev) => ({ ...prev, isPlaying: true }));
+        }
+      } else if (!currentVoice) {
+        // Bình thường: chọn giọng đầu tiên đã sở hữu
+        const owned = data.find((v) => v.owned);
+        if (owned) setCurrentVoice(owned);
+      }
+    } catch (error) {
+      console.error("Lỗi tải giọng:", error);
+    } finally {
+      setIsLoadingVoice(false);
     }
   };
 
-  const colors = getColors();
+  useEffect(() => {
+    if (chapterId) fetchVoices();
+    setVoiceSettings((prev) => ({ ...prev, isPlaying: false, currentTime: 0 }));
+    setAudioCurrentTime(0);
+    setAudioDuration(0);
+    setCurrentVoice(null);
+  }, [chapterId]);
+
+  // 🔥 EFFECT: Xử lý auto play sau khi mở khóa chapter
+  useEffect(() => {
+    if (autoPlayAfterUnlock && chapterId) {
+      console.log("🎯 AUTO PLAY TRIGGERED, reloading voices...");
+      fetchVoices(); // Reload voices để có dữ liệu mới nhất
+    }
+  }, [autoPlayAfterUnlock, chapterId]);
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setAudioCurrentTime(audioRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setAudioDuration(audioRef.current.duration);
+    }
+  };
+
+  const handleEnded = () => {
+    setVoiceSettings((prev) => ({ ...prev, isPlaying: false }));
+    setAudioCurrentTime(0);
+  };
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      if (voiceSettings.isPlaying && currentVoice?.audioUrl) {
+        audio.play().catch((e) => {
+          console.error("Play error:", e);
+          setVoiceSettings((prev) => ({ ...prev, isPlaying: false }));
+        });
+      } else {
+        audio.pause();
+      }
+    }
+  }, [voiceSettings.isPlaying, currentVoice]);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = voiceSettings.volume / 100;
+    }
+  }, [voiceSettings.volume]);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = voiceSettings.speed;
+    }
+  }, [voiceSettings.speed]);
+
+  const togglePlay = () => {
+    if (!currentVoice) {
+      toast.info("Vui lòng mua hoặc chọn giọng đọc trước.");
+      return;
+    }
+    setVoiceSettings((prev) => ({ ...prev, isPlaying: !prev.isPlaying }));
+  };
+
+  const skipTime = (seconds: number) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime += seconds;
+    }
+  };
+
+  const handleSeek = (value: number[]) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = value[0];
+      setAudioCurrentTime(value[0]);
+    }
+  };
+
+  const onVoiceSelect = (voiceId: string) => {
+    const selectedVoice = voices.find((v) => v.voiceId === voiceId);
+    if (!selectedVoice) return;
+
+    if (selectedVoice.owned) {
+      // ✅ Đã sở hữu -> Chọn và PHÁT LUÔN
+      setCurrentVoice(selectedVoice);
+      setVoiceSettings((prev) => ({ ...prev, isPlaying: true }));
+    } else {
+      // ❌ Chưa sở hữu -> Mở Dialog xác nhận mua
+      setVoiceToBuy(selectedVoice);
+    }
+  };
+
+  const confirmBuyVoice = async () => {
+    if (!voiceToBuy) return;
+
+    setIsBuying(true);
+    try {
+      await chapterPurchaseApi.buyVoice(chapterId, [voiceToBuy.voiceId]);
+
+      toast.success(`Đã mua giọng ${voiceToBuy.voiceName}`, {
+        description: `Đã trừ ${voiceToBuy.priceDias} Dias trong ví.`,
+      });
+
+      await refreshAndPlay(voiceToBuy.voiceId);
+    } catch (error: any) {
+      const errorCode = error.response?.data?.error?.code;
+      const errorMessage = error.response?.data?.error?.message;
+
+      // 🔥 XỬ LÝ CÁC LOẠI LỖI
+      switch (true) {
+        case error.response?.status === 409:
+          toast.success("Bạn đã sở hữu giọng đọc này!", {
+            description: "Đang cập nhật lại trạng thái...",
+            icon: <Check className="w-4 h-4 text-green-500" />,
+          });
+          await refreshAndPlay(voiceToBuy.voiceId);
+          break;
+
+        case error.response?.status === 400 &&
+          errorCode === "InsufficientBalance":
+          toast.error("Số dư không đủ", {
+            description: `Bạn cần thêm ${voiceToBuy.priceDias} Dias để mua giọng đọc này.`,
+            action: {
+              label: "Nạp Dias",
+              onClick: () => setShowTopUpModal(true),
+            },
+          });
+          break;
+
+        case error.response?.status === 400:
+          toast.error("Giao dịch thất bại", {
+            description: errorMessage || "Yêu cầu không hợp lệ.",
+          });
+          break;
+
+        default:
+          const msg =
+            errorMessage ||
+            error.response?.data?.message ||
+            "Không thể mua giọng đọc này.";
+          toast.error("Giao dịch thất bại", { description: msg });
+      }
+    } finally {
+      setIsBuying(false);
+      setVoiceToBuy(null);
+    }
+  };
+
+  const refreshAndPlay = async (targetVoiceId: string) => {
+    try {
+      const data = await chapterCatalogApi.getChapterVoices(chapterId);
+      setVoices(data);
+      const newOwned = data.find((v) => v.voiceId === targetVoiceId);
+      if (newOwned && newOwned.owned) {
+        setCurrentVoice(newOwned);
+        setVoiceSettings((prev) => ({ ...prev, isPlaying: true }));
+      }
+    } catch (e) {
+      console.error("Reload error", e);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    if (!seconds || isNaN(seconds)) return "00:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  };
+
+  const sortedChapters = [...chapters].sort(
+    (a, b) => a.chapterNo - b.chapterNo
+  );
+
+  const themeClasses = {
+    bg: isTransparent
+      ? "bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-white/20"
+      : isDarkTheme
+      ? "bg-[#0f172a] border-b border-slate-800"
+      : "bg-white border-b border-gray-200 shadow-sm",
+    text: isDarkTheme ? "text-slate-100" : "text-slate-800",
+    textMuted: isDarkTheme ? "text-slate-400" : "text-slate-500",
+    hover: isDarkTheme ? "hover:bg-slate-800" : "hover:bg-slate-100",
+  };
 
   return (
-    <div
-      className="sticky top-0 z-50 transition-all duration-300"
-      style={{
-        backgroundColor: colors.bg,
-        backdropFilter: "blur(20px)",
-        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
-        borderBottom: `1px solid ${colors.border}`,
-      }}
-    >
-      <div className="max-w-7xl mx-auto px-4 py-3">
-        <div className="flex items-center justify-between gap-6">
-          {/* Left: Back + Chapter Info */}
-          <div className="flex items-center gap-3 flex-5 min-w-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onBack}
-              className="h-9 w-9 rounded-lg transition-colors shrink-0"
-              style={{
-                color: colors.text,
-                backgroundColor: "transparent",
-              }}
+    <>
+      <div
+        className={cn(
+          "fixed top-0 left-0 right-0 z-50 h-16 flex items-center px-4 transition-all duration-300 gap-4",
+          themeClasses.bg
+        )}
+      >
+        {currentVoice?.audioUrl && (
+          <audio
+            ref={audioRef}
+            src={getFullAudioUrl(currentVoice.audioUrl)}
+            preload="auto"
+            onTimeUpdate={handleTimeUpdate}
+            onLoadedMetadata={handleLoadedMetadata}
+            onEnded={handleEnded}
+            onError={(e) => console.error("Audio Load Error:", e)}
+          />
+        )}
+
+        <div className="flex items-center gap-2 w-1/4 min-w-[200px] shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onBack}
+            className={cn(
+              "h-10 w-10 shrink-0 rounded-full",
+              themeClasses.hover,
+              themeClasses.text
+            )}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+
+          <div className="flex flex-col min-w-0 overflow-hidden">
+            <span
+              className={cn(
+                "text-[10px] font-bold uppercase tracking-wider",
+                themeClasses.textMuted
+              )}
             >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+              Chương {chapterNo}
+            </span>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="hidden md:flex items-center gap-2 min-w-0 h-9 px-3 rounded-lg hover:scale-[1.02] transition-all"
-                  style={{
-                    color: colors.text,
-                    backgroundColor: `${colors.hover}80`,
-                  }}
-                >
-                  <BookOpen
-                    className="h-4 w-4 shrink-0"
-                    style={{ color: colors.accent, opacity: 0.6 }}
-                  />
-                  <div className="min-w-0 flex items-baseline gap-2">
-                    <span
-                      className="text-xs font-medium truncate"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      Chương {chapterNo}
-                    </span>
-                    <span
-                      className="text-xs truncate"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      •
-                    </span>
-                    <span
-                      className="text-sm font-medium truncate max-w-[200px]"
-                      style={{ color: colors.text }}
-                    >
-                      {chapterTitle}
-                    </span>
-                  </div>
-                  <ChevronDown
-                    className="h-3 w-3 flex-shrink-0"
-                    style={{ color: colors.textSecondary }}
-                  />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                className="w-[400px]"
-                style={{
-                  backgroundColor: colors.bg,
-                  borderColor: colors.border,
-                }}
-              >
-                <div
-                  className="px-3 py-2 border-b"
-                  style={{ borderColor: colors.border }}
-                >
-                  <p
-                    className="text-sm font-semibold"
-                    style={{ color: colors.text }}
-                  >
-                    Danh sách chương
-                  </p>
-                  <p
-                    className="text-xs"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {chapters.length} chương
-                  </p>
-                </div>
-                <ScrollArea className="h-[400px]">
-                  {chapters.map((chapter) => (
-                    <DropdownMenuItem
-                      key={chapter.chapterId}
-                      className="px-3 py-2.5 cursor-pointer transition-colors"
-                      style={{
-                        backgroundColor:
-                          chapter.chapterId === chapterId
-                            ? `${colors.accent}15`
-                            : "transparent",
-                      }}
-                      onClick={() => {
-                        if (onChapterChange && !chapter.isLocked) {
-                          onChapterChange(chapter.chapterId);
-                        }
-                      }}
-                      disabled={chapter.isLocked}
-                    >
-                      <div className="flex items-center justify-between w-full gap-3">
-                        <div className="flex items-baseline gap-2 min-w-0 flex-1">
-                          <span
-                            className="text-xs font-medium flex-shrink-0"
-                            style={{
-                              color:
-                                chapter.chapterId === chapterId
-                                  ? colors.accent
-                                  : colors.textSecondary,
-                            }}
-                          >
-                            {chapter.chapterNo}
-                          </span>
-                          <span
-                            className="text-sm truncate"
-                            style={{
-                              color: chapter.isLocked
-                                ? colors.textSecondary
-                                : colors.text,
-                              opacity: chapter.isLocked ? 0.5 : 1,
-                            }}
-                          >
-                            {chapter.title}
-                          </span>
-                        </div>
-                        {chapter.isLocked && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 flex-shrink-0">
-                            Khóa
-                          </span>
-                        )}
-                        {chapter.chapterId === chapterId && (
-                          <span
-                            className="text-[10px] px-2 py-0.5 rounded-full flex-shrink-0"
-                            style={{
-                              backgroundColor: `${colors.accent}20`,
-                              color: colors.accent,
-                            }}
-                          >
-                            Đang đọc
-                          </span>
-                        )}
-                      </div>
-                    </DropdownMenuItem>
-                  ))}
-                </ScrollArea>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {/* Center: Voice Controls - Redesigned Layout */}
-          <div className="flex items-center gap-4 flex-1 justify-center">
-            {/* Skip Buttons - Moved to left of Play/Pause */}
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => skipTime(-10)}
-                className="h-8 px-3 rounded-md text-sm font-medium transition-all hover:scale-105"
-                style={{
-                  color: colors.text,
-                  backgroundColor: `${colors.hover}60`,
-                }}
-              >
-                -10s
-              </Button>
-
-              {/* Play/Pause - Central */}
-              <Button
-                size="icon"
-                className="h-10 w-10 rounded-full shadow-md transition-all hover:scale-105 mx-2"
-                style={{
-                  backgroundColor: colors.accent,
-                  color: isDarkTheme ? "#003454" : "#ffffff",
-                }}
-                onClick={togglePlay}
-              >
-                {settings.isPlaying ? (
-                  <Pause className="h-4 w-4" fill="currentColor" />
-                ) : (
-                  <Play className="h-4 w-4 ml-0.5" fill="currentColor" />
-                )}
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => skipTime(10)}
-                className="h-8 px-3 rounded-md text-sm font-medium transition-all hover:scale-105"
-                style={{
-                  color: colors.text,
-                  backgroundColor: `${colors.hover}60`,
-                }}
-              >
-                +10s
-              </Button>
-            </div>
-
-            {/* Progress Bar - Improved spacing */}
-            <div className="hidden lg:flex items-center gap-3 w-[200px]">
-              <span
-                className="text-sm font-mono tabular-nums min-w-[45px]"
-                style={{ color: colors.textSecondary }}
-              >
-                {formatTime(settings.currentTime)}
-              </span>
-              <Slider
-                value={[settings.currentTime]}
-                max={settings.duration || 100}
-                step={1}
-                className="flex-1"
-                onValueChange={(value) =>
-                  setSettings((prev) => ({ ...prev, currentTime: value[0] }))
-                }
-              />
-              <span
-                className="text-sm font-mono tabular-nums min-w-[45px]"
-                style={{ color: colors.textSecondary }}
-              >
-                {formatTime(settings.duration)}
-              </span>
-            </div>
-
-            {/* Voice Settings - Improved spacing */}
-            <div className="hidden md:flex items-center gap-2">
-              <Select
-                value={settings.speed.toString()}
-                onValueChange={(value) =>
-                  setSettings((prev) => ({ ...prev, speed: parseFloat(value) }))
-                }
-              >
-                <SelectTrigger
-                  className="w-[70px] h-8 text-sm border rounded-lg"
-                  style={{
-                    borderColor: colors.border,
-                    color: colors.text,
-                  }}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {speedOptions.map((speed) => (
-                    <SelectItem key={speed} value={speed.toString()}>
-                      {speed}x
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Fixed width for voice selector */}
-              <Select
-                value={settings.voice}
-                onValueChange={(value) =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    voice: value as VoiceSettings["voice"],
-                  }))
-                }
-              >
-                <SelectTrigger
-                  className="w-[130px] h-8 text-sm border rounded-lg"
-                  style={{
-                    borderColor: colors.border,
-                    color: colors.text,
-                  }}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(voiceNames).map(([key, name]) => (
-                    <SelectItem key={key} value={key}>
-                      {name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Volume - Moved to center section */}
-            <Popover open={showVolume} onOpenChange={setShowVolume}>
+            <Popover open={openChapterList} onOpenChange={setOpenChapterList}>
               <PopoverTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-lg transition-all hover:scale-105"
-                  style={{ color: colors.text }}
+                  role="combobox"
+                  className={cn(
+                    "p-0 h-auto font-bold text-sm md:text-base justify-start hover:bg-transparent w-full truncate",
+                    themeClasses.text
+                  )}
                 >
-                  <Volume2 className="h-4 w-4" />
+                  <span className="truncate">{chapterTitle}</span>
+                  <ChevronDown className="ml-1 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent
-                side="bottom"
-                className="w-[200px] p-4"
-                style={{
-                  backgroundColor: colors.bg,
-                  borderColor: colors.border,
-                }}
+                className="w-[360px] sm:w-[400px] p-0"
+                align="start"
               >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span
-                      className="text-sm font-medium"
-                      style={{ color: colors.text }}
-                    >
-                      Âm lượng
-                    </span>
-                    <span
-                      className="text-sm font-mono"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {settings.volume}%
-                    </span>
-                  </div>
-                  <Slider
-                    value={[settings.volume]}
-                    max={100}
-                    step={1}
-                    onValueChange={(value) =>
-                      setSettings((prev) => ({ ...prev, volume: value[0] }))
-                    }
-                  />
+                <div className="p-3 border-b bg-muted/20">
+                  <h4 className="font-semibold text-sm">Danh sách chương</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Chọn chương để đọc
+                  </p>
                 </div>
-              </PopoverContent>
-            </Popover>
-          </div>
 
-          {/* Right: Audio + Highlights + Settings */}
-          <div className="flex items-center gap-2 flex-1 justify-end">
-            {/* Audio Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-lg transition-all hover:scale-105"
-                  style={{ color: colors.text }}
-                >
-                  <Headphones className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-[320px]"
-                style={{
-                  backgroundColor: colors.bg,
-                  borderColor: colors.border,
-                }}
-              >
-                <div
-                  className="px-3 py-2 border-b"
-                  style={{ borderColor: colors.border }}
-                >
-                  <p
-                    className="text-sm font-semibold"
-                    style={{ color: colors.text }}
-                  >
-                    Danh sách bài hát
-                  </p>
-                  <p
-                    className="text-xs"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {audioSources.length} bài
-                  </p>
-                </div>
-                <ScrollArea className="h-[300px]">
-                  {audioSources.map((src) => {
-                    const active = src.id === selectedAudio;
+                <ScrollArea className="h-[300px] overflow-y-auto">
+                  {sortedChapters.map((ch) => {
+                    const isReading = ch.chapterId === chapterId;
+                    const isLocked = ch.isLocked;
+                    const showOwnedBadge = ch.isOwned === true;
+                    // 🔥 FIX LOGIC: Đã mua = Không bị khóa VÀ accessType là 'dias'
+                    const isPurchased = !isLocked && ch.accessType === "dias";
+                    const isOwnedState = ch.isOwned === true || isPurchased;
+                    const isFree = ch.accessType === "free";
+
                     return (
-                      <DropdownMenuItem
-                        key={src.id}
-                        className="px-3 py-2.5 cursor-pointer transition-colors"
-                        style={{
-                          backgroundColor: active
-                            ? `${colors.accent}15`
-                            : "transparent",
-                          opacity: src.locked ? 0.6 : 1,
+                      <div
+                        key={ch.chapterId}
+                        onClick={() => {
+                          onChapterChange(ch.chapterId);
+                          setOpenChapterList(false);
                         }}
-                        disabled={src.locked}
-                        // Prevent dropdown from closing on select
-                        onSelect={(e) => {
-                          e.preventDefault();
-                          if (!src.locked) setSelectedAudio(src.id);
-                        }}
+                        className={cn(
+                          "relative flex cursor-pointer select-none items-center px-4 py-3 text-sm transition-colors hover:bg-accent hover:text-accent-foreground border-b border-border/40 last:border-0",
+                          isReading && "bg-blue-50 dark:bg-blue-900/20"
+                        )}
                       >
                         <div className="flex items-center justify-between w-full gap-3">
-                          <div className="flex items-baseline gap-2 min-w-0 flex-1">
+                          <div className="flex flex-col overflow-hidden flex-1">
                             <span
-                              className="text-xs font-medium shrink-0"
-                              style={{
-                                color: active
-                                  ? colors.accent
-                                  : colors.textSecondary,
-                              }}
+                              className={cn(
+                                "truncate font-medium flex items-center gap-2",
+                                isReading
+                                  ? "text-blue-600"
+                                  : isLocked
+                                  ? "text-gray-900 font-bold"
+                                  : ""
+                              )}
                             >
-                              {src.number}
+                              {isLocked && (
+                                <Lock className="w-3 h-3 text-orange-500" />
+                              )}
+                              {isOwnedState && (
+                                <Check className="w-3 h-3 text-green-500" />
+                              )}
+                              Chương {ch.chapterNo}
                             </span>
-                            <div className="min-w-0 flex-1">
-                              <div
-                                className="text-sm font-medium truncate"
-                                style={{ color: colors.text }}
-                              >
-                                {src.title}
-                              </div>
-                              <div
-                                className="text-xs truncate"
-                                style={{ color: colors.textSecondary }}
-                              >
-                                {src.artist}
-                              </div>
-                            </div>
+                            <span className="text-xs text-muted-foreground truncate">
+                              {ch.title}
+                            </span>
                           </div>
-                          {active && (
-                            <Play
-                              className="h-3 w-3 flex-shrink-0"
-                              style={{ color: colors.accent }}
-                            />
-                          )}
+
+                          <div className="shrink-0">
+                            {isReading ? (
+                              <Badge
+                                variant="secondary"
+                                className="bg-blue-100 text-blue-700 hover:bg-blue-100"
+                              >
+                                Đang đọc
+                              </Badge>
+                            ) : isLocked ? (
+                              <Badge
+                                variant="outline"
+                                className="border-orange-500 text-orange-600 bg-orange-50 font-bold"
+                              >
+                                {ch.priceDias} Dias
+                              </Badge>
+                            ) : isOwnedState ? (
+                              <div className="flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full border border-green-100">
+                                <Check className="w-3 h-3" />{" "}
+                                <span>Sở hữu</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/70">
+                                Free
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </DropdownMenuItem>
+                      </div>
                     );
                   })}
                 </ScrollArea>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-lg relative transition-all hover:scale-105"
-              style={{ color: colors.text }}
-            >
-              <Highlighter className="h-4 w-4" />
-              {highlightCount > 0 && (
-                <span
-                  className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center"
-                  style={{
-                    backgroundColor: colors.accent,
-                    color: isDarkTheme ? "#003454" : "#ffffff",
-                  }}
-                >
-                  {highlightCount}
-                </span>
-              )}
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onSettings}
-              className="h-8 w-8 rounded-lg transition-all hover:scale-105"
-              style={{ color: colors.text }}
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
-        {/* Mobile Progress Bar - Show on smaller screens */}
-        <div className="lg:hidden flex items-center gap-3 mt-3">
-          <span
-            className="text-xs font-mono tabular-nums min-w-[40px]"
-            style={{ color: colors.textSecondary }}
+        <div className="flex-1 flex items-center justify-center gap-2 md:gap-6 px-2 w-full max-w-5xl">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => skipTime(-10)}
+            className={cn(
+              "hidden sm:flex h-8 w-8 text-xs shrink-0",
+              themeClasses.textMuted,
+              themeClasses.hover
+            )}
+            title="Lùi 10s"
           >
-            {formatTime(settings.currentTime)}
-          </span>
-          <Slider
-            value={[settings.currentTime]}
-            max={settings.duration || 100}
-            step={1}
-            className="flex-1"
-            onValueChange={(value) =>
-              setSettings((prev) => ({ ...prev, currentTime: value[0] }))
-            }
-          />
-          <span
-            className="text-xs font-mono tabular-nums min-w-[40px]"
-            style={{ color: colors.textSecondary }}
+            -10s
+          </Button>
+
+          <Button
+            size="icon"
+            className="h-10 w-10 md:h-12 md:w-12 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700 text-white shrink-0 transition-transform hover:scale-105"
+            onClick={togglePlay}
+            disabled={!currentVoice}
           >
-            {formatTime(settings.duration)}
-          </span>
+            {voiceSettings.isPlaying ? (
+              <Pause className="h-5 w-5 md:h-6 md:w-6 fill-current" />
+            ) : (
+              <Play className="h-5 w-5 md:h-6 md:w-6 fill-current ml-1" />
+            )}
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => skipTime(10)}
+            className={cn(
+              "hidden sm:flex h-8 w-8 text-xs shrink-0",
+              themeClasses.textMuted,
+              themeClasses.hover
+            )}
+            title="Tua 10s"
+          >
+            +10s
+          </Button>
+
+          <div className="flex flex-1 items-center gap-3 min-w-[100px]">
+            <span
+              className={cn(
+                "text-xs font-mono w-10 text-right hidden md:block",
+                themeClasses.textMuted
+              )}
+            >
+              {formatTime(audioCurrentTime)}
+            </span>
+            <Slider
+              value={[audioCurrentTime]}
+              max={audioDuration || 100}
+              step={1}
+              onValueChange={handleSeek}
+              className="flex-1 cursor-pointer py-2"
+            />
+            <span
+              className={cn(
+                "text-xs font-mono w-10 hidden md:block",
+                themeClasses.textMuted
+              )}
+            >
+              {formatTime(audioDuration)}
+            </span>
+          </div>
+
+          <div className="hidden xl:flex items-center gap-2 shrink-0">
+            <Select
+              value={voiceSettings.speed.toString()}
+              onValueChange={(val) =>
+                setVoiceSettings((p) => ({ ...p, speed: parseFloat(val) }))
+              }
+            >
+              <SelectTrigger className="h-8 w-[65px] text-xs bg-transparent border-0 hover:bg-black/5 focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {speedOptions.map((s) => (
+                  <SelectItem key={s} value={s.toString()}>
+                    {s}x
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={currentVoice?.voiceId || ""}
+              onValueChange={onVoiceSelect}
+            >
+              <SelectTrigger className="h-8 w-[140px] text-xs bg-black/5 dark:bg-white/10 border-0 rounded-full px-3 truncate">
+                <SelectValue
+                  placeholder={isLoadingVoice ? "Đang tải..." : "Chọn giọng"}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {isLoadingVoice ? (
+                  <div className="p-2 text-xs text-center">
+                    <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                  </div>
+                ) : (
+                  voices.map((v) => (
+                    <SelectItem key={v.voiceId} value={v.voiceId}>
+                      <div className="flex items-center justify-between w-full min-w-[140px] gap-2">
+                        <span>{v.voiceName}</span>
+                        {v.owned ? (
+                          <div className="flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">
+                            <Check className="w-3 h-3" /> <span>Sở hữu</span>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full">
+                            {v.priceDias} Dias
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-1 w-fit shrink-0">
+          <Popover open={showVolume} onOpenChange={setShowVolume}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "hidden lg:flex h-9 w-9",
+                  themeClasses.textMuted,
+                  themeClasses.hover
+                )}
+              >
+                {voiceSettings.volume === 0 ? (
+                  <VolumeX className="h-5 w-5" />
+                ) : (
+                  <Volume2 className="h-5 w-5" />
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent side="bottom" align="end" className="w-32 p-3">
+              <Slider
+                value={[voiceSettings.volume]}
+                max={100}
+                step={1}
+                onValueChange={(val) =>
+                  setVoiceSettings((p) => ({ ...p, volume: val[0] }))
+                }
+              />
+            </PopoverContent>
+          </Popover>
+
+          {children}
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onSettings}
+            className={cn(
+              "h-9 w-9",
+              themeClasses.textMuted,
+              themeClasses.hover
+            )}
+          >
+            <Settings className="h-5 w-5" />
+          </Button>
         </div>
       </div>
-    </div>
+
+      <Dialog
+        open={!!voiceToBuy}
+        onOpenChange={(open) => !open && setVoiceToBuy(null)}
+      >
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingCart className="w-5 h-5 text-blue-600" />
+              Xác nhận mua giọng đọc
+            </DialogTitle>
+            <DialogDescription>
+              Bạn có muốn sử dụng <strong>{voiceToBuy?.priceDias} Dias</strong>{" "}
+              để mở khóa vĩnh viễn giọng đọc:
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg flex items-center gap-4 my-2 border border-slate-100 dark:border-slate-800">
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+              <Volume2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-sm">{voiceToBuy?.voiceName}</h4>
+              <p className="text-xs text-muted-foreground">
+                {voiceToBuy?.voiceCode}
+              </p>
+            </div>
+            <div className="ml-auto">
+              <Badge
+                variant="outline"
+                className="border-orange-200 text-orange-600 bg-orange-50"
+              >
+                {voiceToBuy?.priceDias} Dias
+              </Badge>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setVoiceToBuy(null)}>
+              Hủy bỏ
+            </Button>
+            <Button
+              onClick={confirmBuyVoice}
+              disabled={isBuying}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {isBuying ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xử
+                  lý...
+                </>
+              ) : (
+                "Xác nhận mua"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
-}
+};

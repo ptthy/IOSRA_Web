@@ -2,7 +2,13 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, FileText, Sparkles } from "lucide-react";
+import {
+  LayoutDashboard,
+  FileText,
+  Sparkles,
+  Trophy,
+  CircleDollarSign,
+} from "lucide-react";
 import React, { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { VoiceTopupModal } from "@/components/payment/VoiceTopupModal";
@@ -23,6 +29,8 @@ export default function AuthorLayout({ children }: AuthorLayoutProps) {
       home: "/",
       "author-dashboard": "/author/overview",
       "author-stories": "/author/story",
+      "author-rank": "/author/author-upgrade-rank",
+      "author-revenue": "/author/revenue",
     };
     router.push(routes[page] || "/");
   };
@@ -31,7 +39,8 @@ export default function AuthorLayout({ children }: AuthorLayoutProps) {
   const isStoriesActive =
     pathname.startsWith("/author/story") ||
     pathname.startsWith("/author/create-story");
-
+  const isRankActive = pathname === "/author/author-upgrade-rank";
+  const isRevenueActive = pathname === "/author/revenue";
   return (
     <div className="min-h-screen bg-background relative">
       {/* --- SIDEBAR --- */}
@@ -44,7 +53,6 @@ export default function AuthorLayout({ children }: AuthorLayoutProps) {
         `}
       >
         <div className="flex flex-col h-full">
-          {/* Sửa đoạn nav này: Đưa nút Mua Ký tự vào chung luồng, bỏ div ngăn cách */}
           <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
             <Button
               variant={isDashboardActive ? "secondary" : "ghost"}
@@ -65,6 +73,29 @@ export default function AuthorLayout({ children }: AuthorLayoutProps) {
               <FileText className="h-5 w-5 shrink-0" />
               {!isCollapsed && (
                 <span className="ml-2 truncate">Quản lý Truyện</span>
+              )}
+            </Button>
+            <Button
+              variant={isRankActive ? "secondary" : "ghost"}
+              className="w-full justify-start"
+              onClick={() => handleNavigate("author-rank")}
+              title="Nâng cấp Rank"
+            >
+              <Trophy className="h-5 w-5 shrink-0 text-amber-500" />
+              {!isCollapsed && (
+                <span className="ml-2 truncate">Nâng cấp Rank</span>
+              )}
+            </Button>
+            <Button
+              variant={isRevenueActive ? "secondary" : "ghost"}
+              className="w-full justify-start"
+              onClick={() => handleNavigate("author-revenue")}
+              title="Quản lý dòng tiền"
+            >
+              {/* Icon tiền tệ màu xanh lá */}
+              <CircleDollarSign className="h-5 w-5 shrink-0 text-green-600" />
+              {!isCollapsed && (
+                <span className="ml-2 truncate">Quản lý dòng tiền</span>
               )}
             </Button>
 

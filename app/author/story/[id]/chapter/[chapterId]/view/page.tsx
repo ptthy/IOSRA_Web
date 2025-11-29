@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Loader2,
   ArrowLeft,
@@ -24,10 +24,16 @@ import {
   MessageSquare,
   Download,
   Eye,
+  XCircle,
+  Globe,
+  AlertCircle,
+  Sparkles,
 } from "lucide-react";
 import { chapterService } from "@/services/chapterService";
 import type { ChapterDetails } from "@/services/apiTypes";
 import { toast } from "sonner";
+import VoiceChapterPlayer from "@/components/author/VoiceChapterPlayer";
+import { profileService } from "@/services/profileService";
 
 // Base URL cho R2 bucket
 const R2_BASE_URL = "https://pub-15618311c0ec468282718f80c66bcc13.r2.dev";
@@ -213,12 +219,18 @@ export default function AuthorChapterViewPage() {
   const router = useRouter();
   const storyId = params.id as string;
   const chapterId = params.chapterId as string;
-
+  const [authorRank, setAuthorRank] = useState<string>("Casual");
+  const [rankLoading, setRankLoading] = useState(true);
   const [chapter, setChapter] = useState<ChapterDetails | null>(null);
   const [chapterContent, setChapterContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingContent, setIsLoadingContent] = useState(false);
-
+  useEffect(() => {
+    profileService.getAuthorRank().then((rank) => {
+      setAuthorRank(rank);
+      setRankLoading(false);
+    });
+  }, []);
   useEffect(() => {
     loadChapter();
   }, [storyId, chapterId]);
@@ -368,70 +380,111 @@ export default function AuthorChapterViewPage() {
         <div>
           <h1 className="text-2xl font-bold">Xem Chương</h1>
           <p className="text-muted-foreground">
-            Chế độ xem - Không thể chỉnh sửa
+            Chế độ xem - Không thể chỉnh sửa nội dung nhưng có thể mua voice AI
+            cho chap
           </p>
         </div>
-        <Badge className="ml-auto bg-blue-500 hover:bg-blue-600 text-white border-none flex items-center gap-x-2 px-3 py-1.5 text-sm font-medium transition-all">
-          <Eye className="h-4 w-4" />
-          <span>Chỉ xem</span>
-        </Badge>
       </div>
-
       {/* Chapter Info */}
-      <Card>
-        <CardHeader>
+      <Card className="relative overflow-hidden">
+        <CardHeader className="pt-0 pb-2">
           <div className="flex items-start justify-between">
-            <div className="w-full">
-              <CardTitle className="text-xl">{chapter?.title}</CardTitle>
-              <CardDescription>Chương {chapter?.chapterNo}</CardDescription>
+            <div className="w-full pr-24">
+              <div className="space-y-1">
+                {/* Dòng Tên chương */}
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <span className="text-base font-normal text-slate-400">
+                    Tên chương:
+                  </span>
+                  <span>{chapter?.title}</span>
+                </CardTitle>
+                {/* Dòng Số chương */}
+                <CardDescription className="flex items-center gap-2 text-base">
+                  <span className="text-slate-400">Số chương:</span>
+                  <span className="text-l flex items-center gap-2">
+                    {chapter?.chapterNo}
+                  </span>
+                </CardDescription>
+              </div>
             </div>
-            <Badge
-              variant={
-                chapter.status === "published"
-                  ? "default"
-                  : chapter.status === "completed"
-                  ? "default"
-                  : chapter.status === "pending"
-                  ? "secondary"
-                  : "outline"
+
+            {/* === PHẦN RUY BĂNG (RIBBON) === */}
+            {(() => {
+              let statusConfig = {
+                label: "Bản nháp",
+                bgColor: "bg-slate-500",
+                shadowColor: "text-slate-700",
+                Icon: FileText,
+              };
+
+              if (chapter?.status === "published") {
+                statusConfig = {
+                  label: "Đã xuất bản",
+                  bgColor: "bg-green-600",
+                  shadowColor: "text-blue-800",
+                  Icon: Globe,
+                };
+              } else if (chapter?.status === "pending") {
+                statusConfig = {
+                  label: "Chờ duyệt",
+                  bgColor: "bg-yellow-500",
+                  shadowColor: "text-yellow-700",
+                  Icon: Clock,
+                };
+              } else if (chapter?.status === "rejected") {
+                statusConfig = {
+                  label: "Bị từ chối",
+                  bgColor: "bg-red-600",
+                  shadowColor: "text-red-800",
+                  Icon: XCircle,
+                };
               }
-            >
-              {chapter.status === "published"
-                ? "Đã xuất bản"
-                : chapter.status === "completed"
-                ? "Đã hoàn thành"
-                : chapter.status === "pending"
-                ? "Chờ duyệt"
-                : "Bản nháp"}
-            </Badge>
+
+              return (
+                <div className="absolute top-0 right-8 drop-shadow-md z-10">
+                  <div
+                    className={`
+                      relative px-3 pt-3 pb-5 flex flex-col items-center justify-center gap-1 
+                      text-white font-bold text-xs shadow-lg transition-all
+                      ${statusConfig.bgColor}
+                    `}
+                    style={{
+                      clipPath:
+                        "polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%)",
+                      minWidth: "70px",
+                    }}
+                  >
+                    <statusConfig.Icon className="h-5 w-5 mb-0.5" />
+                    <span className="text-center leading-tight uppercase tracking-wider text-[10px]">
+                      {statusConfig.label}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </CardHeader>
+
+        {/* Đường kẻ phân cách */}
+        <div className="w-full h-[1px] -mt-6 bg-[#00416a] dark:bg-[#f0ead6]" />
+
         <CardContent className="grid md:grid-cols-3 gap-x-4 gap-y-6">
-          {/* Cột 1 */}
+          {/* === CỘT 1 === */}
           <div className="space-y-6">
+            {/* Số từ */}
             <div>
               <p className="text-sm text-slate-400 mb-1">Số từ</p>
               <p className="font-medium">{chapter?.wordCount} từ</p>
             </div>
+            {/* Tạo lúc */}
             <div className="text-sm">
               <p className="text-slate-400 mb-1">Tạo lúc</p>
               <p>
                 {chapter && new Date(chapter.createdAt).toLocaleString("vi-VN")}
               </p>
             </div>
-          </div>
-
-          {/* Cột 2 */}
-          <div className="space-y-6">
-            <div>
-              <p className="text-sm text-slate-400 mb-1">Số kí tự</p>
-              <p className="font-medium">{chapter?.charCount} từ</p>
-            </div>
-            <div>
-              <p className="text-sm text-slate-400 mb-1">Ngôn ngữ</p>
-              <p className="font-medium">{chapter?.languageName}</p>
-            </div>
-            {chapter.publishedAt && (
+            {/* Xuất bản lúc */}
+            {chapter?.publishedAt && (
               <div className="text-sm">
                 <p className="text-slate-400 mb-1">Xuất bản lúc</p>
                 <p>{new Date(chapter.publishedAt).toLocaleString("vi-VN")}</p>
@@ -439,20 +492,122 @@ export default function AuthorChapterViewPage() {
             )}
           </div>
 
-          {/* Cột 3 */}
+          {/* === CỘT 2 === */}
           <div className="space-y-6">
+            {/* Số kí tự */}
             <div>
-              <p className="text-sm text-slate-400 mb-1">Giá</p>
+              <p className="text-sm text-slate-400 mb-1">Số kí tự</p>
+              <p className="font-medium">{chapter?.charCount} kí tự</p>
+            </div>
+            {/* Ngôn ngữ */}
+            <div>
+              <p className="text-sm text-slate-400 mb-1">Ngôn ngữ</p>
+              <p className="font-medium">{chapter?.languageName}</p>
+            </div>
+            {/* Loại truy cập (Thêm vào cho giống mẫu) */}
+            <div>
+              <p className="text-sm text-slate-400 mb-1">Loại truy cập</p>
               <p className="font-medium">
-                {chapter.accessType === "free"
+                {chapter?.accessType === "free"
                   ? "Miễn phí"
-                  : `${chapter.priceDias} Dias`}
+                  : "Trả phí (Kim cương)"}
               </p>
             </div>
           </div>
+
+          {/* === CỘT 3 === */}
+          <div className="space-y-6">
+            {/* Giá */}
+            <div>
+              <p className="text-sm text-slate-400 mb-1">Giá (Dias)</p>
+              <p className="font-medium">{chapter?.priceDias} Dias</p>
+            </div>
+
+            {/* Trạng thái AI (Thêm vào cho giống mẫu) */}
+            {chapter?.aiResult && (
+              <div>
+                <p className="text-sm text-slate-400 mb-1">Trạng thái AI</p>
+                {(() => {
+                  let statusConfig = {
+                    label: "Đang chờ",
+                    className: "bg-yellow-500 hover:bg-yellow-600 text-white",
+                    Icon: Clock,
+                  };
+
+                  if (chapter.aiResult === "approved") {
+                    statusConfig = {
+                      label: "Đã duyệt",
+                      className: "bg-green-500 hover:bg-green-600 text-white",
+                      Icon: CheckCircle,
+                    };
+                  } else if (chapter.aiResult === "rejected") {
+                    statusConfig = {
+                      label: "Từ chối",
+                      className: "bg-red-500 hover:bg-red-600 text-white",
+                      Icon: XCircle,
+                    };
+                  }
+
+                  return (
+                    <Badge
+                      className={`border-none px-3 py-1.5 text-sm font-medium flex items-center w-fit gap-x-2 transition-all ${statusConfig.className}`}
+                    >
+                      <statusConfig.Icon className="h-4 w-4" />
+                      <span>{statusConfig.label}</span>
+                    </Badge>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
+      {/* Chapter Voice - Tác giả chọn số lượng giọng */}
+      {/* CHỈ HIỆN KHI: Đã xuất bản VÀ Rank không phải là Casual */}
+      {chapter && chapter.status === "published" && (
+        <>
+          {rankLoading ? (
+            <div className="py-8 text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+            </div>
+          ) : authorRank !== "Casual" ? (
+            <VoiceChapterPlayer chapterId={chapterId} />
+          ) : (
+            <Card className="my-6 border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20">
+              <CardContent className="p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                {/* PHẦN TRÁI: Tiêu đề + Nội dung text */}
+                <div className="flex items-center gap-3 text-sm text-orange-900 dark:text-orange-100 w-full sm:w-auto">
+                  <div className="flex items-center gap-2 font-bold text-orange-700 whitespace-nowrap shrink-0">
+                    <Sparkles className="h-5 w-5" />
+                    Tính năng Audio AI
+                  </div>
 
+                  {/* Dấu gạch đứng ngăn cách (chỉ hiện trên desktop) */}
+                  <div className="hidden sm:block h-4 w-[1px] bg-orange-300 dark:bg-orange-700 mx-1" />
+
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <AlertCircle className="h-4 w-4 text-orange-600 shrink-0" />
+                    <span>
+                      Chưa đủ điều kiện. Chỉ tác giả từ{" "}
+                      <strong>rank Bronze</strong> trở lên.
+                    </span>
+                  </div>
+                </div>
+
+                {/* PHẦN PHẢI: Nút bấm */}
+                <Button
+                  size="sm"
+                  onClick={() => router.push("/author/author-upgrade-rank")}
+                  className="bg-orange-600 hover:bg-orange-700 shrink-0 w-full sm:w-auto"
+                >
+                  <Sparkles className="h-3 w-3 mr-2" />
+                  Nâng cấp ngay
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
       {/* AI Assessment */}
       {chapter && (chapter.aiScore !== undefined || vietnameseFeedback) && (
         <Card className="border-blue-200 dark:border-blue-800">
@@ -510,7 +665,6 @@ export default function AuthorChapterViewPage() {
           </CardContent>
         </Card>
       )}
-
       {/* Status Info */}
       <Card>
         {/* <CardHeader>
@@ -518,20 +672,11 @@ export default function AuthorChapterViewPage() {
         </CardHeader> */}
         <CardContent>
           <div className="flex gap-3 flex-wrap">
-            {chapter.status === "completed" && (
-              <Alert className="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
-                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                <AlertDescription>
-                  Chương đã hoàn thành và không thể chỉnh sửa
-                </AlertDescription>
-              </Alert>
-            )}
-
             {chapter.status === "pending" && (
               <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
                 <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                 <AlertDescription>
-                  Chương đang chờ được AI đánh giá và duyệt
+                  Chương đang chờ được Content mod đánh giá và duyệt
                 </AlertDescription>
               </Alert>
             )}
@@ -540,14 +685,13 @@ export default function AuthorChapterViewPage() {
               <Alert className="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
                 <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                 <AlertDescription>
-                  Chương đã được xuất bản thành công
+                  Trạng thái: Chương đã được xuất bản thành công
                 </AlertDescription>
               </Alert>
             )}
           </div>
         </CardContent>
       </Card>
-
       {/* Content View */}
       <Card>
         <CardHeader>
