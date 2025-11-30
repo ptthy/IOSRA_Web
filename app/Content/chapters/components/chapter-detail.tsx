@@ -1,4 +1,3 @@
-// File: app/Content/chapters/components/chapter-detail.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -16,14 +15,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { postChapterDecision, getChapterContent } from "@/services/moderationApi"; 
-import { ChapterFromAPI } from "./chapter-list"; 
-import { ApprovalModal } from "@/app/Content/moderation/components/approval-modal"; 
-import { RejectModal } from "@/app/Content/moderation/components/reject-modal"; 
-import apiClient from "@/services/apiClient";
-// URL gốc của Server chứa file (Dựa trên curl bạn cung cấp)
-// Nên đưa vào biến môi trường: process.env.NEXT_PUBLIC_API_URL
-const STORAGE_BASE_URL = "https://45-132-75-29.sslip.io";
+import { postChapterDecision } from "@/services/moderationApi";
+import { ChapterFromAPI } from "./chapter-list";
+import { ApprovalModal } from "@/app/Content/moderation/components/approval-modal";
+import { RejectModal } from "@/app/Content/moderation/components/reject-modal";
+
+// 1. Cấu hình URL Cloud Storage (R2)
+// File nằm ở đây chứ không phải trên API Server
+const R2_BASE_URL = "https://pub-15618311c0ec468282718f80c66bcc13.r2.dev";
 
 interface ChapterDetailProps {
   content: ChapterFromAPI;
@@ -39,76 +38,55 @@ export function ChapterDetail({ content, onBack }: ChapterDetailProps) {
   const [chapterText, setChapterText] = useState<string>("");
   const [isLoadingContent, setIsLoadingContent] = useState(true);
 
-  // ✅ ĐÃ SỬA: Logic xử lý dữ liệu trả về từ API
+  // --- 2. LOGIC TẢI NỘI DUNG ĐÃ SỬA ---
   useEffect(() => {
     async function fetchContent() {
-      if (!content.reviewId) return;
+      // Nếu dữ liệu API không có đường dẫn file
+      if (!content.contentPath) {
+        setChapterText("Lỗi: Dữ liệu chương thiếu đường dẫn nội dung (contentPath).");
+        setIsLoadingContent(false);
+        return;
+      }
 
       setIsLoadingContent(true);
       try {
-        // 1. Lấy metadata trước
-        const data = await getChapterContent(content.reviewId);
-        
-        let textToShow = "";
-
-        // Trường hợp A: API trả về text luôn (ít gặp)
-        if (typeof data === 'string') {
-          textToShow = data;
-        } 
-        // Trường hợp B: API trả về Object có contentPath
-        else if (data && typeof data === 'object') {
-          
-          if (data.contentPath) {
-             // 💡 SỬ DỤNG API CLIENT ĐỂ TẢI FILE .TXT
-             // Việc này giúp request có kèm Token và dùng đúng BaseURL của API
-             try {
-                const fileRes = await apiClient.get(data.contentPath, {
-                  responseType: 'text', // Quan trọng: báo axios trả về text thay vì json
-                  baseURL: undefined // Thử dùng relative path so với domain gốc nếu path không bắt đầu bằng /api
-                });
-                textToShow = fileRes.data;
-             } catch (err1) {
-                // Nếu gọi theo domain gốc lỗi, thử gọi qua API Base URL mặc định
-                try {
-                  console.log("Thử tải file qua API Base URL...");
-                  const fileRes2 = await apiClient.get(data.contentPath, {
-                    responseType: 'text'
-                  });
-                  textToShow = fileRes2.data;
-                } catch (err2: any) {
-                   console.error("Lỗi tải file:", err2);
-                   // Fallback cuối cùng: Thử fetch thủ công với đường dẫn tĩnh
-                   textToShow = `Không thể tải nội dung từ: ${data.contentPath}. \n(Lỗi: ${err2.response?.status || 404} - Vui lòng kiểm tra lại xem Backend đã public thư mục 'stories' chưa)`;
-                }
-             }
-          }
-          // Ưu tiên: Nếu Backend trả trực tiếp field content hoặc text trong JSON
-          else if (data.content) {
-             textToShow = data.content;
-          } else if (data.text) {
-             textToShow = data.text;
-          } else {
-             textToShow = "API trả về metadata nhưng không có đường dẫn file (contentPath) hoặc nội dung.";
-          }
-        } else {
-            textToShow = "Dữ liệu không hợp lệ.";
+        // A. Xử lý URL: Ghép R2 Base URL nếu contentPath là đường dẫn tương đối
+        let fileUrl = content.contentPath;
+        if (!fileUrl.startsWith("http")) {
+            // Xóa dấu / ở đầu nếu có
+            const cleanPath = fileUrl.startsWith("/") ? fileUrl.slice(1) : fileUrl;
+            fileUrl = `${R2_BASE_URL}/${cleanPath}`;
         }
 
-        setChapterText(textToShow);
+        // B. Thêm timestamp để tránh cache (giúp test dễ hơn)
+        fileUrl += `?t=${new Date().getTime()}`;
 
-      } catch (error) {
+        console.log("📥 Đang tải nội dung từ:", fileUrl);
+
+        // C. Dùng fetch thường (KHÔNG dùng apiClient để tránh lỗi 404 từ API Server)
+        const response = await fetch(fileUrl);
+
+        if (!response.ok) {
+            throw new Error(`Không thể tải file (HTTP ${response.status})`);
+        }
+
+        // D. Lấy text
+        const text = await response.text();
+        setChapterText(text);
+
+      } catch (error: any) {
         console.error("Failed to load chapter content:", error);
-        toast.error("Không thể tải nội dung chương.");
-        setChapterText("Lỗi kết nối khi lấy thông tin chương.");
+        setChapterText(`Không thể tải nội dung chương.\nChi tiết lỗi: ${error.message}`);
+        toast.error("Lỗi tải nội dung chương");
       } finally {
         setIsLoadingContent(false);
       }
     }
 
     fetchContent();
-  }, [content.reviewId]);
+  }, [content.contentPath]); 
 
-  // Hàm gọi API Duyệt
+  // --- HÀM XỬ LÝ DUYỆT ---
   const handleApprove = async (reason: string) => {
     if (!reason) {
       toast.error("Vui lòng cung cấp lý do phê duyệt.");
@@ -128,7 +106,7 @@ export function ChapterDetail({ content, onBack }: ChapterDetailProps) {
     }
   };
 
-  // Hàm gọi API Từ chối
+  // --- HÀM XỬ LÝ TỪ CHỐI ---
   const handleReject = async (reason: string) => {
     if (!reason) {
       toast.error("Vui lòng cung cấp lý do từ chối.");
@@ -176,7 +154,7 @@ export function ChapterDetail({ content, onBack }: ChapterDetailProps) {
         </p>
       </motion.div>
 
-      {/* Alert */}
+      {/* Alert Info */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -235,7 +213,7 @@ export function ChapterDetail({ content, onBack }: ChapterDetailProps) {
             </Card>
           
             {/* Card nội dung chương */}
-            {/* <Card className="p-6">
+              <Card className="p-6"> 
               <CardHeader className="px-0 pt-0 border-b border-[var(--border)] pb-4 mb-4">
                 <h3 className="text-lg font-semibold">Nội dung chương</h3>
               </CardHeader>
@@ -247,11 +225,12 @@ export function ChapterDetail({ content, onBack }: ChapterDetailProps) {
                       <p>Đang tải nội dung chương...</p>
                     </div>
                   ) : chapterText ? (
-                    <article className="prose dark:prose-invert max-w-none">
-                      <p className="whitespace-pre-wrap leading-relaxed text-[var(--foreground)] text-justify">
-                        {chapterText}
-                      </p>
-                    </article>
+                  <article className="prose dark:prose-invert max-w-none">
+  <div 
+    className="leading-relaxed text-[var(--foreground)] text-justify content-html"
+    dangerouslySetInnerHTML={{ __html: chapterText }}
+  />
+</article>
                   ) : (
                     <div className="flex flex-col items-center justify-center h-40 text-[var(--muted-foreground)] italic">
                       <BookOpen className="w-8 h-8 mb-2 opacity-20" />
@@ -260,7 +239,7 @@ export function ChapterDetail({ content, onBack }: ChapterDetailProps) {
                   )}
                 </div>
               </CardContent>
-            </Card> */}
+            </Card> 
 
             {/* Card quyết định */}
             <Card className="p-6">
@@ -328,13 +307,14 @@ export function ChapterDetail({ content, onBack }: ChapterDetailProps) {
       {/* Modals */}
       <ApprovalModal 
         isOpen={showApprovalModal} 
-        onClose={() => setShowApprovalModal(false)} 
+        onClose={() => setShowApprovalModal(false)}
         onConfirm={handleApprove}
         isSubmitting={isSubmitting}
       />
+
       <RejectModal 
         isOpen={showRejectModal} 
-        onClose={() => setShowRejectModal(false)} 
+        onClose={() => setShowRejectModal(false)}
         onConfirm={handleReject}
         isSubmitting={isSubmitting}
       />

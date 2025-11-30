@@ -1,5 +1,3 @@
-"use client";
-
 import apiClient from "@/services/apiClient";
 
 export interface TagPagedItem {
@@ -18,7 +16,6 @@ export interface TagApiResponse {
 /**
  * Lấy danh sách Tag (có phân trang và thống kê usage)
  */
-
 export async function getPagedTags(
   page: number,
   pageSize: number
@@ -75,3 +72,24 @@ export const tagService = {
     }
   },
 };
+
+export async function updateTag(tagId: string, name: string): Promise<void> {
+  try {
+    // Giả sử API yêu cầu body JSON là { "name": "Tên mới" }
+    await apiClient.put(`/api/Tag/${tagId}`, { name });
+  } catch (error: any) {
+    throw new Error(
+      error.response?.data?.message || "Lỗi khi cập nhật Tag"
+    );
+  }
+}
+export async function createTag(name: string): Promise<void> {
+  try {
+    // Gọi API POST /api/Tag với body là { name: "..." }
+    await apiClient.post("/api/Tag", { name });
+  } catch (error: any) {
+    throw new Error(
+      error.response?.data?.message || "Lỗi khi tạo mới Tag"
+    );
+  }
+}
