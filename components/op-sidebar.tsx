@@ -36,8 +36,8 @@ const data = {
     { title: "Dashboard", url: "/Op/dashboard", icon: LayoutDashboard },
     { title: "Quản lý Author", url: "/Op/manage-author", icon: User },
     { title: "Rút tiền", url: "/Op/manage-withdraw", icon: DollarSign },
-    { title: "Sự kiện", url: "/Op/manage-event", icon: Calendar },
-    { title: "Hỗ trợ", url: "/Op/manage-support", icon: HelpCircle },
+    // { title: "Sự kiện", url: "/Op/manage-event", icon: Calendar },
+    // { title: "Hỗ trợ", url: "/Op/manage-support", icon: HelpCircle },
     { title: "Doanh thu", url: "/Op/manage-revenue", icon: CircleDollarSign },
   ],
 };

@@ -1,13 +1,8 @@
-// File: services/moderationApi.ts
-"use client";
+// File: src/services/moderationApi.ts
 
 import apiClient from "@/services/apiClient"; 
-
-// Tắt Mock Data để dùng API thật
-const USE_MOCK_DATA = false; 
-
-// --- KHAI BÁO INTERFACE (Để sử dụng trong ModerationList) ---
-// Định nghĩa kiểu dữ liệu cơ bản của một Report
+import { AxiosResponse } from 'axios';
+// Giao diện chung cho các API liên quan đến Report
 interface ReportItem {
     id: string; 
     targetType: "story" | "chapter" | "comment" | string; 
@@ -21,316 +16,310 @@ interface ReportItem {
     resolvedAt?: string;
 }
 
-// Định nghĩa kiểu dữ liệu trả về từ API Reports có phân trang
-interface ApiResponse {
-    items: ReportItem[];
+interface ApiResponse<T> {
+    items: T[];
     total?: number;
     page?: number;
     pageSize?: number;
 }
-// -----------------------------------------------------------
 
 
-// --- (Phần Mock Data - Sẽ không được dùng nữa) ---
-// Giữ nguyên mockPendingStories
+// ========================= STATS INTERFACES (Cần cho cả Statistics và Dashboard) =========================
 
-const mockPendingStories = [
-  {
-    reviewId: "0156ec13-6e0a-4874-a7ae-2fc530fa86da",
-    storyId: "f527623c-3fb6-4c6e-b9d3-347b0f3b5ef1",
-    authorId: "d57ad37b-5679-4af9-b88a-cc3bae415200",
-    title: "Truyện Mẫu 1 (Pending)",
-    description: "Nội dung mô tả của truyện mẫu 1. AI đã gắn cờ truyện này vì một lý do nào đó, cần moderator xem xét.",
-    authorUsername: "TacGiaMock",
-    coverUrl: "https://res.cloudinary.com/dp5ogtfgi/image/upload/v1762292478/avatars/story_covers/cjmxqwjbtmbovg3ww9ay.png",
-    aiScore: 0.6,
-    aiResult: "flagged" as "flagged",
-    status: "pending" as "pending",
-    submittedAt: "2025-11-05T09:00:00",
-    tags: [
-      { tagId: "f5a915ee-53d1-42d4-b953-820123e57546", tagName: "Kỳ ảo" },
-      { tagId: "46759a3b-86b6-4a9b-962f-b7d3da72e7f1", tagName: "Phiêu lưu" }
-    ]
-  },
-];
-// --- (Hết Mock Data) ---
+type StatPeriod = 'day' | 'week' | 'month' | 'year';
 
+interface StatQueryRequest {
+    from?: string; // YYYY-MM-DD
+    to?: string; // YYYY-MM-DD
+    period?: StatPeriod;
+    status?: 'approved' | 'pending' | 'rejected' | 'resolved' | 'removed';
+}
+
+export interface StatPoint {
+    periodLabel: string; // VD: 2025-45, 2025-11-03
+    periodStart: string; // YYYY-MM-DD
+    periodEnd: string; // YYYY-MM-DD
+    value: number;
+}
+
+export interface StatSeriesResponse {
+    period: StatPeriod;
+    total: number;
+    points: StatPoint[];
+}
+
+// Thêm interface cho Biểu đồ Tròn (Violation Breakdown)
+export interface ViolationStat {
+    violationType: string;
+    count: number;
+    percentage: number;
+}
+
+export interface ViolationStatsResponse {
+    totalReports: number;
+    breakdown: ViolationStat[];
+}
+
+// Interface cho số liệu tức thời (Dashboard)
+export interface RealtimeStats {
+    pendingStories: number;
+    pendingChapters: number;
+    sentBack: number;
+    newReportsToday: number;
+    approvedToday: number;
+}
+
+
+// ========================= CORE API FUNCTIONS (Sử dụng apiClient) =========================
+
+// --- API Xử lý Nội dung (Moderation Stories, Chapters, Comments) ---
+// -------------------------------------------------------------------
+
+// 1. Hàm API chính cho Biểu đồ cột (Bar Chart) - SỬ DỤNG API THẬT
+type StatEndpoint = 'stories' | 'chapters' | 'story-decisions' | 'reports' | 'reports/handled';
+
+export async function getContentModStats(
+    endpoint: StatEndpoint,
+    query: StatQueryRequest = {}
+): Promise<StatSeriesResponse> {
+    try {
+        const response: AxiosResponse<StatSeriesResponse> = await apiClient.get(`/api/ContentModStat/${endpoint}`, { 
+            params: query 
+        });
+        return response.data;
+    } catch (error: any) {
+        // Dùng error.response?.data?.message nếu có, nếu không dùng thông báo chung
+        throw new Error(error.response?.data?.message || `Lỗi khi tải thống kê ${endpoint}`);
+    }
+}
+
+
+// --- API CHO BIỂU ĐỒ TRÒN (MOCK) ---
+// *Cần API backend mới: /api/ContentModStat/violation-breakdown (hoặc tương tự)*
+export async function getViolationBreakdown(): Promise<ViolationStatsResponse> {
+    // Tạm thời dùng MOCK DATA cho đến khi API thật được tạo
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve({
+                totalReports: 378,
+                breakdown: [
+                    { violationType: "Spam/Quảng cáo", count: 145, percentage: 38.4 },
+                    { violationType: "Nội dung nhạy cảm", count: 89, percentage: 23.5 },
+                    { violationType: "Vi phạm Bản quyền", count: 43, percentage: 11.4 },
+                    { violationType: "Quấy rối/Bắt nạt", count: 67, percentage: 17.7 },
+                    { violationType: "Khác", count: 34, percentage: 9.0 },
+                ],
+            });
+        }, 500);
+    });
+}
+
+// --- API CHO DASHBOARD TỨC THỜI (Realtime) ---
+export async function getRealtimeStats(): Promise<RealtimeStats> {
+    
+    let approvedToday = 0;
+    let newReportsToday = 0;
+    
+    // 1. Lấy Decisions Today (API thật)
+    try {
+        // Giả định tổng số Decisions (story-decisions) là số lượng Approved/Rejected hôm nay
+        const decisionData = await getContentModStats('story-decisions', { period: 'day' });
+        approvedToday = decisionData.total;
+    } catch(e) {
+        console.error("Lỗi khi tải Approved Today:", e);
+        // Giữ 0 nếu lỗi
+    }
+
+    // 2. Lấy Reports Today (API thật)
+    try {
+        const reportData = await getContentModStats('reports', { period: 'day' });
+        newReportsToday = reportData.total;
+    } catch(e) {
+        console.error("Lỗi khi tải Reports Today:", e);
+        // Giữ 0 nếu lỗi
+    }
+    
+    // 3. Pending & Sent-back: Gán cứng là 0 (theo yêu cầu) vì chưa có API backend
+    const pendingSentBackDefaults = {
+        pendingStories: 0, 
+        pendingChapters: 0, 
+        sentBack: 0, 
+    };
+    
+    return {
+        ...pendingSentBackDefaults,
+        newReportsToday: newReportsToday,
+        approvedToday: approvedToday,
+    };
+}
+
+
+// ========================= CÁC API KHÁC (Đã được chuyển từ code gốc) =========================
 
 // --- API 1: Lấy danh sách TRUYỆN ---
 export async function getModerationStories(status: 'pending' | 'published' | 'rejected') {
-  
-  if (USE_MOCK_DATA) {
-    console.log(`⚠️ ĐANG DÙNG DATA MẪU (MOCK) cho status: ${status}.`);
-    if (status === 'pending') {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return Promise.resolve(mockPendingStories);
+    try {
+        const apiStatus = status.toUpperCase(); 
+        
+        const response = await apiClient.get('/api/moderation/stories', { 
+            params: { status: apiStatus }
+        });
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || error.message || "Lỗi khi tải danh sách truyện");
     }
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return Promise.resolve([]);
-  }
-
-  // --- API THẬT ---
-  try {
-    // ✅ SỬA LỖI 400: Gửi status CHỮ HOA
-    const apiStatus = status.toUpperCase(); 
-    
-    const response = await apiClient.get('/api/moderation/stories', { 
-      params: { status: apiStatus }
-    });
-    return response.data;
-  } catch (error: any) {
-    throw new Error(error.response?.data?.message || error.message || "Lỗi khi tải danh sách truyện");
-  }
 }
 
 // --- API 2: Ra quyết định TRUYỆN ---
 export async function postModerationDecision(
-  reviewId: string,
-  approve: boolean,
-  moderatorNote: string
+    reviewId: string,
+    approve: boolean,
+    moderatorNote: string
 ) {
-  
-  if (USE_MOCK_DATA) {
-     // ... (logic mock)
-  }
-
-  // --- API THẬT ---
-  try {
-    const payload = { approve, moderatorNote };
-    const response = await apiClient.post(`/api/moderation/stories/${reviewId}/decision`, payload);
-    return response.data;
-  } catch (error: any) {
-    throw new Error(error.response?.data?.message || error.message || "Lỗi khi gửi quyết định");
-  }
+    try {
+        const payload = { approve, moderatorNote };
+        const response = await apiClient.post(`/api/moderation/stories/${reviewId}/decision`, payload);
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || error.message || "Lỗi khi gửi quyết định");
+    }
 }
 
 // --- API 3: Lấy danh sách BÌNH LUẬN ---
 export async function getModerationComments(
-  status: "pending" | "approved" | "removed",
-  page: number,
-  pageSize: number
+    status: "pending" | "approved" | "removed",
+    page: number,
+    pageSize: number
 ) {
-  try {
-    const apiStatus = status.toUpperCase(); 
-    const response = await apiClient.get('/api/moderation/comments', { 
-      params: { 
-        status: apiStatus, 
-        page, 
-        pageSize 
-      }
-    });
-    return response.data;
-  } catch (error: any) {
-    throw new Error(error.response?.data?.message || "Lỗi khi tải bình luận");
-  }
+    try {
+        const apiStatus = status.toUpperCase(); 
+        const response = await apiClient.get('/api/moderation/comments', { 
+            params: { 
+                status: apiStatus, 
+                page, 
+                pageSize 
+            }
+        });
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || "Lỗi khi tải bình luận");
+    }
 }
 
 // --- API 4: Duyệt (Approve) BÌNH LUẬN ---
 export async function approveComment(commentId: string) {
-  try {
-    // Giả lập
-    await new Promise(res => setTimeout(res, 500));
-    console.log(`(Mock) Đã duyệt ${commentId}`);
-    return { message: "Duyệt thành công (Mock)"};
-  } catch (error: any) {
-     throw new Error(error.response?.data?.message || "Lỗi khi xử lý bình luận");
-  }
+    try {
+        const response = await apiClient.post(`/api/moderation/comments/${commentId}/approve`);
+        return response.data;
+    } catch (error: any) {
+         throw new Error(error.response?.data?.message || "Lỗi khi xử lý bình luận");
+    }
 }
 
 // --- API 5: Gỡ (Remove) BÌNH LUẬN ---
 export async function removeComment(commentId: string) {
-   try {
-    // Giả lập
-    await new Promise(res => setTimeout(res, 500));
-    console.log(`(Mock) Đã gỡ ${commentId}`);
-    return { message: "Gỡ thành công (Mock)"};
-  } catch (error: any) {
-     throw new Error(error.response?.data?.message || "Lỗi khi xử lý bình luận");
-  }
+    try {
+        const response = await apiClient.post(`/api/moderation/comments/${commentId}/remove`);
+        return response.data;
+    } catch (error: any) {
+         throw new Error(error.response?.data?.message || "Lỗi khi xử lý bình luận");
+    }
 }
 
 // --- API 6: Lấy danh sách CHƯƠNG ---
 export async function getModerationChapters(status: 'pending' | 'published' | 'rejected') {
-  const apiStatus = status.toUpperCase(); 
+    const apiStatus = status.toUpperCase(); 
 
-  try {
-    const response = await apiClient.get('/api/moderation/chapters', { 
-      params: { status: apiStatus }
-    });
-    return response.data;
-  } catch (error: any) {
-    throw new Error(error.response?.data?.message || "Lỗi khi tải danh sách chương");
-  }
+    try {
+        const response = await apiClient.get('/api/moderation/chapters', { 
+            params: { status: apiStatus }
+        });
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || "Lỗi khi tải danh sách chương");
+    }
 }
 
 // --- API 7: Ra quyết định CHƯƠNG ---
 export async function postChapterDecision(
-  reviewId: string,
-  approve: boolean,
-  moderatorNote: string
+    reviewId: string,
+    approve: boolean,
+    moderatorNote: string
 ) {
-  try {
-    const payload = { approve, moderatorNote };
-    const response = await apiClient.post(`/api/moderation/chapters/${reviewId}/decision`, payload);
-    return response.data;
-  } catch (error: any) {
-    throw new Error(error.response?.data?.message || "Lỗi khi gửi quyết định chương");
-  }
+    try {
+        const payload = { approve, moderatorNote };
+        const response = await apiClient.post(`/api/moderation/chapters/${reviewId}/decision`, payload);
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || "Lỗi khi gửi quyết định chương");
+    }
 }
 
-// PHẦN MỚI: API XỬ LÝ BÁO CÁO (CONTENT MOD HANDLING)
-
-// 1. Lấy danh sách Report
-// Đã thêm kiểu trả về Promise<ApiResponse>
+// --- API 8: Lấy danh sách Report ---
 export async function getHandlingReports(
-  status: 'pending' | 'resolved' | 'rejected' | null,
-  targetType: 'story' | 'chapter' | 'comment' | null,
-  page: number,
-  pageSize: number
-): Promise<ApiResponse> { // <-- KHAI BÁO KIỂU TRẢ VỀ TƯỜNG MINH
-  try {
-    const params: any = { page, pageSize };
-    if (status) params.status = status;
-    if (targetType) params.targetType = targetType;
+    status: 'pending' | 'resolved' | 'rejected' | null,
+    targetType: 'story' | 'chapter' | 'comment' | null,
+    page: number,
+    pageSize: number
+): Promise<ApiResponse<ReportItem>> { 
+    try {
+        const params: any = { page, pageSize };
+        if (status) params.status = status;
+        if (targetType) params.targetType = targetType;
 
-    const response = await apiClient.get('/api/ContentModHandling/reports', { params });
-    return response.data as ApiResponse; // ÉP KIỂU KẾT QUẢ API
-  } catch (error: any) {
-    throw new Error(error.response?.data?.message || "Lỗi khi tải danh sách báo cáo");
-  }
+        const response: AxiosResponse<ApiResponse<ReportItem>> = await apiClient.get('/api/ContentModHandling/reports', { params });
+        return response.data; 
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || "Lỗi khi tải danh sách báo cáo");
+    }
 }
 
-// 2. Xem chi tiết 1 Report
+// --- API 9: Xem chi tiết 1 Report ---
 export async function getReportDetail(reportId: string): Promise<ReportItem> {
-  try {
-    const response = await apiClient.get(`/api/ContentModHandling/reports/${reportId}`);
-    return response.data as ReportItem;
-  } catch (error: any) {
-    throw new Error(error.response?.data?.message || "Lỗi khi xem chi tiết báo cáo");
-  }
+    try {
+        const response: AxiosResponse<ReportItem> = await apiClient.get(`/api/ContentModHandling/reports/${reportId}`);
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || "Lỗi khi xem chi tiết báo cáo");
+    }
 }
 
-// 3. Chốt trạng thái Report (Resolved - Phạt / Rejected - Bỏ qua)
+// --- API 10. Chốt trạng thái Report (Resolved - Phạt / Rejected - Bỏ qua) ---
 export async function updateReportStatus(reportId: string, status: 'resolved' | 'rejected') {
-  try {
-    // Body: { "status": "resolved" }
-    const response = await apiClient.put(`/api/ContentModHandling/reports/${reportId}/status`, { status });
-    return response.data;
-  } catch (error: any) {
-    throw new Error(error.response?.data?.message || "Lỗi khi cập nhật trạng thái báo cáo");
-  }
+    try {
+        const response = await apiClient.put(`/api/ContentModHandling/reports/${reportId}/status`, { status });
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || "Lỗi khi cập nhật trạng thái báo cáo");
+    }
 }
 
-// 4. Ẩn/Hiện Nội dung (Story, Chapter, Comment)
+// --- API 11. Ẩn/Hiện Nội dung (Story, Chapter, Comment) ---
 export async function updateContentStatus(
-  targetType: 'story' | 'chapter' | 'comment',
-  targetId: string,
-  status: 'hidden' | 'published' | 'visible' // Comment dùng 'visible', story/chapter dùng 'published'
+    targetType: 'story' | 'chapter' | 'comment',
+    targetId: string,
+    status: 'hidden' | 'published' | 'visible' // Comment dùng 'visible', story/chapter dùng 'published'
 ) {
-  try {
-    let endpoint = '';
-    if (targetType === 'story') endpoint = `/api/ContentModHandling/stories/${targetId}`;
-    if (targetType === 'chapter') endpoint = `/api/ContentModHandling/chapters/${targetId}`;
-    if (targetType === 'comment') endpoint = `/api/ContentModHandling/comments/${targetId}`;
+    try {
+        let endpoint = '';
+        if (targetType === 'story') endpoint = `/api/ContentModHandling/stories/${targetId}`;
+        else if (targetType === 'chapter') endpoint = `/api/ContentModHandling/chapters/${targetId}`;
+        else if (targetType === 'comment') endpoint = `/api/ContentModHandling/comments/${targetId}`;
+        else throw new Error("Loại nội dung không hợp lệ");
 
-    const response = await apiClient.put(endpoint, { status });
-    return response.data;
-  } catch (error: any) {
-    throw new Error(error.response?.data?.message || "Lỗi khi thay đổi trạng thái nội dung");
-  }
+        const response = await apiClient.put(endpoint, { status });
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || "Lỗi khi thay đổi trạng thái nội dung");
+    }
 }
-
-const MOCK_REPORTS_DATA: ReportItem[] = [ // Đã thêm kiểu dữ liệu cho Mock Data
-  // PENDING REPORTS
-  {
-    id: "rep-001",
-    targetType: "chapter",
-    targetId: "chap-abc1234",
-    reason: "ip_infringement",
-    details: "Chương 5 truyện này sao chép nội dung từ tiểu thuyết A, link gốc: https://example.com/A",
-    status: "pending",
-    reporterId: "user-reporter-456",
-    reportedAt: new Date(Date.now() - 3600000).toISOString(), // 1 giờ trước
-  },
-  {
-    id: "rep-002",
-    targetType: "story",
-    targetId: "story-xyz7890",
-    reason: "negative_content",
-    details: "Nội dung truyện xuyên tạc lịch sử và có xu hướng gây thù ghét tôn giáo.",
-    status: "pending",
-    reporterId: "user-reporter-111",
-    reportedAt: new Date(Date.now() - 7200000).toISOString(), // 2 giờ trước
-  },
-  {
-    id: "rep-003",
-    targetType: "comment",
-    targetId: "cmt-def5678",
-    reason: "spam",
-    details: "Bình luận này chỉ quảng cáo link web ngoài, không liên quan nội dung.",
-    status: "pending",
-    reporterId: "user-reporter-999",
-    reportedAt: new Date(Date.now() - 10800000).toISOString(), // 3 giờ trước
-  },
-  
-  // RESOLVED REPORTS (Đã xử phạt)
-  {
-    id: "rep-004",
-    targetType: "chapter",
-    targetId: "chap-hij1234",
-    reason: "misinformation",
-    details: "Thông tin sai sự thật về dịch bệnh được lan truyền trong chương này.",
-    status: "resolved",
-    reporterId: "user-reporter-333",
-    reportedAt: new Date(Date.now() - 86400000).toISOString(), // 1 ngày trước
-    resolvedBy: "cmod-001",
-    resolvedAt: new Date(Date.now() - 43200000).toISOString(), // 12 giờ trước
-  },
-  
-  // REJECTED REPORTS (Đã từ chối)
-  {
-    id: "rep-005",
-    targetType: "story",
-    targetId: "story-klm4567",
-    reason: "negative_content",
-    details: "Report vô căn cứ, truyện có yếu tố dark nhưng không vi phạm quy định.",
-    status: "rejected",
-    reporterId: "user-reporter-555",
-    reportedAt: new Date(Date.now() - 172800000).toISOString(), // 2 ngày trước
-    resolvedBy: "cmod-001",
-    resolvedAt: new Date(Date.now() - 86400000).toISOString(), // 1 ngày trước
-  },
-];
-
-/**
- * MOCK FUNCTION: Giả lập việc gọi API lấy danh sách reports
- * @param status - 'pending', 'resolved', 'rejected'
- * @returns Object có thuộc tính items (giống API thật)
- */
-// Đã thêm kiểu trả về Promise<ApiResponse>
-export async function MOCK_getHandlingReports(
-  status: 'pending' | 'resolved' | 'rejected' | null,
-  targetType: 'story' | 'chapter' | 'comment' | null,
-  page: number,
-  pageSize: number
-): Promise<ApiResponse> { // <-- KHAI BÁO KIỂU TRẢ VỀ TƯỜNG MINH
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 800)); 
-  
-  const filteredReports = MOCK_REPORTS_DATA.filter(report => {
-    // Lọc theo status (rất quan trọng cho Tabs)
-    if (status && report.status !== status) return false;
-    return true;
-  });
-
-  // Giả lập phân trang và trả về dưới dạng OBJECT (ApiResponse) để khớp với API thật
-  const startIndex = (page - 1) * pageSize;
-  const items = filteredReports.slice(startIndex, startIndex + pageSize);
-
-  return {
-      items: items,
-      total: filteredReports.length,
-      page: page,
-      pageSize: pageSize,
-  };
+export async function getChapterContent(reviewId: string) {
+    try {
+        // Gọi đúng endpoint như trong hướng dẫn trên UI của bạn
+        const response = await apiClient.get(`/api/moderation/chapters/${reviewId}`);
+        return response.data; 
+        // Kỳ vọng data trả về sẽ có trường kiểu như { content: "Nội dung chương..." }
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || "Lỗi khi tải nội dung chương");
+    }
 }

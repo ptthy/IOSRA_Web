@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Dashboard } from "./components/dashboard";
+
 import { SentBackList } from "../moderation/components/sent-back-list";
+import Dashboard from "./components/dashboard";
 
 export default function DashboardPage() {
   const [currentPage, setCurrentPage] = useState("dashboard");
