@@ -184,9 +184,25 @@ export default function CreateStoryPage() {
 
   const handleRejectAICover = () => {
     setShowAIPreview(false);
+    setShowAIPreview(false);
     setGeneratedAICover(null);
     setCoverMode("upload");
-    setHasUsedAICover(true);
+    setHasUsedAICover(true); // <<<--- THÊM DÒNG NÀY VÀO!!!
+
+    // Xóa draft cũ nhưng lưu lại createdStoryId để không bị mất khi reload
+    const newDraft = {
+      title,
+      description,
+      outline,
+      lengthPlan,
+      selectedTagIds,
+      coverMode: "upload",
+      coverPrompt: "",
+      hasUsedAICover: true,
+      createdStoryId, // giữ lại cái quan trọng nhất
+    };
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newDraft));
+
     toast.info("Đã từ chối ảnh AI → Vui lòng upload ảnh mới");
   };
 
