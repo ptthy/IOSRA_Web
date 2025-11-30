@@ -1,4 +1,4 @@
-// File: app/Content/dashboard/components/enhanced-sidebar.tsx (ĐÃ SỬA MÀU CHỮ HOVER)
+// File: app/Content/dashboard/components/enhanced-sidebar.tsx
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -6,7 +6,8 @@ import {
   BookOpen, BarChart3, FileText, MessageSquare,
   Settings, Bell, History, ChartPie, LogOut,
   Moon, Sun, Tags,
-  FileCheck 
+  FileCheck,
+  Music // <--- Đã thêm icon Music
 } from "lucide-react";
 import {
   SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem,
@@ -46,6 +47,8 @@ export function EnhancedSidebar({
     { id: "statistics", label: "Thống kê", icon: ChartPie, href: "/Content/statistics" },
     { id: "history", label: "Lịch sử kiểm duyệt", icon: History, href: "/Content/review?tab=history" },
     { id: "tags", label: "Quản lý Tag", icon: Tags, href: "/Content/tags" }, 
+    // --- MỤC MỚI THÊM ---
+    { id: "music", label: "Nhạc nền", icon: Music, href: "/Content/music" }, 
   ];
 
   const bottomItems = [
@@ -66,7 +69,7 @@ export function EnhancedSidebar({
   return (
     <>
       {/* Header sidebar */}
-     <SidebarHeader>
+      <SidebarHeader>
         <div className="flex items-center gap-4 px-6 h-16 transition-colors duration-300 bg-[var(--card)]">
           <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center shadow-sm flex-shrink-0">
             <BookOpen className="w-6 h-6 text-[var(--primary)]" />
@@ -113,7 +116,6 @@ export function EnhancedSidebar({
                       "rounded-lg transition-colors duration-200",
                       active
                         ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-md"
-                        // ✅ SỬA LỖI: Đổi màu chữ khi hover thành màu đen/dễ nhìn
                         : "text-[var(--foreground)] font-medium hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-gray-900 dark:hover:text-white"
                     )}
                   >
@@ -150,7 +152,6 @@ export function EnhancedSidebar({
                           "rounded-lg transition-colors duration-200",
                           active
                             ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-md"
-                            // ✅ SỬA LỖI: Đổi màu chữ khi hover thành màu đen/dễ nhìn
                             : "text-[var(--foreground)] font-medium hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-gray-900 dark:hover:text-white"
                         )}
                       >
@@ -163,7 +164,6 @@ export function EnhancedSidebar({
 
                 {/* Dark mode switch */}
                 <SidebarMenuItem>
-                  {/* ✅ SỬA LỖI: Đổi màu chữ khi hover thành màu đen/dễ nhìn */}
                   <div className="flex items-center justify-between p-2 rounded-lg text-[var(--foreground)] font-medium hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-gray-900 dark:hover:text-white cursor-pointer transition-colors duration-200">
                     <div className="flex items-center gap-3">
                       {isDarkMode ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}

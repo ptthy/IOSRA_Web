@@ -205,7 +205,7 @@ export default function DashboardAnalytics() {
           {/* Card 4: Đơn rút tiền (type: withdraw) */}
           <Card className="shadow-sm border-l-4 border-l-purple-500">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Yêu cầu Rút tiền</CardTitle>
+              <CardTitle className="text-sm font-medium">Yêu cầu chờ duyệt</CardTitle>
               <div className="p-2 bg-purple-100 rounded-full text-purple-600">
                 <Wallet className="w-4 h-4" />
               </div>

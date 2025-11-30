@@ -13,6 +13,7 @@ import {
   LogOut,
   Moon,
   Sun,
+  ClipboardList ,
 } from "lucide-react";
 
 import {
@@ -35,7 +36,7 @@ const data = {
   navMain: [
     { title: "Dashboard", url: "/Op/dashboard", icon: LayoutDashboard },
     { title: "Quản lý Author", url: "/Op/manage-author", icon: User },
-    { title: "Rút tiền", url: "/Op/manage-withdraw", icon: DollarSign },
+    { title: "Quản lý yêu cầu", url: "/Op/manage-withdraw", icon: ClipboardList },
     // { title: "Sự kiện", url: "/Op/manage-event", icon: Calendar },
     // { title: "Hỗ trợ", url: "/Op/manage-support", icon: HelpCircle },
     { title: "Doanh thu", url: "/Op/manage-revenue", icon: CircleDollarSign },
