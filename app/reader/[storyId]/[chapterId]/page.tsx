@@ -79,6 +79,7 @@ export default function ReaderPage() {
         // A. Lấy chi tiết chương
         const detail = await chapterCatalogApi.getChapterDetail(chapterId);
         setChapter(detail);
+        console.log("🔥 CHI TIẾT CHAPTER API TRẢ VỀ:", detail);
         setOriginalContentUrl(detail.contentUrl);
 
         // B. Lấy danh sách tất cả chương
@@ -378,6 +379,11 @@ export default function ReaderPage() {
       </div>
     );
 
+  const currentChapterSummary = allChapters.find(
+    (c) => c.chapterId === chapterId
+  );
+  const realPrice = currentChapterSummary?.priceDias ?? chapter.priceDias ?? 0;
+
   return (
     <div
       className="min-h-screen relative transition-colors duration-300 pb-24"
@@ -476,9 +482,9 @@ export default function ReaderPage() {
             {shouldShowLockedOverlay() ? (
               <LockedOverlay
                 chapterId={chapterId}
-                priceDias={chapter.priceDias}
+                priceDias={realPrice}
                 onUnlockSuccess={handleChapterUnlockSuccess}
-                currentBalance={balance} // 🔥 SỬ DỤNG STATE BALANCE
+                currentBalance={balance}
                 setShowTopUpModal={setShowTopUpModal}
               />
             ) : (
@@ -503,6 +509,7 @@ export default function ReaderPage() {
           </TabsContent>
 
           <TabsContent value="comments" className="m-0 p-0">
+            {/* ... Code phần comment giữ nguyên ... */}
             <div className="py-4 w-full">
               <CommentSection
                 comments={comments}

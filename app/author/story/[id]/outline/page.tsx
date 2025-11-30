@@ -658,7 +658,9 @@ export default function OutlineEditorPage() {
                   Điểm AI
                 </p>
                 <p className="font-semibold text-primary">
-                  {story.aiScore.toFixed(1)} / 10.0
+                  {story.aiScore != null
+                    ? `${Number(story.aiScore).toFixed(1)} / 10.0`
+                    : "- / 10.0"}
                 </p>
               </div>
             )}

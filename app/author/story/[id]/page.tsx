@@ -378,7 +378,9 @@ export default function StoryDetailPage() {
                         Điểm AI
                       </p>
                       <p className="text-sm font-semibold text-primary">
-                        {story.aiScore.toFixed(1)} / 10.0
+                        {story.aiScore != null
+                          ? `${Number(story.aiScore).toFixed(1)} / 10.0`
+                          : "- / 10.0"}
                       </p>
                     </div>
                     <div>
@@ -474,11 +476,11 @@ export default function StoryDetailPage() {
               <div className="flex gap-2 pt-4">
                 {story.status === "draft" && (
                   <Button
-                    onClick={() => handleNavigate("author-dashboard")}
-                    variant="outline"
+                    onClick={() => router.push(`/author/story/${storyId}/edit`)}
+                    className="ml-3"
                   >
                     <Edit className="h-4 w-4 mr-2" />
-                    Quản lý truyện
+                    Chỉnh sửa thông tin
                   </Button>
                 )}
               </div>
@@ -590,13 +592,11 @@ export default function StoryDetailPage() {
                 </p>
                 {story.status === "draft" && (
                   <Button
-                    variant="outline"
-                    onClick={() =>
-                      handleNavigate("manage-chapters", { storyId })
-                    }
+                    onClick={() => router.push(`/author/story/${storyId}/edit`)}
+                    className="ml-3"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Quản lý chương
+                    <Edit className="h-4 w-4 mr-2" />
+                    Chỉnh sửa thông tin
                   </Button>
                 )}
               </div>
