@@ -118,9 +118,9 @@ export default function DashboardPage(): JSX.Element {
                 <h2 className="text-xl font-semibold text-[var(--primary)] flex items-center gap-2">
                   <Clock className="w-5 h-5" /> Hoạt động gần đây
                 </h2>
-                <p className="text-sm text-[var(--muted-foreground)] mt-2">
+                {/* <p className="text-sm text-[var(--muted-foreground)] mt-2">
                   (Hiện ẩn vì backend chưa cung cấp activity stream)
-                </p>
+                </p> */}
                 {/* nếu sau này có API activity: render list ở đây */}
               </div>
             </Card>

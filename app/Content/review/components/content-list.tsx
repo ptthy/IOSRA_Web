@@ -204,7 +204,7 @@ export function ContentList({ onReview }: ContentListProps) {
                         story.aiResult === 'rejected' && 'bg-red-100 text-red-800'
                       )}
                     >
-                      {story.aiResult} ({(story.aiScore * 100).toFixed(0)}%)
+                     {story.aiResult} ({story.aiScore.toFixed(1)})
                     </Badge>
                   </TableCell>
 

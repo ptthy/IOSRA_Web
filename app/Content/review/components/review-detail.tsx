@@ -188,12 +188,12 @@ export function ReviewDetail({ content, onBack }: ReviewDetailPageProps) {
             </Card>
 
             {/* Card nội dung chương (giữ nguyên) */}
-            <Card className="p-6">
+            {/* <Card className="p-6">
               <h3 className="mb-4 text-lg font-semibold">Chương 1: Khởi đầu (TODO)</h3>
               <div className="space-y-4 text-[var(--muted-foreground)]">
                 <p>(Nội dung chương 1 sẽ được tải ở đây...)</p>
               </div>
-            </Card>
+            </Card> */}
             
             {/* Card quyết định (giữ nguyên) */}
             <Card className="p-6">
@@ -225,10 +225,10 @@ export function ReviewDetail({ content, onBack }: ReviewDetailPageProps) {
               </ul>
             </Card>
 
-            <Card className="p-6">
+            {/* <Card className="p-6">
               <h3 className="mb-4 font-semibold">Lịch sử kiểm duyệt</h3>
-              {/* ... (giữ nguyên) ... */}
-            </Card>
+           
+            </Card> */}
           </div>
         </div>
       </div>

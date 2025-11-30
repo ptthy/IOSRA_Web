@@ -313,3 +313,13 @@ export async function updateContentStatus(
         throw new Error(error.response?.data?.message || "Lỗi khi thay đổi trạng thái nội dung");
     }
 }
+export async function getChapterContent(reviewId: string) {
+    try {
+        // Gọi đúng endpoint như trong hướng dẫn trên UI của bạn
+        const response = await apiClient.get(`/api/moderation/chapters/${reviewId}`);
+        return response.data; 
+        // Kỳ vọng data trả về sẽ có trường kiểu như { content: "Nội dung chương..." }
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || "Lỗi khi tải nội dung chương");
+    }
+}
