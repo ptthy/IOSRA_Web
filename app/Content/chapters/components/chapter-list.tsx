@@ -32,13 +32,23 @@ import { getModerationChapters } from "@/services/moderationApi";
 export interface ChapterFromAPI {
   reviewId: string;
   chapterId: string;
+  storyId: string;       // Có thể thiếu
   storyTitle: string;
   chapterTitle: string;
+  authorId: string;      // Có thể thiếu
   authorUsername: string;
+  authorEmail?: string;  // Có thể thiếu
+  chapterNo: number;     // Có thể thiếu
+  wordCount?: number;    // Có thể thiếu
+  priceDias?: number;    // Có thể thiếu
+  
+  contentPath: string;   // <--- QUAN TRỌNG: Thêm dòng này để sửa lỗi
+  
   aiScore: number;
-  aiFeedback: string;
-  status: "pending" | "published" | "rejected";
+  aiFeedback?: string;
+  status: 'pending' | 'published' | 'rejected' | string;
   submittedAt: string;
+  createdAt?: string;
 }
 
 interface ChapterListProps {
