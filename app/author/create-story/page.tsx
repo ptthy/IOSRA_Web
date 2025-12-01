@@ -206,7 +206,61 @@ export default function CreateStoryPage() {
     toast.info("Đã từ chối ảnh AI → Vui lòng upload ảnh mới");
   };
 
+  // const handleSubmit = async () => {
+  //   if (!title.trim()) return toast.error("Vui lòng nhập tên truyện");
+  //   if (!outline.trim()) return toast.error("Vui lòng nhập dàn ý cốt truyện");
+  //   if (selectedTagIds.length === 0)
+  //     return toast.error("Vui lòng chọn ít nhất 1 thể loại");
+  //   if (coverMode === "upload" && !coverFile && !createdStoryId)
+  //     return toast.error("Vui lòng chọn ảnh bìa");
+  //   if (coverMode === "generate" && !coverPrompt.trim())
+  //     return toast.error("Vui lòng nhập mô tả ảnh AI");
+
+  //   setIsSubmitting(true);
+
+  //   try {
+  //     if (!createdStoryId) {
+  //       // Dùng CreateStoryRequest object – sạch sẽ, không cần FormData thủ công
+  //       const requestData: CreateStoryRequest = {
+  //         title,
+  //         description: description || "",
+  //         outline,
+  //         lengthPlan,
+  //         tagIds: selectedTagIds,
+  //         coverMode,
+  //         coverFile: coverMode === "upload" ? coverFile! : undefined,
+  //         coverPrompt: coverMode === "generate" ? coverPrompt : undefined,
+  //       };
+
+  //       const res = await storyService.createStory(requestData);
+
+  //       setCreatedStoryId(res.storyId);
+  //       localStorage.removeItem(LOCAL_STORAGE_KEY);
+
+  //       if (coverMode === "generate" && res.coverUrl) {
+  //         setGeneratedAICover(res.coverUrl);
+  //         setHasUsedAICover(true);
+  //         setShowAIPreview(true);
+  //       } else {
+  //         toast.success("Tạo truyện thành công!");
+  //         router.push(`/author/story/${res.storyId}/submit-ai`);
+  //       }
+  //     }
+  //     // Từ chối AI → upload ảnh mới
+  //     else if (createdStoryId && coverMode === "upload" && coverFile) {
+  //       await storyService.replaceDraftCover(createdStoryId, coverFile);
+  //       localStorage.removeItem(LOCAL_STORAGE_KEY);
+  //       toast.success("Cập nhật ảnh bìa thành công!");
+  //       router.push(`/author/story/${createdStoryId}/submit-ai`);
+  //     }
+  //   } catch (err: any) {
+  //     toast.error(err.message || "Có lỗi xảy ra");
+  //   } finally {
+  //     setIsSubmitting(false);
+  //   }
+  // };
   const handleSubmit = async () => {
+    // Validation cơ bản
     if (!title.trim()) return toast.error("Vui lòng nhập tên truyện");
     if (!outline.trim()) return toast.error("Vui lòng nhập dàn ý cốt truyện");
     if (selectedTagIds.length === 0)
@@ -219,8 +273,8 @@ export default function CreateStoryPage() {
     setIsSubmitting(true);
 
     try {
+      // TRƯỜNG HỢP 1: Tạo mới hoàn toàn (Chưa có ID)
       if (!createdStoryId) {
-        // Dùng CreateStoryRequest object – sạch sẽ, không cần FormData thủ công
         const requestData: CreateStoryRequest = {
           title,
           description: description || "",
@@ -246,15 +300,39 @@ export default function CreateStoryPage() {
           router.push(`/author/story/${res.storyId}/submit-ai`);
         }
       }
-      // Từ chối AI → upload ảnh mới
+      // TRƯỜNG HỢP 2: Đã có ID (do từ chối AI trước đó) -> Gọi Update ảnh bìa
       else if (createdStoryId && coverMode === "upload" && coverFile) {
         await storyService.replaceDraftCover(createdStoryId, coverFile);
+
         localStorage.removeItem(LOCAL_STORAGE_KEY);
         toast.success("Cập nhật ảnh bìa thành công!");
         router.push(`/author/story/${createdStoryId}/submit-ai`);
       }
     } catch (err: any) {
-      toast.error(err.message || "Có lỗi xảy ra");
+      console.error(err);
+
+      // === XỬ LÝ LOGIC NẾU ID BỊ LỖI (NOT FOUND) ===
+      if (
+        err.code === "STORY_NOT_FOUND" ||
+        err.message === "Truyện không tồn tại"
+      ) {
+        toast.error(
+          "Truyện cũ không tìm thấy. Hệ thống sẽ tạo truyện mới khi bạn lưu lại."
+        );
+
+        // Reset ID để lần sau bấm nút sẽ nhảy vào TRƯỜNG HỢP 1 (Tạo mới)
+        setCreatedStoryId(null);
+
+        // Cập nhật lại localStorage để xóa ID lỗi đi
+        const currentDraft = JSON.parse(
+          localStorage.getItem(LOCAL_STORAGE_KEY) || "{}"
+        );
+        delete currentDraft.createdStoryId;
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentDraft));
+      } else {
+        // Các lỗi khác thì hiển thị bình thường
+        toast.error(err.message || "Có lỗi xảy ra");
+      }
     } finally {
       setIsSubmitting(false);
     }

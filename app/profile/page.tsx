@@ -29,6 +29,10 @@ import {
   Gift,
   Users,
   BookOpen,
+  Heart,
+  ChevronRight,
+  Receipt,
+  Flag,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
@@ -480,6 +484,75 @@ export default function ProfilePage() {
               </div>
             </CardContent>
           </Card>
+          {/* 1. Tủ truyện yêu thích */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* 1. Tủ truyện yêu thích  */}
+            <div className="rounded-2xl p-5 border border-red-100 shadow-sm bg-red-50/50 flex flex-col justify-between h-full gap-4">
+              <div className="flex items-center gap-2">
+                <Heart className="h-5 w-5 text-red-600 fill-red-600" />
+                <span className="font-bold text-sm uppercase text-red-900">
+                  Tủ truyện yêu thích
+                </span>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-red-700/70">
+                  Xem danh sách truyện bạn đang theo dõi.
+                </p>
+              </div>
+              <Button
+                onClick={() => router.push("/favorite-story")}
+                className="w-full bg-red-500 hover:bg-red-600 text-white border-0 shadow-sm rounded-xl"
+              >
+                <Heart className="mr-2 h-4 w-4" />
+                Xem tủ truyện
+              </Button>
+            </div>
+
+            {/* 2. Truyện sách đã mua  */}
+            <div className="rounded-2xl p-5 border border-blue-100 shadow-sm bg-blue-50/50 flex flex-col justify-between h-full gap-4">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-blue-600 fill-blue-600" />
+                <span className="font-bold text-sm uppercase text-blue-900">
+                  Truyện đã mua
+                </span>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-blue-700/70">
+                  Kho truyện bạn đã sở hữu vĩnh viễn.
+                </p>
+              </div>
+              <Button
+                onClick={() => router.push("/purchased-stories")}
+                className="w-full bg-blue-500 hover:bg-blue-600 text-white border-0 shadow-sm rounded-xl"
+              >
+                <BookOpen className="mr-2 h-4 w-4" />
+                Xem kho sách
+              </Button>
+            </div>
+
+            {/* 3. Lịch sử thanh toán  */}
+            <div className="rounded-2xl p-5 border border-yellow-100 shadow-sm bg-yellow-50/50 flex flex-col justify-between h-full gap-4">
+              <div className="flex items-center gap-2">
+                <Receipt className="h-5 w-5 text-yellow-600" />
+                <span className="font-bold text-sm uppercase text-yellow-900">
+                  Lịch sử GD
+                </span>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-yellow-700/70">
+                  Lịch sử nạp và mua gói cước.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => router.push("/payment-history")}
+                className="w-full bg-white border-2 border-yellow-400 text-yellow-600 hover:bg-yellow-50 rounded-xl"
+              >
+                <Receipt className="mr-2 h-4 w-4" />
+                Xem tất cả
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* RIGHT COLUMN */}
@@ -595,7 +668,7 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              <div className="pt-2 border-t">
+              {/* <div className="pt-2 border-t">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -604,7 +677,7 @@ export default function ProfilePage() {
                 >
                   Kiểm tra đơn treo lỗi
                 </Button>
-              </div>
+              </div> */}
             </CardContent>
           </Card>
 
@@ -625,6 +698,28 @@ export default function ProfilePage() {
                 className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-sm"
               >
                 Nạp ký tự Voice
+              </Button>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm border-border/60">
+            <CardContent className="p-4">
+              <Button
+                variant="outline"
+                onClick={() => router.push("/all-report")}
+                className="w-full h-auto py-3 px-4 flex items-center justify-between bg-card hover:bg-orange-50 hover:text-orange-700 hover:border-orange-200 shadow-sm rounded-xl transition-all group border-dashed border-2 dark:border-[#f0ead6]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-100 rounded-lg text-orange-600 group-hover:scale-110 transition-transform">
+                    <Flag className="h-5 w-5" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-bold text-sm">Lịch sử Báo Cáo</p>
+                    <p className="text-[10px] text-muted-foreground font-normal">
+                      Xem trạng thái xử lý
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-orange-600" />
               </Button>
             </CardContent>
           </Card>

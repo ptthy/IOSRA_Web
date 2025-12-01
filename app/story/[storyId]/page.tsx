@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
-// import { Navbar } from "@/components/layout/Navbar"; // Bỏ comment nếu cần
+import { favoriteStoryService } from "@/services/favoriteStoryService";
 import { StoryRatingActions } from "@/components/StoryRatingActions";
 import { StoryRatingSummary } from "@/components/StoryRatingSummary";
 import { StoryRatingList } from "@/components/StoryRatingList";
@@ -20,7 +20,11 @@ import {
   MessageSquare,
   Star,
   ArrowUpDown,
+  Heart,
   Lock,
+  Flag,
+  AlertCircle,
+  FileText,
 } from "lucide-react";
 import { storyCatalogApi, Story } from "@/services/storyCatalog";
 import {
@@ -36,7 +40,16 @@ import {
   ChapterComment,
 } from "@/services/chapterCommentService";
 import { useAuth } from "@/context/AuthContext";
-
+import { toast } from "sonner";
+import { StoryFavoriteAction } from "@/components/StoryFavoriteAction";
+import { ReportModal } from "@/components/report/ReportModal";
+import { ReportChapterSelector } from "@/components/report/ReportChapterSelector";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 // Component ImageWithFallback
 function ImageWithFallback({
   src,
@@ -96,8 +109,14 @@ export default function StoryDetailPage() {
   const [activeTab, setActiveTab] = useState("chapters");
   const [sortOption, setSortOption] = useState<SortOption>("newest");
   const [totalComments, setTotalComments] = useState(0);
-
-  // 🔥 THÊM: State để kiểm tra chế độ tối
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showChapterSelector, setShowChapterSelector] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{
+    type: "story" | "chapter";
+    id: string;
+    title: string;
+  } | null>(null);
+  //  THÊM: State để kiểm tra chế độ tối
   const [isDarkTheme, setIsDarkTheme] = useState(false);
 
   useEffect(() => {
@@ -185,7 +204,6 @@ export default function StoryDetailPage() {
     }
     return null;
   };
-
   // Load Data
   useEffect(() => {
     const loadData = async () => {
@@ -476,7 +494,29 @@ export default function StoryDetailPage() {
     const first = getFirstChapter();
     if (first) handleNavigate("/reader", storyId, first.chapterId);
   };
+  const handleReportStory = () => {
+    if (!story) return;
+    setReportTarget({
+      type: "story",
+      id: story.storyId,
+      title: story.title,
+    });
+    setShowReportModal(true);
+  };
 
+  const handleReportChapter = () => {
+    setShowChapterSelector(true);
+  };
+
+  const handleChapterSelected = (chapter: ChapterSummary) => {
+    setShowChapterSelector(false);
+    setReportTarget({
+      type: "chapter",
+      id: chapter.chapterId,
+      title: `Chương ${chapter.chapterNo}: ${chapter.title}`,
+    });
+    setShowReportModal(true); // Mở form báo cáo sau khi chọn chương
+  };
   // Render Loading/Error/Empty...
   if (loading)
     return (
@@ -495,7 +535,42 @@ export default function StoryDetailPage() {
     <div className="min-h-screen">
       <div className="max-w-6xl mx-auto space-y-6 pb-16 pt-6 px-4">
         <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-card via-card to-muted/20">
-          <CardContent className="p-0">
+          <CardContent className="p-0 relative">
+            {" "}
+            {/* 🔥 QUAN TRỌNG: Thêm 'relative' ở đây */}
+            {/* 👇 KHỐI NÚT BÁO CÁO (Nằm ngay đầu CardContent) 👇 */}
+            <div className="absolute top-4 right-4 z-20">
+              {" "}
+              {/* Tăng z-index lên 20 */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full h-8 w-8 transition-colors"
+                  >
+                    <Flag className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem
+                    onClick={handleReportStory}
+                    className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                  >
+                    <AlertCircle className="mr-2 h-4 w-4" />
+                    Báo cáo truyện
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleReportChapter}
+                    className="cursor-pointer"
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    Báo cáo chương
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            {/* 👆 KẾT THÚC KHỐI NÚT BÁO CÁO 👆 */}
             <div className="flex flex-col md:flex-row gap-8 p-6 md:p-8">
               <div className="flex-shrink-0">
                 <div className="relative w-full md:w-64 group">
@@ -578,6 +653,7 @@ export default function StoryDetailPage() {
                     <BookOpen className="mr-2 h-5 w-5" />
                     Đọc từ đầu
                   </Button>
+                  <StoryFavoriteAction storyId={storyId} />
                   <StoryRatingActions
                     storyId={storyId}
                     currentRating={storyRating?.viewerRating}
@@ -754,6 +830,20 @@ export default function StoryDetailPage() {
           </Tabs>
         </Card>
       </div>
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        targetType={reportTarget?.type || "story"}
+        targetId={reportTarget?.id || ""}
+        targetTitle={reportTarget?.title}
+      />
+
+      <ReportChapterSelector
+        isOpen={showChapterSelector}
+        onClose={() => setShowChapterSelector(false)}
+        chapters={chapters}
+        onSelectChapter={handleChapterSelected}
+      />
     </div>
   );
 }

@@ -45,16 +45,39 @@ export interface ChapterVoiceHistoryItem {
   purchasedAt: string;
 }
 
-// Lịch sử mua giọng toàn hệ thống (Global Voice History - Nested)
-export interface GlobalVoiceHistoryItem {
+// // Lịch sử mua giọng toàn hệ thống (Global Voice History - Nested)
+// export interface GlobalVoiceHistoryItem {
+//   storyId: string;
+//   storyTitle: string;
+//   chapters: {
+//     chapterId: string;
+//     chapterNo: number;
+//     chapterTitle: string;
+//     voices: ChapterVoiceHistoryItem[];
+//   }[];
+// }
+export interface VoiceItem {
+  purchaseVoiceId: string;
+  chapterId: string;
+  storyId: string;
+  voiceId: string;
+  voiceName: string;
+  voiceCode: string;
+  priceDias: number;
+  audioUrl: string; // này kiểu lịch sử mau giọng coi ở con trong profile á nha
+  purchasedAt: string;
+}
+export interface ChapterItem {
+  chapterId: string;
+  chapterNo: number;
+  chapterTitle: string;
+  voices: VoiceItem[];
+}
+
+export interface StoryItem {
   storyId: string;
   storyTitle: string;
-  chapters: {
-    chapterId: string;
-    chapterNo: number;
-    chapterTitle: string;
-    voices: ChapterVoiceHistoryItem[];
-  }[];
+  chapters: ChapterItem[];
 }
 
 export const chapterPurchaseApi = {
@@ -101,7 +124,7 @@ export const chapterPurchaseApi = {
 
   // 5. Lấy lịch sử mua giọng toàn bộ (Tủ giọng đọc)
   // GET /api/ChapterPurchase/voice-history
-  getAllVoiceHistory: (): Promise<GlobalVoiceHistoryItem[]> => {
+  getAllVoiceHistory: (): Promise<StoryItem[]> => {
     return apiClient
       .get("/api/ChapterPurchase/voice-history")
       .then((response) => response.data);

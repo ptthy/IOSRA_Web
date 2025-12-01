@@ -458,7 +458,7 @@ export default function StoryDetailPage() {
                       }
                     >
                       <FileText className="h-4 w-4 mr-2" />
-                      Chỉnh sửa dàn ý chi tiết
+                      Dàn ý chi tiết
                     </Button>
                   </div>
                   <Card className="bg-muted/40 border-dashed">
@@ -473,7 +473,7 @@ export default function StoryDetailPage() {
               )}
 
               {/* Action Buttons */}
-              <div className="flex gap-2 pt-4">
+              {/* <div className="flex gap-2 pt-4">
                 {story.status === "draft" && (
                   <Button
                     onClick={() => router.push(`/author/story/${storyId}/edit`)}
@@ -483,7 +483,7 @@ export default function StoryDetailPage() {
                     Chỉnh sửa thông tin
                   </Button>
                 )}
-              </div>
+              </div> */}
             </div>
           </div>
         </CardContent>
