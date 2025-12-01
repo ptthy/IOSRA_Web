@@ -7,8 +7,10 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Poppins } from "next/font/google";
 import { cn } from "@/lib/utils";
-import { getPagedTags, TagApiResponse, TagPagedItem } from "@/services/tagService";
-import { TagGrid } from "./components/TagTable";
+import { getPagedTags, updateTag, createTag, TagApiResponse, TagPagedItem } from "@/services/tagService";
+
+// Import từ file gộp (chỉ cần TagTable và TagModal)
+import { TagTable, TagModal } from "./components/TagManagerComponents"; 
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -20,43 +22,71 @@ export default function TagManagementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // (State cho các Modal CRUD sau này)
-  // const [showCreateModal, setShowCreateModal] = useState(false);
-  // const [showEditModal, setShowEditModal] = useState<TagPagedItem | null>(null);
-  // const [showDeleteModal, setShowDeleteModal] = useState<TagPagedItem | null>(null);
+  // --- STATE MODAL (Chỉ dùng 1 bộ state duy nhất) ---
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTag, setEditingTag] = useState<TagPagedItem | null>(null); 
+  // editingTag = null => Thêm mới
+  // editingTag = object => Chỉnh sửa
 
-  useEffect(() => {
-    const loadTags = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const response: TagApiResponse = await getPagedTags(1, 20);
-        setTags(response.items);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadTags();
-  }, []);
-
-  const handleCreateTag = () => {
-    toast.info("Chức năng 'Thêm Tag' chưa được kết nối API.");
-    // setShowCreateModal(true);
+  const fetchTags = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response: TagApiResponse = await getPagedTags(1, 20);
+      setTags(response.items);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleEditTag = (tag: TagPagedItem) => {
-    toast.info(`Chức năng 'Sửa Tag' [${tag.name}] chưa được kết nối API.`);
-    // setShowEditModal(tag);
+  useEffect(() => {
+    fetchTags();
+  }, []);
+
+  // 1. Mở Modal Thêm mới
+  const handleCreateClick = () => {
+    setEditingTag(null); // Reset về null để Modal hiểu là Thêm
+    setIsModalOpen(true);
+  };
+
+  // 2. Mở Modal Chỉnh sửa
+  const handleEditClick = (tag: TagPagedItem) => {
+    setEditingTag(tag); // Truyền tag vào để Modal hiểu là Sửa
+    setIsModalOpen(true);
+  };
+
+  // 3. Hàm Xử lý Lưu chung (Cho cả Thêm và Sửa)
+  const handleSaveTag = async (tagName: string) => {
+    try {
+      if (editingTag) {
+        // --- LOGIC SỬA ---
+        await updateTag(editingTag.tagId, tagName);
+        toast.success("Cập nhật thể loại thành công!");
+        
+        // Cập nhật state trực tiếp cho mượt
+        setTags((prev) => 
+          prev.map(t => t.tagId === editingTag.tagId ? { ...t, name: tagName } : t)
+        );
+      } else {
+        // --- LOGIC THÊM ---
+        await createTag(tagName);
+        toast.success("Thêm thể loại thành công!");
+        
+        // Reload lại danh sách để lấy ID mới nhất
+        await fetchTags();
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Có lỗi xảy ra.");
+      throw error; // Ném lỗi để Modal tắt loading
+    }
   };
 
   const handleDeleteTag = (tag: TagPagedItem) => {
     toast.error(`Chức năng 'Xóa Tag' [${tag.name}] chưa được kết nối API.`);
-    // setShowDeleteModal(tag);
   };
 
-  // Tính tổng số truyện đang sử dụng tags
   const totalUsage = tags.reduce((sum, tag) => sum + tag.usage, 0);
 
   return (
@@ -70,9 +100,6 @@ export default function TagManagementPage() {
         color: "var(--foreground)",
       }}
     >
-
-
-      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -100,7 +127,7 @@ export default function TagManagementPage() {
           </div>
 
           <Button
-            onClick={handleCreateTag}
+            onClick={handleCreateClick}
             className="bg-blue-600 hover:bg-blue-700 shadow-sm"
           >
             <PlusCircle className="w-4 h-4 mr-2" />
@@ -109,27 +136,28 @@ export default function TagManagementPage() {
         </div>
       </motion.div>
 
-      {/* Tag Grid */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <TagGrid
+        {/* Component Bảng */}
+        <TagTable
           tags={tags}
           isLoading={isLoading}
           error={error}
-          onEdit={handleEditTag}
+          onEdit={handleEditClick}  
           onDelete={handleDeleteTag}
         />
       </motion.div>
 
-      {/* (Các Modal CRUD thêm sau này) */}
-      {/* <CreateTagModal 
-          isOpen={showCreateModal} 
-          onClose={() => setShowCreateModal(false)} 
-          onSuccess={() => loadTags()} 
-      /> */}
+      {/* Component Modal (Chỉ dùng 1 cái duy nhất) */}
+      <TagModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        tagToEdit={editingTag}     // Truyền null hoặc object tag
+        onConfirm={handleSaveTag}  // Gọi hàm xử lý chung
+      />
     </div>
   );
 }

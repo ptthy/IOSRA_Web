@@ -70,7 +70,7 @@ export interface RealtimeStats {
 }
 
 
-// ========================= CORE API FUNCTIONS (Sử dụng apiClient) =========================
+const R2_BASE_URL = "https://pub-15618311c0ec468282718f80c66bcc13.r2.dev";
 
 // --- API Xử lý Nội dung (Moderation Stories, Chapters, Comments) ---
 // -------------------------------------------------------------------
@@ -321,5 +321,43 @@ export async function getChapterContent(reviewId: string) {
         // Kỳ vọng data trả về sẽ có trường kiểu như { content: "Nội dung chương..." }
     } catch (error: any) {
         throw new Error(error.response?.data?.message || "Lỗi khi tải nội dung chương");
+    }
+}
+export async function downloadChapterText(contentPath: string): Promise<string> {
+    try {
+        let fullUrl = contentPath;
+
+        // Nếu path chưa có http (tức là path tương đối: stories/...), thì ghép với R2 Base URL
+        if (!contentPath.startsWith("http")) {
+            // Xử lý trường hợp contentPath có dấu / ở đầu hay không
+            const cleanPath = contentPath.startsWith("/") ? contentPath.slice(1) : contentPath;
+            fullUrl = `${R2_BASE_URL}/${cleanPath}`;
+        }
+
+        // Thêm timestamp để tránh cache (tùy chọn, nhưng tốt cho việc test)
+        if (fullUrl.includes("?")) {
+            fullUrl += `&_t=${new Date().getTime()}`;
+        } else {
+            fullUrl += `?_t=${new Date().getTime()}`;
+        }
+
+        console.log("📥 Downloading content from:", fullUrl);
+
+        // Dùng fetch thay vì apiClient để tránh bị dính BaseURL của API Server
+        const response = await fetch(fullUrl, {
+            method: "GET",
+            // R2 là public bucket nên thường không cần Authorization header
+            // Nếu cần, hãy thêm vào đây. Nhưng link pub-xxx thường là public.
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const text = await response.text();
+        return text;
+    } catch (error) {
+        console.error("❌ Error downloading chapter text:", error);
+        throw new Error("Không thể tải nội dung chương từ Storage.");
     }
 }
