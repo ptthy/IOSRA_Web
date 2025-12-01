@@ -492,18 +492,28 @@ export const storyService = {
         data.tagIds.forEach((tagId) => formData.append("TagIds", tagId));
       }
 
-      // CoverMode (bắt buộc gửi nếu backend yêu cầu validate mode khi update)
-      const mode = data.coverMode === "generate" ? "generate" : "upload";
-      formData.append("CoverMode", mode);
+      // CoverMode (luôn gửi)
+      formData.append("CoverMode", data.coverMode!);
 
-      // Ảnh bìa mới (nếu có)
-      if (data.coverFile) {
+      // 🔥 FIX QUAN TRỌNG: Chỉ gửi CoverFile nếu có (không phải undefined)
+      if (data.coverFile instanceof File) {
         formData.append("CoverFile", data.coverFile);
       }
+      // Nếu coverFile là undefined (trong edit mode không có file mới), KHÔNG gửi trường CoverFile
 
       // Prompt (nếu có)
       if (data.coverPrompt) {
         formData.append("CoverPrompt", data.coverPrompt);
+      }
+
+      // Debug FormData
+      console.log("FormData gửi đi:");
+      for (let [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          console.log(`  ${key}: ${value.name} (${value.size} bytes)`);
+        } else {
+          console.log(`  ${key}: ${value}`);
+        }
       }
 
       await apiClient.put(`/api/AuthorStory/${storyId}`, formData, {
@@ -518,8 +528,12 @@ export const storyService = {
         throw new Error("Bạn không có quyền chỉnh sửa truyện này.");
       }
       if (error.response?.status === 400) {
+        // 🔥 HIỂN THỊ CHI TIẾT LỖI TỪ SERVER
+        const serverError = error.response?.data;
+        console.error("Chi tiết lỗi 400:", serverError);
+
         throw new Error(
-          error.response?.data?.message || "Dữ liệu cập nhật không hợp lệ."
+          serverError?.message || "Dữ liệu cập nhật không hợp lệ."
         );
       }
 
@@ -528,6 +542,37 @@ export const storyService = {
   },
 
   // === Endpoint 3: PUT /api/AuthorStory/{storyId} (Chỉ đổi ảnh bìa) ===
+  // async replaceDraftCover(storyId: string, coverFile: File): Promise<void> {
+  //   try {
+  //     console.log(`Đang cập nhật ảnh bìa cho truyện ${storyId}...`);
+
+  //     const formData = new FormData();
+  //     formData.append("CoverFile", coverFile);
+  //     formData.append("CoverMode", "upload");
+
+  //     await apiClient.put(`/api/AuthorStory/${storyId}`, formData, {
+  //       timeout: 60000,
+  //     });
+
+  //     console.log("Cập nhật ảnh bìa thành công!");
+  //   } catch (error: any) {
+  //     console.error("Lỗi khi cập nhật ảnh bìa:", error);
+
+  //     if (error.response?.status === 403) {
+  //       throw new Error("Bạn không có quyền sửa truyện này");
+  //     }
+  //     if (error.response?.status === 400) {
+  //       const msg = error.response?.data?.message || "";
+  //       if (msg.toLowerCase().includes("draft") || msg.includes("status")) {
+  //         throw new Error(
+  //           "Chỉ được thay ảnh bìa khi truyện còn ở trạng thái Bản nháp"
+  //         );
+  //       }
+  //       throw new Error(msg || "Dữ liệu ảnh không hợp lệ");
+  //     }
+  //     throw new Error("Không thể cập nhật ảnh bìa. Vui lòng thử lại.");
+  //   }
+  // },
   async replaceDraftCover(storyId: string, coverFile: File): Promise<void> {
     try {
       console.log(`Đang cập nhật ảnh bìa cho truyện ${storyId}...`);
@@ -543,6 +588,17 @@ export const storyService = {
       console.log("Cập nhật ảnh bìa thành công!");
     } catch (error: any) {
       console.error("Lỗi khi cập nhật ảnh bìa:", error);
+
+      // === THÊM ĐOẠN NÀY ĐỂ BẮT LỖI STORY NOT FOUND ===
+      // Kiểm tra theo cấu trúc response trong ảnh bạn gửi
+      const errorCode = error.response?.data?.error?.code;
+
+      if (error.response?.status === 404 || errorCode === "StoryNotFound") {
+        const notFoundError = new Error("Truyện không tồn tại");
+        (notFoundError as any).code = "STORY_NOT_FOUND"; // Gắn cờ để frontend nhận biết
+        throw notFoundError;
+      }
+      // =================================================
 
       if (error.response?.status === 403) {
         throw new Error("Bạn không có quyền sửa truyện này");

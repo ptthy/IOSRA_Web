@@ -29,22 +29,26 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Loader2,
   Save,
   AlertTriangle,
   Sparkles,
   Upload,
+  ChevronDown,
   X,
   CheckCircle2,
 } from "lucide-react";
 
 import { storyService } from "@/services/storyService";
-import type { Tag } from "@/services/apiTypes";
+import type { Tag, CreateStoryRequest } from "@/services/apiTypes";
 import { toast } from "sonner";
 import { ImageWithFallback } from "@/components/ui/ImageWithFallback";
 
@@ -87,6 +91,7 @@ export default function CreateStoryForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAIWarning, setShowAIWarning] = useState(false);
   const [showAIPreview, setShowAIPreview] = useState(false);
+  const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -129,7 +134,7 @@ export default function CreateStoryForm({
     }
   };
 
-  // Load initial data (dùng cho cả draft localStorage và edit mode)
+  // Load initial data
   useEffect(() => {
     if (initialData) {
       setTitle(initialData.title || "");
@@ -137,17 +142,28 @@ export default function CreateStoryForm({
       setOutline(initialData.outline || "");
       setLengthPlan(initialData.lengthPlan || "short");
       setSelectedTagIds(initialData.selectedTagIds || []);
-      setCoverMode(
-        initialData.hasUsedAICover
-          ? "upload"
-          : initialData.coverMode || "upload"
-      );
-      setCoverPrompt(initialData.coverPrompt || "");
-      setHasUsedAICover(initialData.hasUsedAICover || false);
-      setCreatedStoryId(initialData.createdStoryId || null);
-      if (initialData.currentCoverUrl) {
-        setGeneratedAICover(initialData.currentCoverUrl);
+
+      // Trong edit mode, luôn dùng upload và khóa AI
+      if (isEditMode) {
+        setCoverMode("upload");
+        setHasUsedAICover(true);
+        if (initialData.currentCoverUrl) {
+          setGeneratedAICover(initialData.currentCoverUrl);
+        }
+      } else {
+        setCoverMode(
+          initialData.hasUsedAICover
+            ? "upload"
+            : initialData.coverMode || "upload"
+        );
+        setHasUsedAICover(initialData.hasUsedAICover || false);
+        if (initialData.currentCoverUrl) {
+          setGeneratedAICover(initialData.currentCoverUrl);
+        }
       }
+
+      setCoverPrompt(initialData.coverPrompt || "");
+      setCreatedStoryId(initialData.createdStoryId || null);
     } else {
       // Chỉ load draft khi không phải edit mode
       const draft = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -168,7 +184,7 @@ export default function CreateStoryForm({
         }
       }
     }
-  }, [initialData]);
+  }, [initialData, isEditMode]);
 
   // Save draft (chỉ khi không phải edit mode)
   useEffect(() => {
@@ -214,6 +230,10 @@ export default function CreateStoryForm({
   };
 
   const handleCoverModeChange = (value: "upload" | "generate") => {
+    if (isEditMode) {
+      toast.error("Chế độ chỉnh sửa chỉ cho phép upload ảnh");
+      return;
+    }
     if (value === "generate" && hasUsedAICover) {
       toast.error("Bạn đã dùng lượt tạo ảnh AI. Không thể chọn lại.");
       return;
@@ -234,78 +254,85 @@ export default function CreateStoryForm({
         return;
       }
       setCoverFile(file);
+      // Tạo URL tạm thời để preview
       setGeneratedAICover(URL.createObjectURL(file));
     }
   };
 
   const handleSubmit = async () => {
-    // 1. Validate dữ liệu đầu vào
-    if (
-      !title.trim() ||
-      !description.trim() ||
-      !outline.trim() ||
-      selectedTagIds.length === 0
-    ) {
-      toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
+    // Validation
+    if (!title.trim()) {
+      toast.error("Vui lòng nhập tên truyện");
+      return;
+    }
+    if (!outline.trim()) {
+      toast.error("Vui lòng nhập dàn ý cốt truyện");
+      return;
+    }
+    if (selectedTagIds.length === 0) {
+      toast.error("Vui lòng chọn ít nhất 1 thể loại");
       return;
     }
 
+    // 🔥 FIX QUAN TRỌNG: Trong edit mode, không bắt buộc phải có coverFile mới
     if (
-      (coverMode === "upload" && !coverFile && !generatedAICover) ||
-      (coverMode === "generate" && !coverPrompt.trim())
+      coverMode === "upload" &&
+      !coverFile &&
+      !generatedAICover &&
+      !isEditMode
     ) {
-      toast.error("Vui lòng chọn ảnh bìa hoặc nhập prompt AI");
+      toast.error("Vui lòng chọn ảnh bìa");
+      return;
+    }
+    if (coverMode === "generate" && !coverPrompt.trim()) {
+      toast.error("Vui lòng nhập mô tả ảnh AI");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // 🔥 FIX 1: Chuyển đổi coverFile từ (File | null) sang (File | undefined) để khớp Interface
-      const validCoverFile =
-        coverMode === "upload" && coverFile ? coverFile : undefined;
+      // 🔥 FIX LỖI 400 & LỖI TYPESCRIPT:
+      // Trong edit mode, nếu không có coverFile mới, gửi coverFile là undefined
+      // Đảm bảo kiểu dữ liệu phù hợp với CreateStoryRequest
+      const finalCoverFile =
+        isEditMode && !coverFile ? undefined : coverFile || undefined;
 
-      // 🔥 FIX 2: Tạo object data đầy đủ (bao gồm cả coverMode) để dùng cho cả Create và Update
-      const requestData = {
+      const requestData: CreateStoryRequest = {
         title,
-        description,
+        description: description || "",
         outline,
         lengthPlan,
         tagIds: selectedTagIds,
-        coverMode, // <-- Thêm trường này vì Interface bắt buộc có
-        coverFile: validCoverFile,
+        coverMode,
+        // 🔥 FIX: Đảm bảo coverFile chỉ có thể là File hoặc undefined
+        coverFile: coverMode === "upload" ? finalCoverFile : undefined,
         coverPrompt: coverMode === "generate" ? coverPrompt : undefined,
       };
 
       if (isEditMode && storyId) {
         // EDIT MODE: Update draft
-        // Truyền đủ requestData để không bị thiếu trường coverMode
         await storyService.updateDraft(storyId, requestData);
-
         localStorage.removeItem(LOCAL_STORAGE_KEY);
         toast.success("Cập nhật truyện thành công!");
         onSuccess?.();
-      } else if (createdStoryId && coverMode === "upload" && coverFile) {
-        // Đã tạo draft, giờ upload ảnh thay thế
-        await storyService.replaceDraftCover(createdStoryId, coverFile);
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
-        toast.success("Đã cập nhật ảnh bìa!");
-        router.push(`/author/story/${createdStoryId}`);
       } else {
-        // Tạo mới hoàn toàn
-        // requestData ở đây đã khớp hoàn toàn với CreateStoryRequest
-        const result = await storyService.createDraft(requestData);
-
+        // CREATE MODE
+        const result = await storyService.createStory(requestData);
         setCreatedStoryId(result.storyId);
-        if (coverMode === "generate") {
-          setGeneratedAICover(result.coverUrl || null);
+
+        if (coverMode === "generate" && result.coverUrl) {
+          setGeneratedAICover(result.coverUrl);
+          setHasUsedAICover(true);
           setShowAIPreview(true);
         } else {
           localStorage.removeItem(LOCAL_STORAGE_KEY);
+          toast.success("Tạo truyện thành công!");
           router.push(`/author/story/${result.storyId}`);
         }
       }
     } catch (error: any) {
+      console.error("Submit error:", error);
       toast.error(error.message || "Có lỗi xảy ra");
     } finally {
       setIsSubmitting(false);
@@ -317,7 +344,9 @@ export default function CreateStoryForm({
     setHasUsedAICover(true);
     localStorage.removeItem(LOCAL_STORAGE_KEY);
     toast.success("Đã dùng ảnh bìa AI");
-    router.push(`/author/story/${createdStoryId}/submit-ai`);
+    if (createdStoryId) {
+      router.push(`/author/story/${createdStoryId}`);
+    }
   };
 
   const handleRejectAICover = () => {
@@ -338,7 +367,6 @@ export default function CreateStoryForm({
       createdStoryId,
     };
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newDraft));
-
     toast.info("Đã từ chối ảnh AI → Vui lòng upload ảnh mới");
   };
 
@@ -360,56 +388,92 @@ export default function CreateStoryForm({
           <CardDescription>
             {isEditMode
               ? "Bạn có thể chỉnh sửa thông tin khi truyện còn ở trạng thái bản nháp"
-              : "Điền thông tin chi tiết để tạo truyện mới"}
+              : "Tất cả các trường đánh dấu (*) là bắt buộc"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* === Tiêu đề === */}
-          <div>
-            <Label htmlFor="title">Tiêu đề truyện *</Label>
+          {/* === Tên truyện === */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label className="text-base font-bold ">
+                Tên truyện <span className="text-red-500 text-xl ">*</span>
+              </Label>
+              <span
+                className={`text-xs ${
+                  titleLength > LIMITS.TITLE
+                    ? "text-red-500"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {titleLength}/{LIMITS.TITLE}
+              </span>
+            </div>
             <Input
-              id="title"
+              placeholder="Nhập tên truyện của bạn..."
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Nhập tiêu đề hấp dẫn..."
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setTitleLength(e.target.value.length);
+              }}
               maxLength={LIMITS.TITLE}
+              className={
+                titleLength > LIMITS.TITLE
+                  ? "border-red-500"
+                  : "dark:border-[#f0ead6]"
+              }
             />
-            <p className="text-xs text-muted-foreground text-right mt-1">
-              {titleLength}/{LIMITS.TITLE}
-            </p>
           </div>
 
-          {/* === Mô tả ngắn & Dàn ý === */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <Label htmlFor="description">Mô tả ngắn *</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Mô tả ngắn gọn, hấp dẫn..."
-                rows={4}
-              />
-            </div>
-            <div>
-              <Label htmlFor="outline">Dàn ý chi tiết *</Label>
-              <Textarea
-                id="outline"
-                value={outline}
-                onChange={(e) => setOutline(e.target.value)}
-                placeholder="Viết dàn ý chi tiết các chương..."
-                rows={4}
-                maxLength={LIMITS.OUTLINE}
-              />
-              <p className="text-xs text-muted-foreground text-right mt-1">
+          {/* === Mô tả === */}
+          <div className="space-y-2">
+            <Label>Mô tả</Label>
+            <Textarea
+              placeholder="Giới thiệu nội dung truyện của bạn..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={5}
+              className="dark:border-[#f0ead6]"
+            />
+          </div>
+
+          {/* === Dàn ý cốt truyện === */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label className="text-base font-bold">
+                Dàn ý cốt truyện <span className="text-red-500 text-xl">*</span>
+              </Label>
+              <span
+                className={`text-xs ${
+                  outlineLength > LIMITS.OUTLINE
+                    ? "text-red-500"
+                    : "text-muted-foreground"
+                }`}
+              >
                 {outlineLength}/{LIMITS.OUTLINE}
-              </p>
+              </span>
             </div>
+            <Textarea
+              placeholder="Viết dàn ý chi tiết dự kiến của truyện..."
+              value={outline}
+              onChange={(e) => {
+                setOutline(e.target.value);
+                setOutlineLength(e.target.value.length);
+              }}
+              rows={8}
+              maxLength={LIMITS.OUTLINE}
+              className={
+                outlineLength > LIMITS.OUTLINE
+                  ? "border-red-500"
+                  : "dark:border-[#f0ead6]"
+              }
+            />
           </div>
 
           {/* === Độ dài dự kiến === */}
-          <div>
-            <Label>Độ dài dự kiến *</Label>
+          <div className="space-y-2">
+            <Label className="text-base font-bold">
+              Độ dài dự kiến <span className="text-red-500 text-xl">*</span>
+            </Label>
             <RadioGroup
               value={lengthPlan}
               onValueChange={(v) => setLengthPlan(v as any)}
@@ -419,8 +483,15 @@ export default function CreateStoryForm({
                   key={opt.value}
                   className="flex items-center space-x-2 mt-2"
                 >
-                  <RadioGroupItem value={opt.value} id={opt.value} />
-                  <Label htmlFor={opt.value} className="cursor-pointer">
+                  <RadioGroupItem
+                    value={opt.value}
+                    id={opt.value}
+                    className="dark:border-[#f0ead6]"
+                  />
+                  <Label
+                    htmlFor={opt.value}
+                    className="cursor-pointer font-normal"
+                  >
                     {opt.label}
                   </Label>
                 </div>
@@ -429,138 +500,266 @@ export default function CreateStoryForm({
           </div>
 
           {/* === Thể loại === */}
-          <div>
-            <Label>Thể loại *</Label>
-            <div className="flex flex-wrap gap-2 mt-3">
-              {tags.map((tag) => (
-                <Badge
-                  key={tag.tagId}
-                  variant={
-                    selectedTagIds.includes(tag.tagId) ? "default" : "outline"
-                  }
-                  className="cursor-pointer"
-                  onClick={() => toggleTag(tag.tagId)}
+          <div className="space-y-2">
+            <Label className="text-base font-bold">
+              Thể loại <span className="text-red-500 text-xl">*</span>
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                (Chọn ít nhất 1)
+              </span>
+            </Label>
+            <Dialog open={isTagDialogOpen} onOpenChange={setIsTagDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isSubmitting}
+                  className="w-full justify-between border-2 border-primary/30 dark:border-[#f0ead6]"
                 >
-                  {tag.tagName}
-                </Badge>
-              ))}
-            </div>
-            {selectedTagIds.length === 0 && (
-              <p className="text-sm text-destructive mt-2">
-                Vui lòng chọn ít nhất 1 thể loại
-              </p>
-            )}
-          </div>
+                  <div className="flex flex-wrap gap-1.5 flex-1 items-center">
+                    {selectedTagIds.length ? (
+                      selectedTagIds.map((id) => {
+                        const tag = tags.find((t) => t.tagId === id);
+                        return tag ? (
+                          <Badge key={id} variant="default" className="text-xs">
+                            {tag.tagName}
+                          </Badge>
+                        ) : null;
+                      })
+                    ) : (
+                      <span className="text-muted-foreground">
+                        Chọn thể loại...
+                      </span>
+                    )}
+                  </div>
+                  <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+                </Button>
+              </DialogTrigger>
 
-          {/* === Ảnh bìa === */}
-          <div>
-            <Label>Ảnh bìa *</Label>
-            {generatedAICover && (
-              <div className="mt-3 mb-4">
-                <div className="relative inline-block">
-                  <ImageWithFallback
-                    src={generatedAICover}
-                    alt="Preview bìa"
-                    width={200}
-                    height={300}
-                    className="rounded-lg shadow-md object-cover aspect-[2/3]"
-                  />
-                  {coverMode === "generate" && (
-                    <Badge className="absolute top-2 right-2">AI</Badge>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <RadioGroup value={coverMode} onValueChange={handleCoverModeChange}>
-              <div className="space-y-4 mt-4">
-                <label className="cursor-pointer">
-                  <Card
-                    className={
-                      coverMode === "upload"
-                        ? "ring-2 ring-primary border-primary bg-primary/5"
-                        : ""
-                    }
-                  >
-                    <CardContent className="pt-6 pb-6">
-                      <div className="flex items-start gap-3">
-                        <RadioGroupItem
-                          value="upload"
-                          id="upload"
-                          className="mt-1"
-                        />
-                        <div>
-                          <p className="font-medium flex items-center gap-2">
-                            <Upload className="h-5 w-5" /> Upload ảnh từ máy
-                            tính
-                          </p>
-                          {coverMode === "upload" && (
-                            <div className="mt-4">
-                              <Input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleFileChange}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </label>
-
-                <label
-                  className={
-                    hasUsedAICover ? "cursor-not-allowed" : "cursor-pointer"
-                  }
-                >
-                  <Card
-                    className={`${
-                      coverMode === "generate"
-                        ? "ring-2 ring-primary border-primary bg-primary/5"
-                        : ""
-                    } ${hasUsedAICover ? "opacity-50" : ""}`}
-                  >
-                    <CardContent className="pt-6 pb-6">
-                      <div className="flex items-start gap-3">
-                        <RadioGroupItem
-                          value="generate"
-                          id="generate"
-                          disabled={hasUsedAICover}
+              <DialogContent className="max-w-2xl max-h-[600px]">
+                <DialogHeader>
+                  <DialogTitle>Chọn Thể Loại Truyện</DialogTitle>
+                  <DialogDescription>
+                    Chọn một hoặc nhiều thể loại phù hợp
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="max-h-[400px] overflow-y-auto pr-2 ">
+                  <div className="grid grid-cols-1 gap-3">
+                    {tags.map((tag) => (
+                      <div
+                        key={tag.tagId}
+                        className={`flex items-start space-x-3 p-3 rounded-lg border-2 cursor-pointer ${
+                          selectedTagIds.includes(tag.tagId)
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                        onClick={() => toggleTag(tag.tagId)}
+                      >
+                        <Checkbox
+                          checked={selectedTagIds.includes(tag.tagId)}
+                          onCheckedChange={() => toggleTag(tag.tagId)}
                           className="mt-1"
                         />
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Sparkles className="h-5 w-5 text-primary" />
-                            <p className="font-medium">Tạo ảnh bằng AI</p>
-                            {hasUsedAICover && (
-                              <Badge variant="secondary">Đã dùng</Badge>
-                            )}
-                          </div>
-                          {coverMode === "generate" && !hasUsedAICover && (
-                            <div className="mt-4 space-y-3">
-                              <Textarea
-                                placeholder="Mô tả ảnh bìa bạn muốn AI tạo..."
-                                value={coverPrompt}
-                                onChange={(e) => {
-                                  setCoverPrompt(e.target.value);
-                                  setPromptLength(e.target.value.length);
-                                }}
-                                rows={6}
-                                maxLength={LIMITS.PROMPT}
-                              />
-                              <p className="text-xs text-muted-foreground text-right">
-                                {promptLength}/{LIMITS.PROMPT} ký tự
-                              </p>
-                            </div>
+                          <p className="font-medium">{tag.tagName}</p>
+                          {tag.description && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {tag.description}
+                            </p>
                           )}
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                </label>
+                    ))}
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    onClick={() => setIsTagDialogOpen(false)}
+                    className="w-full"
+                  >
+                    Xong ({selectedTagIds.length} đã chọn)
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {/* === Ảnh bìa - LAYOUT MỚI 2 CỘT === */}
+          <div className="space-y-4">
+            <Label className="text-base font-bold">
+              Ảnh bìa <span className="text-red-500 text-xl ">*</span>
+            </Label>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Cột trái: Hiển thị ảnh preview */}
+              <div className="md:col-span-1">
+                {generatedAICover && (
+                  <div className="flex flex-col items-center">
+                    <div className="relative w-full max-w-[200px] aspect-[2/3] border rounded-lg overflow-hidden shadow-lg">
+                      <ImageWithFallback
+                        src={generatedAICover}
+                        alt="Preview cover"
+                        className="w-full h-full object-cover"
+                      />
+                      {coverMode === "generate" && (
+                        <Badge className="absolute top-2 right-2 bg-primary text-white">
+                          AI
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2 text-center">
+                      {isEditMode ? "Ảnh hiện tại" : "Xem trước"}
+                    </p>
+                  </div>
+                )}
               </div>
-            </RadioGroup>
+
+              {/* Cột phải: Các tùy chọn ảnh bìa */}
+              <div className="md:col-span-2">
+                <RadioGroup
+                  value={coverMode}
+                  onValueChange={handleCoverModeChange}
+                >
+                  {/* Upload ảnh */}
+                  <label className="cursor-pointer">
+                    <Card
+                      className={
+                        coverMode === "upload"
+                          ? "ring-2 ring-primary border-primary bg-primary/5"
+                          : "hover:border-primary/50"
+                      }
+                    >
+                      <CardContent className="pt-6 pb-6">
+                        <div className="flex items-start gap-3">
+                          <RadioGroupItem
+                            value="upload"
+                            id="upload"
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Upload className="h-5 w-5 text-primary" />
+                              <p className="font-medium">
+                                Upload ảnh từ máy tính
+                              </p>
+                            </div>
+                            {coverMode === "upload" && (
+                              <div className="mt-4">
+                                {/* Ẩn input gốc đi, dùng Label để tạo giao diện hiển thị tên file */}
+                                <div className="relative group">
+                                  <Label
+                                    htmlFor="file-upload-input"
+                                    className="flex items-center w-full h-10 px-3 py-2 text-sm border rounded-md cursor-pointer bg-background hover:bg-accent/50 transition-colors"
+                                  >
+                                    {/* Giả lập cái nút "Chọn tệp" màu xám */}
+                                    <span className="px-3 py-1 mr-3 text-xs font-medium border rounded bg-secondary text-secondary-foreground whitespace-nowrap group-hover:bg-secondary/80">
+                                      Chọn tệp
+                                    </span>
+
+                                    {/* Phần hiển thị tên file hoặc trạng thái */}
+                                    <span
+                                      className={`truncate ${
+                                        coverFile
+                                          ? "text-foreground font-medium"
+                                          : "text-muted-foreground"
+                                      }`}
+                                    >
+                                      {coverFile
+                                        ? coverFile.name // Nếu vừa chọn file mới thì hiện tên file
+                                        : (isEditMode && generatedAICover) ||
+                                          generatedAICover
+                                        ? "Đang dùng ảnh hiện tại (Bấm để thay đổi)"
+                                        : "Không có tệp nào được chọn"}
+                                    </span>
+                                  </Label>
+
+                                  {/* Input thật bị ẩn đi bằng className="hidden" */}
+                                  <Input
+                                    id="file-upload-input"
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleFileChange}
+                                  />
+                                </div>
+
+                                {/* Dòng thông báo trạng thái màu xanh bên dưới */}
+                                {(coverFile ||
+                                  ((isEditMode || generatedAICover) &&
+                                    generatedAICover)) && (
+                                  <p className="text-sm text-emerald-600 mt-2 font-medium">
+                                    {coverFile
+                                      ? "Đã chọn ảnh mới thành công"
+                                      : "Đang sử dụng ảnh bìa cũ"}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </label>
+
+                  {/* AI - Bị disable trong edit mode */}
+                  <label
+                    className={
+                      isEditMode || hasUsedAICover
+                        ? "cursor-not-allowed"
+                        : "cursor-pointer"
+                    }
+                  >
+                    <Card
+                      className={`${
+                        coverMode === "generate"
+                          ? "ring-2 ring-primary border-primary bg-primary/5"
+                          : ""
+                      } ${isEditMode || hasUsedAICover ? "opacity-50" : ""}`}
+                    >
+                      <CardContent className="pt-6 pb-6">
+                        <div className="flex items-start gap-3">
+                          <RadioGroupItem
+                            value="generate"
+                            id="generate"
+                            disabled={isEditMode || hasUsedAICover}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Sparkles className="h-5 w-5 text-primary" />
+                              <p className="font-medium">Tạo ảnh bằng AI</p>
+                              {(isEditMode || hasUsedAICover) && (
+                                <Badge variant="secondary">
+                                  {isEditMode ? "Đã khóa" : "Đã dùng"}
+                                </Badge>
+                              )}
+                            </div>
+                            {coverMode === "generate" &&
+                              !isEditMode &&
+                              !hasUsedAICover && (
+                                <div className="mt-4 space-y-3">
+                                  <Textarea
+                                    placeholder="Mô tả ảnh bìa bạn muốn AI tạo..."
+                                    value={coverPrompt}
+                                    onChange={(e) => {
+                                      setCoverPrompt(e.target.value);
+                                      setPromptLength(e.target.value.length);
+                                    }}
+                                    rows={6}
+                                    maxLength={LIMITS.PROMPT}
+                                  />
+                                  <p className="text-xs text-muted-foreground text-right">
+                                    {promptLength}/{LIMITS.PROMPT} ký tự
+                                  </p>
+                                </div>
+                              )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </label>
+                </RadioGroup>
+              </div>
+            </div>
           </div>
         </CardContent>
 
@@ -585,7 +784,7 @@ export default function CreateStoryForm({
         </CardFooter>
       </Card>
 
-      {/* AI Warning Dialog */}
+      {/* Dialog cảnh báo AI */}
       <AlertDialog open={showAIWarning} onOpenChange={setShowAIWarning}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -594,8 +793,8 @@ export default function CreateStoryForm({
               Lưu ý quan trọng
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Bạn chỉ được <strong>TẠO AI 1 LẦN DUY NHẤT</strong>. Sau khi tạo,
-              bạn sẽ không thể thay đổi lại.
+              Bạn chỉ được <strong>TẠO ẢNH AI 1 LẦN DUY NHẤT</strong>. Sau khi
+              tạo, bạn sẽ không thể thay đổi lại.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -604,7 +803,7 @@ export default function CreateStoryForm({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* AI Preview Dialog */}
+      {/* Preview ảnh AI */}
       <Dialog open={showAIPreview} onOpenChange={setShowAIPreview}>
         <DialogContent className="max-w-md">
           <DialogHeader>

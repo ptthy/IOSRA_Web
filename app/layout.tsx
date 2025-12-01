@@ -9,7 +9,8 @@ import { Navbar } from "@/components/layout/Navbar";
 import { AuthProvider } from "@/context/AuthContext";
 
 import { AppProviders } from "@/components/providers/app-providers";
-
+import { ChatBotWidget } from "@/components/chat/ChatBotWidget";
+import { ModalProvider } from "@/context/ModalContext";
 const poppins = Poppins({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
@@ -43,9 +44,12 @@ export default async function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <AuthProvider>
             <AppProviders activeThemeValue={activeThemeValue}>
-              <Navbar />
+              <ModalProvider>
+                <Navbar />
 
-              {children}
+                {children}
+                <ChatBotWidget />
+              </ModalProvider>
             </AppProviders>
           </AuthProvider>
         </ThemeProvider>

@@ -570,16 +570,35 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
             <Select
               value={currentVoice?.voiceId || ""}
               onValueChange={onVoiceSelect}
+              // Nếu không có voice nào, disable select luôn hoặc để mở ra xem thông báo
+              disabled={isLoadingVoice}
             >
               <SelectTrigger className="h-8 w-[140px] text-xs bg-black/5 dark:bg-white/10 border-0 rounded-full px-3 truncate">
                 <SelectValue
-                  placeholder={isLoadingVoice ? "Đang tải..." : "Chọn giọng"}
+                  //  CẬP NHẬT 1: Thay đổi placeholder dựa trên trạng thái dữ liệu
+                  placeholder={
+                    isLoadingVoice
+                      ? "Đang tải..."
+                      : voices.length === 0
+                      ? "Không có audio"
+                      : "Chọn giọng"
+                  }
                 />
               </SelectTrigger>
               <SelectContent>
                 {isLoadingVoice ? (
                   <div className="p-2 text-xs text-center">
                     <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                  </div>
+                ) : voices.length === 0 ? (
+                  //  CẬP NHẬT 2: Hiển thị thông báo khi mảng rỗng
+                  <div className="p-4 text-xs text-center text-muted-foreground flex flex-col items-center gap-2">
+                    <VolumeX className="w-6 h-6 opacity-50" />
+                    <span>
+                      Tác giả chưa tạo voice
+                      <br />
+                      cho chương này
+                    </span>
                   </div>
                 ) : (
                   voices.map((v) => (
