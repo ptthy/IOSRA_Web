@@ -1,7 +1,7 @@
-//components/payment/TopUpModal.tsx
+// components/payment/TopUpModal.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -24,13 +24,53 @@ import {
   Trophy,
 } from "lucide-react";
 import { toast } from "sonner";
-import { paymentService } from "@/services/paymentService";
+import {
+  paymentService,
+  PaymentPricingPackage,
+} from "@/services/paymentService";
 
 interface TopUpModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentBalance?: number;
 }
+
+// Định nghĩa trước các Theme để map theo index của gói
+const THEME_MAPPING = [
+  {
+    // Index 0: Gói Basic (Cyan)
+    border: "border-cyan-400 dark:border-cyan-600",
+    bg: "bg-cyan-50 dark:bg-cyan-950/30",
+    iconBg: "bg-cyan-100 dark:bg-cyan-900/50",
+    iconColor: "text-cyan-600 dark:text-cyan-400",
+    btn: "bg-cyan-600 hover:bg-cyan-700 text-white",
+    badge: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300",
+    icon: Gem,
+    label: "Cơ bản",
+  },
+  {
+    // Index 1: Gói Popular (Blue)
+    border: "border-blue-500 dark:border-blue-600",
+    bg: "bg-blue-50 dark:bg-blue-950/30",
+    iconBg: "bg-blue-100 dark:bg-blue-900/50",
+    iconColor: "text-blue-600 dark:text-blue-400",
+    btn: "bg-blue-600 hover:bg-blue-700 text-white",
+    badge: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+    icon: Star,
+    label: "Phổ biến",
+  },
+  {
+    // Index 2: Gói VIP (Amber/Gold)
+    border: "border-amber-400 dark:border-amber-600",
+    bg: "bg-amber-50 dark:bg-amber-950/30",
+    iconBg: "bg-amber-100 dark:bg-amber-900/50",
+    iconColor: "text-amber-600 dark:text-amber-400",
+    btn: "bg-amber-600 hover:bg-amber-700 text-white",
+    badge: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+    icon: Trophy,
+    label: "Đại gia",
+  },
+];
 
 export function TopUpModal({
   isOpen,
@@ -39,61 +79,34 @@ export function TopUpModal({
 }: TopUpModalProps) {
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const topUpPackages = [
-    {
-      id: "pkg_basic",
-      dias: 550,
-      price: 2000,
-      bonus: "10%",
-      label: "Cơ bản",
-      // MÀU 1: CYAN
-      theme: {
-        border: "border-cyan-400 dark:border-cyan-600",
-        bg: "bg-cyan-50 dark:bg-cyan-950/30",
-        iconBg: "bg-cyan-100 dark:bg-cyan-900/50",
-        iconColor: "text-cyan-600 dark:text-cyan-400",
-        btn: "bg-cyan-600 hover:bg-cyan-700 text-white",
-        badge: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300",
-      },
-      icon: Gem,
-    },
-    {
-      id: "pkg_popular",
-      dias: 1150,
-      price: 3000,
-      bonus: "15%",
-      label: "Phổ biến",
-      popular: true,
-      // MÀU 2: BLUE
-      theme: {
-        border: "border-blue-500 dark:border-blue-600",
-        bg: "bg-blue-50 dark:bg-blue-950/30",
-        iconBg: "bg-blue-100 dark:bg-blue-900/50",
-        iconColor: "text-blue-600 dark:text-blue-400",
-        btn: "bg-blue-600 hover:bg-blue-700 text-white",
-        badge: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-      },
-      icon: Star,
-    },
-    {
-      id: "pkg_vip",
-      dias: 2400,
-      price: 4000,
-      bonus: "20%",
-      label: "Đại gia",
-      // MÀU 3: AMBER/GOLD
-      theme: {
-        border: "border-amber-400 dark:border-amber-600",
-        bg: "bg-amber-50 dark:bg-amber-950/30",
-        iconBg: "bg-amber-100 dark:bg-amber-900/50",
-        iconColor: "text-amber-600 dark:text-amber-400",
-        btn: "bg-amber-600 hover:bg-amber-700 text-white",
-        badge:
-          "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
-      },
-      icon: Trophy,
-    },
-  ];
+  // State lưu danh sách gói lấy từ API
+  const [packages, setPackages] = useState<PaymentPricingPackage[]>([]);
+  const [isLoadingPackages, setIsLoadingPackages] = useState(false);
+
+  // --- Gọi API lấy gói cước khi mở Modal ---
+  useEffect(() => {
+    if (isOpen) {
+      const fetchPricing = async () => {
+        setIsLoadingPackages(true);
+        try {
+          const res = await paymentService.getPricingPackages();
+          if (res.data && Array.isArray(res.data)) {
+            // Sắp xếp theo giá tăng dần
+            const sortedPackages = res.data.sort(
+              (a, b) => a.amountVnd - b.amountVnd
+            );
+            setPackages(sortedPackages);
+          }
+        } catch (error) {
+          console.error("Lỗi lấy bảng giá:", error);
+          toast.error("Không thể tải bảng giá kim cương.");
+        } finally {
+          setIsLoadingPackages(false);
+        }
+      };
+      fetchPricing();
+    }
+  }, [isOpen]);
 
   const handleTopUp = async (amount: number, pkgId: string) => {
     setProcessingId(pkgId);
@@ -101,10 +114,12 @@ export function TopUpModal({
       const returnUrl = `${window.location.origin}/payment/success`;
       const cancelUrl = `${window.location.origin}/payment/cancel`;
 
+      // Truyền thêm pricingId vào API
       const response = await paymentService.createPaymentLink({
         amount: amount,
         returnUrl,
         cancelUrl,
+        pricingId: pkgId,
       });
 
       if (response.data?.checkoutUrl) {
@@ -145,18 +160,10 @@ export function TopUpModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      {/* Thêm !flex vào nút button để đè class ẩn mặc định */}
-      <DialogContent
-        className="!w-[95vw] !max-w-none h-[90vh] p-0 overflow-hidden bg-card rounded-xl border shadow-2xl flex flex-col [&>button]:hidden relative 
-        fixed left-[50%] -translate-x-1/2 top-[2%] sm:top-[5%] translate-y-0 duration-200"
-      >
+      <DialogContent className="!w-[95vw] !max-w-none h-[90vh] p-0 overflow-hidden bg-card rounded-xl border shadow-2xl flex flex-col [&>button]:hidden fixed left-[50%] -translate-x-1/2 top-[2%] sm:top-[5%] translate-y-0 duration-200">
         <button
           onClick={onClose}
-          className="!flex items-center justify-center absolute top-4 right-4 z-50 p-2 rounded-full transition-all duration-200 
-            bg-white hover:bg-red-50 dark:bg-zinc-800 dark:hover:bg-zinc-700
-            text-gray-500 hover:text-red-500 dark:text-white
-            shadow-lg shadow-black/10 border-2 border-gray-100 dark:border-zinc-700
-            hover:scale-110 active:scale-95 cursor-pointer group h-10 w-10"
+          className="!flex items-center justify-center absolute top-4 right-4 z-50 p-2 rounded-full transition-all duration-200 bg-white hover:bg-red-50 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-500 hover:text-red-500 dark:text-white shadow-lg shadow-black/10 border-2 border-gray-100 dark:border-zinc-700 hover:scale-110 active:scale-95 cursor-pointer group h-10 w-10"
         >
           <X className="h-6 w-6 group-hover:rotate-90 transition-transform duration-300 stroke-[3px]" />
         </button>
@@ -164,11 +171,11 @@ export function TopUpModal({
         <div className="flex h-full w-full">
           {/* --- CỘT TRÁI: PREMIUM (Giữ nguyên) --- */}
           <div className="w-[350px] flex-shrink-0 bg-gradient-to-br from-[#FF9966] via-[#FF5E62] to-[#FF0000] p-6 text-white flex flex-col overflow-y-auto scrollbar-hide">
+            {/* ... Nội dung Premium giữ nguyên ... */}
             <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-[50px] pointer-events-none translate-x-1/2 -translate-y-1/2"></div>
             <div className="absolute bottom-0 left-0 w-32 h-32 bg-yellow-300/20 rounded-full blur-[40px] pointer-events-none -translate-x-1/2 translate-y-1/2"></div>
 
             <div className="relative z-10 flex flex-col h-full gap-4">
-              {/* Header Trái */}
               <div>
                 <div className="inline-flex items-center gap-2 mb-3 bg-white/10 px-3 py-1 rounded-full backdrop-blur-md border border-white/20 shadow-sm">
                   <Crown className="h-4 w-4 text-yellow-300 fill-yellow-300" />
@@ -185,7 +192,6 @@ export function TopUpModal({
                 </p>
               </div>
 
-              {/* Card Premium */}
               <div className="flex-1 flex flex-col justify-start mt-2">
                 <div className="bg-white/10 backdrop-blur-xl rounded-xl p-5 border border-white/20 shadow-lg">
                   <div className="flex justify-between items-start mb-3 border-b border-white/10 pb-3">
@@ -244,14 +250,13 @@ export function TopUpModal({
                   </p>
                 </div>
               </div>
-
               <div className="text-[10px] text-white/40 text-center mt-auto">
                 Áp dụng Điều khoản dịch vụ & CSBM.
               </div>
             </div>
           </div>
 
-          {/* --- CỘT PHẢI: GÓI NẠP LẺ --- */}
+          {/* --- CỘT PHẢI: GÓI NẠP LẺ (DYNAMIC) --- */}
           <div className="flex-1 min-w-0 p-8 bg-white dark:bg-card overflow-auto flex flex-col">
             <div className="flex-shrink-0 flex items-center justify-between mb-4 pb-4 border-b border-border/50">
               <div className="pr-12">
@@ -274,78 +279,121 @@ export function TopUpModal({
               </div>
             </div>
 
-            {/* Grid 3 gói */}
+            {/* Grid Các Gói Nạp - Động */}
             <div className="flex-1 flex flex-col justify-center py-2">
-              <div className="grid grid-cols-3 gap-6">
-                {topUpPackages.map((pkg, idx) => (
-                  <Card
-                    key={idx}
-                    onClick={() => {
-                      if (processingId === null) handleTopUp(pkg.price, pkg.id);
-                    }}
-                    className={`group cursor-pointer relative overflow-visible transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl border-2 h-[300px] rounded-2xl flex flex-col justify-between
-                      ${pkg.theme.border} ${pkg.theme.bg}
-                      ${
-                        processingId === pkg.id
-                          ? "opacity-80 pointer-events-none ring-2 ring-offset-2 ring-blue-400"
-                          : ""
-                      }
-                    `}
-                  >
-                    {pkg.popular && (
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg z-10 tracking-wide uppercase whitespace-nowrap">
-                        Phổ biến nhất
-                      </div>
-                    )}
+              {isLoadingPackages ? (
+                <div className="flex flex-col items-center justify-center py-10">
+                  <Loader2 className="h-10 w-10 animate-spin text-blue-500 mb-2" />
+                  <p className="text-muted-foreground text-sm">
+                    Đang tải gói nạp...
+                  </p>
+                </div>
+              ) : packages.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground bg-gray-50 rounded-lg">
+                  Hiện chưa có gói nạp nào.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {packages.map((pkg, idx) => {
+                    // Logic chọn Theme dựa trên index, xoay vòng nếu vượt quá 3 gói
+                    // Index 0: Cơ bản, 1: Phổ biến, 2: Đại gia
+                    const themeIndex = idx % THEME_MAPPING.length;
+                    const theme = THEME_MAPPING[themeIndex];
 
-                    <CardContent className="p-5 flex flex-col items-center text-center h-full justify-center gap-4">
-                      <div
-                        className={`h-20 w-20 rounded-2xl flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-110 
-                          ${pkg.theme.iconBg}`}
+                    // Logic Popular: Gói thứ 2 (giữa) thường là phổ biến
+                    const isPopular = idx === 1;
+
+                    // Tính Bonus (Optional): So sánh tỷ lệ Kim cương/Giá tiền với gói thấp nhất
+                    // Tỷ lệ cơ bản (Gói 0)
+                    const baseRate =
+                      packages[0].amountVnd > 0
+                        ? packages[0].diamondGranted / packages[0].amountVnd
+                        : 0;
+                    const currentRate =
+                      pkg.amountVnd > 0
+                        ? pkg.diamondGranted / pkg.amountVnd
+                        : 0;
+
+                    let bonusPercent = 0;
+                    if (baseRate > 0 && currentRate > baseRate) {
+                      bonusPercent = Math.round(
+                        ((currentRate - baseRate) / baseRate) * 100
+                      );
+                    }
+
+                    return (
+                      <Card
+                        key={pkg.pricingId}
+                        onClick={() => {
+                          if (processingId === null)
+                            handleTopUp(pkg.amountVnd, pkg.pricingId);
+                        }}
+                        className={`group cursor-pointer relative overflow-visible transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl border-2 h-[300px] rounded-2xl flex flex-col justify-between
+                          ${theme.border} ${theme.bg}
+                          ${
+                            processingId === pkg.pricingId
+                              ? "opacity-80 pointer-events-none ring-2 ring-offset-2 ring-blue-400"
+                              : ""
+                          }
+                        `}
                       >
-                        <pkg.icon
-                          className={`h-10 w-10 ${pkg.theme.iconColor}`}
-                        />
-                      </div>
+                        {isPopular && (
+                          <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg z-10 tracking-wide uppercase whitespace-nowrap">
+                            Phổ biến nhất
+                          </div>
+                        )}
 
-                      <div className="space-y-1">
-                        <h4 className="font-black text-3xl text-gray-900 dark:text-white">
-                          {pkg.dias.toLocaleString()}
-                        </h4>
-                        <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                          Kim Cương
-                        </span>
-                      </div>
+                        <CardContent className="p-5 flex flex-col items-center text-center h-full justify-center gap-4">
+                          <div
+                            className={`h-20 w-20 rounded-2xl flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-110 
+                              ${theme.iconBg}`}
+                          >
+                            <theme.icon
+                              className={`h-10 w-10 ${theme.iconColor}`}
+                            />
+                          </div>
 
-                      {pkg.bonus ? (
-                        <Badge
-                          variant="secondary"
-                          className={`font-bold px-3 py-1 text-xs border-0 ${pkg.theme.badge}`}
-                        >
-                          <Sparkles className="w-3 h-3 mr-1 inline-block" />+
-                          {pkg.bonus} Bonus
-                        </Badge>
-                      ) : (
-                        <div className="h-[26px]"></div>
-                      )}
+                          <div className="space-y-1">
+                            <h4 className="font-black text-3xl text-gray-900 dark:text-white">
+                              {pkg.diamondGranted.toLocaleString()}
+                            </h4>
+                            <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                              Kim Cương
+                            </span>
+                          </div>
 
-                      <div className="w-full mt-2">
-                        <div
-                          className={`w-full py-3 rounded-xl font-bold text-lg transition-colors shadow-sm flex items-center justify-center
-                            ${pkg.theme.btn}
-                          `}
-                        >
-                          {processingId === pkg.id ? (
-                            <Loader2 className="animate-spin h-6 w-6 text-white" />
+                          {/* Hiển thị Bonus nếu tính được > 0 */}
+                          {bonusPercent > 0 ? (
+                            <Badge
+                              variant="secondary"
+                              className={`font-bold px-3 py-1 text-xs border-0 ${theme.badge}`}
+                            >
+                              <Sparkles className="w-3 h-3 mr-1 inline-block" />
+                              +{bonusPercent}% Bonus
+                            </Badge>
                           ) : (
-                            `${pkg.price.toLocaleString()}đ`
+                            <div className="h-[26px]"></div>
                           )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+
+                          <div className="w-full mt-2">
+                            <div
+                              className={`w-full py-3 rounded-xl font-bold text-lg transition-colors shadow-sm flex items-center justify-center
+                                ${theme.btn}
+                              `}
+                            >
+                              {processingId === pkg.pricingId ? (
+                                <Loader2 className="animate-spin h-6 w-6 text-white" />
+                              ) : (
+                                `${pkg.amountVnd.toLocaleString()}đ`
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="flex-shrink-0 border-t border-border/40 pt-4 mt-4">
