@@ -165,7 +165,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const primaryRole = getPrimaryRole(userRoles);
 
-        // Check author approved (giữ nguyên logic cũ )
+        // Check author approved (giữ nguyên logic cũ của bạn)
         let isApproved = userRoles.includes("author");
         if (!isApproved && primaryRole === "reader") {
           try {
@@ -202,7 +202,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
           const profileRes = await authService.getMyProfile();
           avatarUrl = profileRes.data.avatarUrl || null;
-          displayName = profileRes.data.username;
+          displayName = profileRes.data.displayName || username; // nếu sau này có displayName thật
         } catch (err) {
           console.warn("Không lấy được avatar từ /api/Profile");
         }
@@ -226,9 +226,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         router.push(redirectPath);
         toast.success(`Chào mừng, ${displayName}!`);
-        setTimeout(() => {
-          router.push(redirectPath);
-        }, 4000);
       } catch (error: any) {
         console.error("Lỗi đăng nhập:", error);
         const message = error.response?.data?.message || "Đăng nhập thất bại.";
@@ -247,9 +244,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUserCookie(null); // Xóa cookie
     router.push("/login");
     toast.success("Đã đăng xuất.");
-    setTimeout(() => {
-      router.push("/login");
-    }, 4000);
   }, [router]);
 
   const setAuthData = useCallback(

@@ -1070,12 +1070,13 @@ export default function PublicProfilePage() {
                     <div className="space-y-3">
                       {followers.map((follower, index) => (
                         <div
-                          key={`${follower.followerId}-${index}`} // THÊM INDEX ĐỂ ĐẢM BẢO UNIQUE
+                          key={`${follower.followerId}-${index}`}
                           className="flex items-center gap-4 p-4 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors cursor-pointer"
                           onClick={() =>
                             router.push(`/profile/${follower.followerId}`)
                           }
                         >
+                          {/* Avatar */}
                           <div className="w-12 h-12 rounded-full overflow-hidden bg-muted flex-shrink-0">
                             {follower.avatarUrl ? (
                               <img
@@ -1091,6 +1092,8 @@ export default function PublicProfilePage() {
                               </div>
                             )}
                           </div>
+
+                          {/* Thông tin User */}
                           <div className="flex-1 min-w-0">
                             <p className="font-medium truncate">
                               {follower.username}
@@ -1102,15 +1105,8 @@ export default function PublicProfilePage() {
                               )}
                             </p>
                           </div>
-                          {/* {follower.notificationsEnabled && (
-                            <Badge
-                              variant="outline"
-                              className="flex items-center gap-1"
-                            >
-                              <Bell className="h-3 w-3" />
-                              Thông báo
-                            </Badge>
-                          )} */}
+
+                          {/* Đã xóa phần hiển thị Badge Thông báo/Quả chuông ở đây */}
                         </div>
                       ))}
                     </div>
