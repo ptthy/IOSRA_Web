@@ -1,4 +1,3 @@
-// app/content/dashboard/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -88,21 +87,21 @@ export default function DashboardPage(): JSX.Element {
               value={stats?.pendingStories ?? 0}
               subtitle="Số truyện đang chờ"
               icon={<BookOpen className="w-5 h-5 text-orange-500" />}
-              link="/moderation/review/stories"
+              link="/Content/review" // ✅ Updated Link
             />
             <CardStat
               title="Chương chờ duyệt"
               value={stats?.pendingChapters ?? 0}
               subtitle="Số chương đang chờ"
               icon={<FileText className="w-5 h-5 text-indigo-500" />}
-              link="/moderation/review/chapters"
+              link="/Content/chapters" // ✅ Updated Link
             />
             <CardStat
               title="Báo cáo mới (hôm nay)"
               value={stats?.newReportsToday ?? 0}
               subtitle="Cần xử lý"
               icon={<AlertCircle className="w-5 h-5 text-red-500" />}
-              link="/moderation/reports"
+              link="/Content/moderation?tab=reports" // ✅ Updated Link
             />
             <CardStat
               title="Đã duyệt hôm nay"
@@ -129,9 +128,10 @@ export default function DashboardPage(): JSX.Element {
               <div className="p-6">
                 <h3 className="text-lg font-medium text-[var(--primary)]">Hành động nhanh</h3>
                 <div className="mt-4 flex flex-col gap-3">
-                  <Link href="/moderation/review/stories"><Button className="w-full justify-start bg-blue-500 text-white">Duyệt Truyện</Button></Link>
-                  <Link href="/moderation/reports"><Button className="w-full justify-start bg-red-500 text-white">Xử lý Báo Cáo</Button></Link>
-                  <Link href="/content/moderation/statistics"><Button variant="outline" className="w-full">Xem Thống kê</Button></Link>
+                  {/* ✅ Updated Links below */}
+                  <Link href="/Content/review"><Button className="w-full justify-start bg-blue-500 text-white">Duyệt Truyện</Button></Link>
+                  <Link href="/Content/moderation?tab=reports"><Button className="w-full justify-start bg-red-500 text-white">Xử lý Báo Cáo</Button></Link>
+                  <Link href="/Content/statistics"><Button variant="outline" className="w-full">Xem Thống kê</Button></Link>
                 </div>
               </div>
             </Card>
