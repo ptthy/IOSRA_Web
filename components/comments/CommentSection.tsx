@@ -40,6 +40,7 @@ interface CommentSectionProps {
   currentUserId?: string;
   totalCount?: number;
   theme?: ReaderTheme; // Nhận theme từ props
+  onReport?: (comment: ChapterComment) => void;
 }
 
 export function CommentSection({
@@ -62,6 +63,7 @@ export function CommentSection({
   currentUserId,
   totalCount = 0,
   theme,
+  onReport,
 }: CommentSectionProps) {
   const [localComments, setLocalComments] =
     useState<ChapterComment[]>(initialComments);
@@ -272,6 +274,7 @@ export function CommentSection({
                 currentUserId={currentUserId}
                 onReplySubmit={handleReplySubmitWrapper}
                 theme={theme}
+                onReport={onReport}
               />
             ))}
             {hasMore && onLoadMore && (

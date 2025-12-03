@@ -1,5 +1,6 @@
 // components/comments/ReactionsPopup.tsx
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   chapterCommentService,
   CommentReaction,
@@ -46,7 +47,7 @@ export function ReactionsPopup({
   const [dislikesPage, setDislikesPage] = useState(1);
   const [hasMoreLikes, setHasMoreLikes] = useState(true);
   const [hasMoreDislikes, setHasMoreDislikes] = useState(true);
-
+  const router = useRouter();
   useEffect(() => {
     if (isOpen) {
       // Reset state khi mở popup
@@ -59,7 +60,11 @@ export function ReactionsPopup({
       loadInitialReactions();
     }
   }, [isOpen, commentId]); // Thêm commentId vào dependency
-
+  //  Hàm xử lý click user trong popup
+  const handleUserClick = (readerId: string) => {
+    // Có thể đóng popup trước khi chuyển trang nếu muốn: onClose();
+    router.push(`/profile/${readerId}`);
+  };
   const loadInitialReactions = async () => {
     // Tải cả likes và dislikes ban đầu
     await Promise.all([loadLikes(1, true), loadDislikes(1, true)]);
@@ -265,6 +270,8 @@ export function ReactionsPopup({
                     {likes.map((reaction, index) => (
                       <div
                         key={`${reaction.readerId}-${reaction.createdAt}-${index}`}
+                        //  Thêm sự kiện onClick vào thẻ div bao ngoài mỗi dòng user
+                        onClick={() => handleUserClick(reaction.readerId)}
                         className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors group border"
                       >
                         <Avatar className="h-12 w-12 border-2 border-green-200">
@@ -331,6 +338,8 @@ export function ReactionsPopup({
                     {dislikes.map((reaction, index) => (
                       <div
                         key={`${reaction.readerId}-${reaction.createdAt}-${index}`}
+                        //  Tương tự cho phần Dislike
+                        onClick={() => handleUserClick(reaction.readerId)}
                         className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors group border"
                       >
                         <Avatar className="h-12 w-12 border-2 border-red-200">

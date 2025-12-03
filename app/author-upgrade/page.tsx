@@ -117,16 +117,6 @@ export default function AuthorUpgradePage() {
   // ---------------------------------
   const { user, isLoading: isAuthLoading } = useAuth(); // Lấy trạng thái auth
   const router = useRouter();
-  // ĐÃ LÀ TÁC GIẢ → ĐÁ RA LUÔN, KHÔNG CHO VÀO TRANG NÀY NỮA
-  useEffect(() => {
-    if (!isAuthLoading && user) {
-      const isAlreadyAuthor =
-        user.roles?.includes("author") || user.isAuthorApproved;
-      if (isAlreadyAuthor) {
-        router.replace("/author/overview");
-      }
-    }
-  }, [isAuthLoading, user, router]);
   // State chính quản lý trạng thái UI
   const [upgradeRequest, setUpgradeRequest] = useState<LocalUpgradeRequest>({
     status: "default",

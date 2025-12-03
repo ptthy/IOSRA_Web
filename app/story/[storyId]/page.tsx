@@ -112,7 +112,7 @@ export default function StoryDetailPage() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [showChapterSelector, setShowChapterSelector] = useState(false);
   const [reportTarget, setReportTarget] = useState<{
-    type: "story" | "chapter";
+    type: "story" | "chapter" | "comment";
     id: string;
     title: string;
   } | null>(null);
@@ -137,6 +137,15 @@ export default function StoryDetailPage() {
     });
     return () => observer.disconnect();
   }, []);
+  //   Hàm xử lý khi bấm nút Report ở CommentItem
+  const handleReportComment = (comment: ChapterComment) => {
+    setReportTarget({
+      type: "comment",
+      id: comment.commentId,
+      title: `Bình luận của ${comment.username}`,
+    });
+    setShowReportModal(true);
+  };
 
   // --- Helper Recursive Functions ---
   const updateCommentRecursive = (
@@ -800,6 +809,7 @@ export default function StoryDetailPage() {
                   onAddComment={handleAddComment}
                   onUpdateComment={handleUpdateComment}
                   onDeleteComment={handleDeleteComment}
+                  onReport={handleReportComment}
                   onLikeComment={handleLikeComment}
                   onDislikeComment={handleDislikeComment}
                   onRemoveReaction={handleRemoveReaction}

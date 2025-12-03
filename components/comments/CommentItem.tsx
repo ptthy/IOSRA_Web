@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChapterComment } from "@/services/chapterCommentService";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -17,6 +18,7 @@ import {
   X,
   MessageSquare,
   Loader2,
+  Flag,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -41,6 +43,7 @@ interface CommentItemProps {
   currentUserId?: string;
   onReplySubmit?: (content: string, parentId: string) => Promise<void>;
   theme?: any;
+  onReport?: (comment: ChapterComment) => void;
 }
 
 export function CommentItem({
@@ -56,9 +59,10 @@ export function CommentItem({
   currentUserId,
   onReplySubmit,
   theme,
+  onReport,
 }: CommentItemProps) {
   const { user } = useAuth();
-
+  const router = useRouter();
   const [showReply, setShowReply] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
@@ -79,11 +83,11 @@ export function CommentItem({
   const isDarkTheme = theme?.text === "#f0ead6";
 
   // Màu nền tĩnh (Static): Trắng mờ 5% (tối) hoặc Đen mờ 3% (sáng)
-  const itemBgColor = theme
-    ? isDarkTheme
-      ? "rgba(255, 255, 255, 0.05)"
-      : "rgba(0, 0, 0, 0.03)"
-    : undefined;
+  // const itemBgColor = theme
+  //   ? isDarkTheme
+  //     ? "rgba(255, 255, 255, 0.05)"
+  //     : "rgba(0, 0, 0, 0.03)"
+  //   : undefined;
 
   // Màu viền
   const borderColor = theme
@@ -98,7 +102,13 @@ export function CommentItem({
 
   // Class container: Xóa bg-card và hover effects để tránh đổi màu lung tung
   const containerClass = "transition-colors border rounded-lg p-4";
-
+  //   Hàm xử lý chuyển trang Profile
+  const handleProfileClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Ngăn sự kiện lan ra ngoài (nếu có click cha)
+    if (comment.readerId) {
+      router.push(`/profile/${comment.readerId}`);
+    }
+  };
   const handleSendReply = async () => {
     if (!replyText.trim() || !onReplySubmit) return;
     setIsReplying(true);
@@ -197,29 +207,38 @@ export function CommentItem({
     <div className="flex flex-col gap-2 w-full">
       <div
         className={containerClass}
-        // 🔥 Áp dụng style cứng
-        style={{
-          backgroundColor: itemBgColor,
-          borderColor: borderColor,
-        }}
+        //  Áp dụng style cứng
+        style={
+          {
+            // backgroundColor: itemBgColor,
+            // borderColor: borderColor,
+          }
+        }
       >
         <div className="flex gap-3">
+          {/*  Thêm onClick và cursor-pointer vào Avatar */}
           <Avatar
             className="h-10 w-10 border"
             style={{ borderColor: borderColor }}
+            onClick={handleProfileClick}
           >
             <AvatarImage src={comment.avatarUrl || ""} />
             <AvatarFallback
               style={{ backgroundColor: theme?.bg, color: theme?.text }}
             >
-              U
+              {comment.username.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 mb-1">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold" style={textStyle}>
+                {/*  Thêm onClick và hiệu ứng hover vào Tên người dùng */}
+                <span
+                  className="text-sm font-semibold"
+                  style={textStyle}
+                  onClick={handleProfileClick}
+                >
                   {comment.username}
                 </span>
                 <span className="text-xs" style={subTextStyle}>
@@ -269,6 +288,10 @@ export function CommentItem({
                   <DropdownMenuItem onClick={() => setShowReply(!showReply)}>
                     <Reply className="mr-2 h-4 w-4" /> Trả lời
                   </DropdownMenuItem>
+                  {/* Luôn hiện để test lỗi "không thể report chính mình" */}
+                  <DropdownMenuItem onClick={() => onReport?.(comment)}>
+                    <Flag className="mr-2 h-4 w-4" /> Báo cáo
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -280,7 +303,7 @@ export function CommentItem({
                   onChange={(e) => setEditContent(e.target.value)}
                   className="min-h-[80px] text-sm"
                   style={{
-                    backgroundColor: itemBgColor,
+                    // backgroundColor: itemBgColor,
                     color: theme?.text,
                     borderColor: borderColor,
                   }}
@@ -371,7 +394,7 @@ export function CommentItem({
                           placeholder="Viết câu trả lời..."
                           className="min-h-[60px] text-sm"
                           style={{
-                            backgroundColor: itemBgColor,
+                            // backgroundColor: itemBgColor,
                             color: theme?.text,
                             borderColor: borderColor,
                           }}
@@ -431,6 +454,7 @@ export function CommentItem({
                   onRemoveReaction={onRemoveReaction}
                   onReplySubmit={onReplySubmit}
                   theme={theme}
+                  onReport={onReport}
                 />
               )
           )}

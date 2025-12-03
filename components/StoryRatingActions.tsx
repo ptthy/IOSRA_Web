@@ -79,10 +79,16 @@ export function StoryRatingActions({
       onRatingUpdate();
     } catch (error: any) {
       console.error("Rating error:", error);
+      // Lấy dữ liệu lỗi từ API trả về
+      const responseData = error.response?.data;
+      const errorCode = responseData?.error?.code;
       if (error.response?.status === 401) {
         alert("Bạn cần đăng nhập để đánh giá");
-      } else if (error.response?.status === 404) {
-        alert("Tính năng đánh giá đang được cập nhật");
+      } else if (
+        error.response?.status === 400 &&
+        errorCode === "CannotRateOwnStory"
+      ) {
+        alert("Bạn không thể tự đánh giá truyện của mình!");
       } else {
         alert("Có lỗi xảy ra khi gửi đánh giá");
       }

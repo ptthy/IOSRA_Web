@@ -122,4 +122,7 @@ export const authService = {
   getMyProfile: () => {
     return apiClient.get("/api/Profile");
   },
+  refreshToken: () => {
+    return apiClient.post("/api/Auth/refresh");
+  },
 };

@@ -45,15 +45,50 @@ export default function LoginRoute() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      // Gửi identifier (có thể là username hoặc email) và password
       await login({ identifier: identifier, password });
-      // AuthContext sẽ tự chuyển hướng
+      // Thành công -> AuthContext tự redirect
     } catch (err: any) {
       setIsLoading(false);
-      // AuthContext thường đã handle toast, nếu chưa thì thêm toast.error ở đây
+
+      // --- XỬ LÝ LỖI DỰA TRÊN SWAGGER RESPONSE ---
+      if (err.response && err.response.data && err.response.data.error) {
+        const { code, message, details } = err.response.data.error;
+
+        // Case 1: Sai mật khẩu hoặc Tài khoản không tồn tại
+        if (code === "InvalidCredentials") {
+          toast.error("Mật khẩu không chính xác.");
+          return;
+        }
+
+        if (code === "AccountNotFound") {
+          toast.error("Tài khoản không tồn tại.");
+          return;
+        }
+
+        // Case 2: Lỗi Validation (400) - Loop qua object details
+        if (code === "VALIDATION_FAILED" && details) {
+          // details dạng: { Identifier: ["msg1"], Password: ["msg2"] }
+          Object.keys(details).forEach((key) => {
+            const messages = details[key];
+            if (Array.isArray(messages)) {
+              messages.forEach((msg) => toast.error(`${key}: ${msg}`));
+            }
+          });
+          return;
+        }
+
+        // Case 3: Các lỗi khác có message từ Backend
+        if (message) {
+          toast.error(message);
+          return;
+        }
+      }
+
+      // Case 4: Lỗi không xác định (mạng, server down...)
+      toast.error("Đăng nhập thất bại. Vui lòng thử lại sau.");
+      console.error("Login Error:", err);
     }
   };
-
   const signInWithGoogle = async () => {
     setIsLoading(true);
     const provider = new GoogleAuthProvider();

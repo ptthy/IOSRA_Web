@@ -69,12 +69,12 @@ export const authorFollowService = {
   },
 
   /**
-   * GET /api/AuthorFollow/{authorId}/status
-   * Kiểm tra trạng thái follow (nếu có endpoint này)
+   * PATCH /api/AuthorFollow/{authorId}/notification
+   * Bật/Tắt thông báo cho tác giả đang theo dõi
    */
-  getFollowStatus: (authorId: string) => {
-    return apiClient.get<FollowStatusResponse>(
-      `/api/AuthorFollow/${authorId}/status`
-    );
+  toggleNotification: (authorId: string, enableNotifications: boolean) => {
+    return apiClient.patch(`/api/AuthorFollow/${authorId}/notification`, {
+      enableNotifications: enableNotifications,
+    });
   },
 };
