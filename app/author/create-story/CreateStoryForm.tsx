@@ -1,7 +1,7 @@
 // app/author/create-story/CreateStoryForm.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -86,6 +86,9 @@ export default function CreateStoryForm({
 }: CreateStoryFormProps) {
   const router = useRouter();
 
+  // Lưu initialData ban đầu để so sánh
+  const initialDataRef = useRef<typeof initialData | null>(null);
+
   const [tags, setTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -137,6 +140,9 @@ export default function CreateStoryForm({
   // Load initial data
   useEffect(() => {
     if (initialData) {
+      // Lưu initialData vào ref để so sánh sau này
+      initialDataRef.current = initialData;
+
       setTitle(initialData.title || "");
       setDescription(initialData.description || "");
       setOutline(initialData.outline || "");
@@ -289,6 +295,44 @@ export default function CreateStoryForm({
       return;
     }
 
+    // 🔥 KIỂM TRA THAY ĐỔI: Nếu là edit mode và không có thay đổi gì, không gọi API
+    if (isEditMode && initialDataRef.current) {
+      const initial = initialDataRef.current;
+
+      // So sánh các field (trim để loại bỏ whitespace thừa)
+      const hasTitleChanged = title.trim() !== (initial.title || "").trim();
+      const hasDescriptionChanged =
+        (description || "").trim() !== (initial.description || "").trim();
+      const hasOutlineChanged =
+        outline.trim() !== (initial.outline || "").trim();
+      const hasLengthPlanChanged =
+        lengthPlan !== (initial.lengthPlan || "short");
+
+      // So sánh tags (so sánh mảng - normalize và sort)
+      const initialTagIds = (initial.selectedTagIds || [])
+        .slice()
+        .sort()
+        .join(",");
+      const currentTagIds = [...selectedTagIds].slice().sort().join(",");
+      const hasTagsChanged = initialTagIds !== currentTagIds;
+
+      // Kiểm tra có coverFile mới không (chỉ coi là thay đổi nếu thực sự có file mới)
+      const hasNewCoverFile = coverFile instanceof File;
+
+      // Nếu không có thay đổi gì
+      if (
+        !hasTitleChanged &&
+        !hasDescriptionChanged &&
+        !hasOutlineChanged &&
+        !hasLengthPlanChanged &&
+        !hasTagsChanged &&
+        !hasNewCoverFile
+      ) {
+        toast.info("Không có thay đổi nào để cập nhật");
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -298,27 +342,67 @@ export default function CreateStoryForm({
       const finalCoverFile =
         isEditMode && !coverFile ? undefined : coverFile || undefined;
 
-      const requestData: CreateStoryRequest = {
-        title,
-        description: description || "",
-        outline,
-        lengthPlan,
-        tagIds: selectedTagIds,
-        coverMode,
-        // 🔥 FIX: Đảm bảo coverFile chỉ có thể là File hoặc undefined
-        coverFile: coverMode === "upload" ? finalCoverFile : undefined,
-        coverPrompt: coverMode === "generate" ? coverPrompt : undefined,
-      };
+      // Trong edit mode, chỉ gửi những field đã thay đổi
+      let requestData: Partial<CreateStoryRequest>;
+
+      if (isEditMode && initialDataRef.current) {
+        const initial = initialDataRef.current;
+        requestData = {}; // Khởi tạo object rỗng
+
+        // Chỉ thêm field nếu có thay đổi
+        if (title.trim() !== (initial.title || "").trim()) {
+          requestData.title = title;
+        }
+        if ((description || "").trim() !== (initial.description || "").trim()) {
+          requestData.description = description || "";
+        }
+        if (outline.trim() !== (initial.outline || "").trim()) {
+          requestData.outline = outline;
+        }
+        if (lengthPlan !== (initial.lengthPlan || "short")) {
+          requestData.lengthPlan = lengthPlan;
+        }
+
+        // So sánh tags
+        const initialTagIds = (initial.selectedTagIds || [])
+          .slice()
+          .sort()
+          .join(",");
+        const currentTagIds = [...selectedTagIds].slice().sort().join(",");
+        if (initialTagIds !== currentTagIds) {
+          requestData.tagIds = selectedTagIds;
+        }
+
+        // Chỉ gửi coverMode và coverFile nếu có file mới
+        if (coverFile instanceof File) {
+          requestData.coverMode = coverMode;
+          requestData.coverFile = coverFile;
+        }
+      } else {
+        // CREATE MODE: Gửi tất cả field
+        requestData = {
+          title,
+          description: description || "",
+          outline,
+          lengthPlan,
+          tagIds: selectedTagIds,
+          coverMode,
+          coverFile: coverMode === "upload" ? finalCoverFile : undefined,
+          coverPrompt: coverMode === "generate" ? coverPrompt : undefined,
+        };
+      }
 
       if (isEditMode && storyId) {
-        // EDIT MODE: Update draft
+        // EDIT MODE: Update draft (chỉ gửi những field đã thay đổi)
         await storyService.updateDraft(storyId, requestData);
         localStorage.removeItem(LOCAL_STORAGE_KEY);
         toast.success("Cập nhật truyện thành công!");
         onSuccess?.();
       } else {
         // CREATE MODE
-        const result = await storyService.createStory(requestData);
+        const result = await storyService.createStory(
+          requestData as CreateStoryRequest
+        );
         setCreatedStoryId(result.storyId);
 
         if (coverMode === "generate" && result.coverUrl) {

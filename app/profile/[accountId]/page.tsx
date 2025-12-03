@@ -360,17 +360,24 @@ export default function PublicProfilePage() {
       setFollowLoading(false);
     }
   };
-  // Handle notification toggle - SỬA LẠI ĐỂ ĐỒNG BỘ
+  // Handle notification toggle - Endpoint Patch
   const handleNotificationToggle = async () => {
-    if (!profile?.isAuthor || !profile.followState?.isFollowing) return;
+    if (!profile?.isAuthor || !profile.followState?.isFollowing) {
+      toast.error("Bạn chưa theo dõi tác giả này");
+      return;
+    }
+
+    // Nếu profile chưa load xong authorId
+    if (!profile.author?.authorId) return;
 
     setNotificationLoading(true);
-    try {
-      const newNotificationState = !profile.followState.notificationsEnabled;
-      const originalNotificationState =
-        profile.followState.notificationsEnabled;
 
-      // Cập nhật UI ngay lập tức
+    // Tính toán trạng thái mới
+    const currentNotificationState = profile.followState.notificationsEnabled;
+    const newNotificationState = !currentNotificationState;
+
+    try {
+      // 1. Cập nhật UI ngay lập tức (Optimistic Update)
       setProfile((prev) =>
         prev
           ? {
@@ -385,7 +392,7 @@ export default function PublicProfilePage() {
           : null
       );
 
-      // Cập nhật trong followers list nếu có
+      // Cập nhật trong followers list (tab Followers) nếu có user hiện tại ở đó
       if (user) {
         setFollowers((prev) =>
           prev.map((follower) =>
@@ -396,30 +403,22 @@ export default function PublicProfilePage() {
         );
       }
 
-      // Sử dụng unfollow + follow với notification settings mới
-      await authorFollowService.unfollowAuthor(profile.author!.authorId);
-      await authorFollowService.followAuthor(profile.author!.authorId, {
-        enableNotifications: newNotificationState,
-      });
+      // 2. Gọi API PATCH thay vì Unfollow/Follow
+      await authorFollowService.toggleNotification(
+        profile.author.authorId,
+        newNotificationState
+      );
 
       toast.success(
         newNotificationState ? "Đã bật thông báo" : "Đã tắt thông báo"
       );
 
-      // Reload dữ liệu để đồng bộ với server
-      setTimeout(async () => {
-        await reloadProfile();
-        if (activeTab === "followers") {
-          await reloadFollowers();
-        }
-      }, 500);
+      // Không cần reloadProfile() nữa vì ta chỉ đổi 1 boolean,
+      // UI đã được update ở bước 1 rồi. Trừ khi bạn muốn chắc chắn 100% dữ liệu server.
     } catch (error: any) {
       console.error("Error toggling notifications:", error);
 
-      // Revert state nếu có lỗi
-      const originalNotificationState =
-        profile.followState!.notificationsEnabled;
-
+      // Revert (hoàn tác) state nếu API lỗi
       setProfile((prev) =>
         prev
           ? {
@@ -427,7 +426,7 @@ export default function PublicProfilePage() {
               followState: prev.followState
                 ? {
                     ...prev.followState,
-                    notificationsEnabled: originalNotificationState,
+                    notificationsEnabled: currentNotificationState, // Quay về cũ
                   }
                 : null,
             }
@@ -439,13 +438,20 @@ export default function PublicProfilePage() {
         setFollowers((prev) =>
           prev.map((follower) =>
             follower.followerId === user.id
-              ? { ...follower, notificationsEnabled: originalNotificationState }
+              ? { ...follower, notificationsEnabled: currentNotificationState }
               : follower
           )
         );
       }
 
-      toast.error("Đã có lỗi xảy ra khi cập nhật thông báo");
+      // Xử lý thông báo lỗi cụ thể
+      if (error.response?.status === 404) {
+        toast.error("Bạn chưa theo dõi tác giả này (Lỗi dữ liệu)");
+        // Có thể reload profile ở đây để đồng bộ lại trạng thái follow
+        reloadProfile();
+      } else {
+        toast.error("Không thể cập nhật thông báo");
+      }
     } finally {
       setNotificationLoading(false);
     }
@@ -589,7 +595,7 @@ export default function PublicProfilePage() {
               {/* Avatar */}
               <div className="flex-shrink-0">
                 <div className="relative">
-                  <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-border/50 bg-muted shadow-2xl">
+                  <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-border bg-card shadow-2xl">
                     {profile.avatarUrl ? (
                       <img
                         src={profile.avatarUrl}
@@ -597,7 +603,7 @@ export default function PublicProfilePage() {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                      <div className="w-full h-full bg-primary flex items-center justify-center">
                         <span className="text-2xl font-bold text-primary-foreground">
                           {profile.username.charAt(0).toUpperCase()}
                         </span>
@@ -1096,7 +1102,7 @@ export default function PublicProfilePage() {
                               )}
                             </p>
                           </div>
-                          {follower.notificationsEnabled && (
+                          {/* {follower.notificationsEnabled && (
                             <Badge
                               variant="outline"
                               className="flex items-center gap-1"
@@ -1104,7 +1110,7 @@ export default function PublicProfilePage() {
                               <Bell className="h-3 w-3" />
                               Thông báo
                             </Badge>
-                          )}
+                          )} */}
                         </div>
                       ))}
                     </div>

@@ -1,3 +1,4 @@
+//context/AuthContext.tsx
 "use client";
 
 import React, {
@@ -60,6 +61,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Hàm helper để lưu user vào cookies (cho middleware)
+  const setUserCookie = (user: User | null) => {
+    if (typeof window === "undefined") return;
+
+    if (user) {
+      // Lưu user vào cookie với thời gian hết hạn 7 ngày
+      const expires = new Date();
+      expires.setTime(expires.getTime() + 7 * 24 * 60 * 60 * 1000);
+      document.cookie = `authUser=${encodeURIComponent(
+        JSON.stringify(user)
+      )}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+    } else {
+      // Xóa cookie khi logout
+      document.cookie = `authUser=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+    }
+  };
+
   // Hàm check API phụ
   const checkApprovedStatus = async (): Promise<boolean> => {
     try {
@@ -80,6 +98,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const parsedUser: User = JSON.parse(storedUser);
           setToken(storedToken);
           setUser(parsedUser);
+          setUserCookie(parsedUser); // Lưu vào cookie
+
           if (!parsedUser.avatar) {
             authService
               .getMyProfile()
@@ -90,6 +110,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 };
                 setUser(updated);
                 localStorage.setItem("authUser", JSON.stringify(updated));
+                setUserCookie(updated); // Cập nhật cookie
               })
               .catch(() => {});
           }
@@ -104,6 +125,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               const updatedUser = { ...parsedUser, isAuthorApproved: true };
               setUser(updatedUser);
               localStorage.setItem("authUser", JSON.stringify(updatedUser));
+              setUserCookie(updatedUser); // Cập nhật cookie
             }
           }
         }
@@ -143,7 +165,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const primaryRole = getPrimaryRole(userRoles);
 
-        // Check author approved (giữ nguyên logic cũ của bạn)
+        // Check author approved (giữ nguyên logic cũ )
         let isApproved = userRoles.includes("author");
         if (!isApproved && primaryRole === "reader") {
           try {
@@ -171,6 +193,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setToken(token);
         localStorage.setItem("authUser", JSON.stringify(tempUser));
         localStorage.setItem("authToken", token);
+        setUserCookie(tempUser); // Lưu vào cookie
 
         // Bước 2: Lấy avatar + displayName từ /api/Profile (chỉ mất ~300ms)
         let avatarUrl = null;
@@ -179,7 +202,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
           const profileRes = await authService.getMyProfile();
           avatarUrl = profileRes.data.avatarUrl || null;
-          displayName = profileRes.data.displayName || username; // nếu sau này có displayName thật
+          displayName = profileRes.data.username;
         } catch (err) {
           console.warn("Không lấy được avatar từ /api/Profile");
         }
@@ -193,6 +216,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         setUser(finalUser);
         localStorage.setItem("authUser", JSON.stringify(finalUser));
+        setUserCookie(finalUser); // Cập nhật cookie với thông tin đầy đủ
 
         // Redirect như cũ
         let redirectPath = "/";
@@ -202,6 +226,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         router.push(redirectPath);
         toast.success(`Chào mừng, ${displayName}!`);
+        setTimeout(() => {
+          router.push(redirectPath);
+        }, 4000);
       } catch (error: any) {
         console.error("Lỗi đăng nhập:", error);
         const message = error.response?.data?.message || "Đăng nhập thất bại.";
@@ -217,8 +244,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setToken(null);
     localStorage.removeItem("authUser");
     localStorage.removeItem("authToken");
+    setUserCookie(null); // Xóa cookie
     router.push("/login");
     toast.success("Đã đăng xuất.");
+    setTimeout(() => {
+      router.push("/login");
+    }, 4000);
   }, [router]);
 
   const setAuthData = useCallback(
@@ -227,6 +258,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setToken(token);
       localStorage.setItem("authUser", JSON.stringify(user));
       localStorage.setItem("authToken", token);
+      setUserCookie(user); // Lưu vào cookie
       router.push("/");
     },
     [router]
@@ -237,6 +269,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!prev) return null;
       const updated = { ...prev, ...updates };
       localStorage.setItem("authUser", JSON.stringify(updated));
+      setUserCookie(updated); // Cập nhật cookie
       return updated;
     });
   }, []);

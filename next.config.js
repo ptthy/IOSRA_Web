@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // ... (các config khác của bạn có thể đã ở đây)
+  reactStrictMode: false, //  Đổi từ true (hoặc mặc định) thành false
+  // ... các config khác
 
   // ✅ THÊM ĐOẠN NÀY VÀO:
   images: {

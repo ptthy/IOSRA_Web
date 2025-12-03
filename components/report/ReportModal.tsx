@@ -22,7 +22,7 @@ interface ReportModalProps {
   onClose: () => void;
   targetType: ReportTargetType;
   targetId: string;
-  targetTitle?: string; // 🔥 Thêm cái này để hiện tên truyện/chương
+  targetTitle?: string; // Thêm cái này để hiện tên truyện/chương
 }
 
 const REPORT_REASONS = [
@@ -59,29 +59,28 @@ export function ReportModal({
       setReason("spam");
       onClose();
     } catch (error: any) {
-      // 🔥 BẮT LỖI 400: ReportAlreadyExists
+      //  BẮT LỖI 400: ReportAlreadyExists
       const responseData = error.response?.data;
-      const errorCode = responseData?.error?.code; // Lấy mã lỗi từ cấu trúc JSON bạn gửi
+      const errorCode = responseData?.error?.code;
 
-      if (
-        error.response?.status === 400 &&
-        errorCode === "ReportAlreadyExists"
-      ) {
-        // Hiển thị cảnh báo màu vàng (Warning) thay vì lỗi đỏ
-        toast.warning(
-          "Bạn đã gửi báo cáo cho nội dung này rồi. Vui lòng chờ BQT xử lý!"
-        );
-
-        // Tùy chọn: Có thể đóng modal luôn nếu muốn
-        // onClose();
+      if (error.response?.status === 400) {
+        // Case 1: Đã report rồi
+        if (errorCode === "ReportAlreadyExists") {
+          toast.warning("Bạn đã báo cáo nội dung này rồi. Vui lòng chờ xử lý!");
+          onClose(); // Đóng modal luôn cho gọn
+        }
+        // Case 2: Tự report chính mình (Logic mới thêm)
+        else if (errorCode === "CannotReportOwnContent") {
+          toast.warning("Bạn không thể báo cáo nội dung của chính mình!");
+          // Không đóng modal để user nhận thức rõ, hoặc đóng tùy bạn
+        } else {
+          toast.error(
+            responseData?.error?.message || "Lỗi dữ liệu không hợp lệ."
+          );
+        }
       } else {
-        // Các lỗi khác
-        const errorMessage =
-          responseData?.error?.message || // Lấy message trong object error
-          responseData?.message || // Hoặc message ở ngoài (nếu có)
-          "Có lỗi xảy ra khi gửi báo cáo.";
-
-        toast.error(errorMessage);
+        // Các lỗi 500 hoặc khác
+        toast.error("Có lỗi xảy ra khi gửi báo cáo. Vui lòng thử lại sau.");
       }
     } finally {
       setIsSubmitting(false);
