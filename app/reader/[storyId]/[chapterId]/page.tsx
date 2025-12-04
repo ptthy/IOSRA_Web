@@ -34,6 +34,8 @@ import { LockedOverlay } from "@/components/reader/LockedOverlay";
 import { TranslationControl } from "@/components/reader/TranslationControl";
 import { ReaderContent } from "@/components/reader/ReaderContent";
 import { TopUpModal } from "@/components/payment/TopUpModal";
+import { subscriptionService } from "@/services/subscriptionService";
+import { toast } from "sonner";
 export default function ReaderPage() {
   const router = useRouter();
   const params = useParams();
@@ -69,6 +71,8 @@ export default function ReaderPage() {
 
   // --- STATE AUTO PLAY ---
   const [autoPlayAfterUnlock, setAutoPlayAfterUnlock] = useState(false);
+  //  THÊM STATE: Trạng thái gói cước
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
 
   // --- 1. LOAD DATA ---
   useEffect(() => {
@@ -201,6 +205,23 @@ export default function ReaderPage() {
       setAutoPlayAfterUnlock(false);
     }
   }, [autoPlayAfterUnlock, chapter]);
+
+  // THÊM: useEffect kiểm tra Subscription
+  useEffect(() => {
+    const checkSubscription = async () => {
+      if (user?.id) {
+        try {
+          const res = await subscriptionService.getStatus();
+          setHasActiveSubscription(res.data.hasActiveSubscription);
+          console.log("Subscription Status:", res.data.hasActiveSubscription);
+        } catch (error) {
+          console.error("Lỗi check subscription:", error);
+          setHasActiveSubscription(false); // Mặc định là false nếu lỗi
+        }
+      }
+    };
+    checkSubscription();
+  }, [user?.id]);
 
   // --- 4. LOAD COMMENTS ---
   useEffect(() => {
@@ -413,6 +434,9 @@ export default function ReaderPage() {
         onChapterChange={(id) => handleNavigate("/reader", storyId, id)}
         autoPlayAfterUnlock={autoPlayAfterUnlock}
         setShowTopUpModal={setShowTopUpModal}
+        mood={chapter.mood}
+        moodMusicPaths={chapter.moodMusicPaths}
+        hasActiveSubscription={hasActiveSubscription}
       >
         {!shouldShowLockedOverlay() && (
           <TranslationControl

@@ -700,10 +700,10 @@ export default function AuthorRevenuePage() {
         <Card className="lg:col-span-5 border border-[var(--border)] bg-[var(--card)] shadow-md h-fit">
           <CardHeader className="pb-3">
             <CardTitle className="text-[var(--primary)] flex items-center gap-2">
-              <CreditCard className="w-5 h-5" /> Yêu Cầu Rút Tiền
+              <CreditCard className="w-5 h-5" /> Yêu Cầu Đối Soát
             </CardTitle>
             <CardDescription>
-              Nhập thông tin tài khoản nhận tiền chính xác.
+              Nhập thông tin tài khoản chính xác.
             </CardDescription>
           </CardHeader>
           <CardContent>
