@@ -3,9 +3,11 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ContentList } from "./components/content-list";
-import { ReviewDetail } from "./components/review-detail";
+
 import { HistoryPage } from "./components/history-page";
 import { Poppins } from "next/font/google";
+import { ReviewDetail } from "./components/review-detail";
+
 
 // Import font Poppins từ Google Fonts
 const poppins = Poppins({
