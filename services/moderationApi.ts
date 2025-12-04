@@ -170,6 +170,17 @@ export async function getModerationStories(status: 'pending' | 'published' | 're
     }
 }
 
+// --- API: Chi tiết 1 truyện cần kiểm duyệt ---
+export async function getStoryDetail(reviewId: string) {
+    try {
+        const response = await apiClient.get(`/api/moderation/stories/${reviewId}`);
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || "Lỗi khi tải chi tiết truyện");
+    }
+}
+
+
 // --- API 2: Ra quyết định TRUYỆN ---
 export async function postModerationDecision(
     reviewId: string,
