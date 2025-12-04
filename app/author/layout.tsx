@@ -90,12 +90,12 @@ export default function AuthorLayout({ children }: AuthorLayoutProps) {
               variant={isRevenueActive ? "secondary" : "ghost"}
               className="w-full justify-start"
               onClick={() => handleNavigate("author-revenue")}
-              title="Quản lý dòng tiền"
+              title="Quản lý doanh thu "
             >
               {/* Icon tiền tệ màu xanh lá */}
               <CircleDollarSign className="h-5 w-5 shrink-0 text-green-600" />
               {!isCollapsed && (
-                <span className="ml-2 truncate">Quản lý dòng tiền</span>
+                <span className="ml-2 truncate">Quản lý doanh thu</span>
               )}
             </Button>
 
