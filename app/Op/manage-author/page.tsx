@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { AppSidebar } from "@/components/op-sidebar";
+import { SiteHeader } from "@/components/site-header";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import {
   Card,
   CardContent,
@@ -47,13 +50,13 @@ import {
   Trophy, // Icon cho Rank
 } from "lucide-react";
 import { toast } from "sonner";
-import apiClient from "@/services/apiClient"; 
 
-// API Service
+// Import API Service
 import {
   getUpgradeRequests,
   approveRequest,
   rejectRequest,
+  // ✅ Import thêm các hàm mới cho Rank
   getRankRequests,
   approveRankRequest,
   rejectRankRequest
@@ -66,22 +69,26 @@ interface Author {
   id: number | string;
   name: string;
   email: string;
-  stories: number;    // Lấy từ PublicProfile
-  followers: number;  // ✅ Đổi từ Views sang Followers
+  stories: number;
+  views: number;
   status: "active" | "suspended" | "sponsored";
   revenue: number;
 }
 
-// --- Interface cho Rank Request (Tab 2) ---
+// --- ✅ SỬA: Interface cho Rank/Sponsored Request (Tab 2) ---
+// Cập nhật để khớp với API /rank-requests
 interface SponsorRequest {
   requestId: string;
   authorId: string;
   authorName: string;
   email: string;
-  currentRank: string; 
-  followers: number;   
+  
+  currentRank: string; // Map từ currentRankName
+  followers: number;   // Map từ totalFollowers
+  targetRank: string;  // Map từ targetRankName
+  
   createdAt: string;
-  reason: string;
+  reason: string;      // Map từ commitment
   status: string;
 }
 
@@ -127,53 +134,22 @@ export default function AuthorManagement() {
     async function fetchApprovedAuthors() {
       try {
         setIsLoadingAuthors(true);
-        // 1. Lấy danh sách request đã approve
         const data: AuthorUpgradeRequest[] = await getUpgradeRequests("approved");
         
-        // 2. Deduplicate (Lọc trùng lặp user)
-        const uniqueAuthorsMap = new Map();
-        data.forEach((req) => {
-          if (!uniqueAuthorsMap.has(req.requesterId)) {
-            uniqueAuthorsMap.set(req.requesterId, {
-              id: req.requesterId,
-              name: req.requesterUsername || `User ID: ${req.requesterId}`,
-              email: req.requesterEmail || "(Chưa có email)",
-              status: "active",
-              revenue: 0,
-              // Giá trị tạm thời
-              stories: 0,
-              followers: 0
-            });
-          }
-        });
-
-        const initialAuthors = Array.from(uniqueAuthorsMap.values());
-
-        // 3. ✅ Gọi API PublicProfile để lấy số liệu thực tế (Stories, Followers)
-        const authorsWithStats = await Promise.all(
-            initialAuthors.map(async (author: any) => {
-                try {
-                    // Gọi API PublicProfile cho từng tác giả
-                    const res = await apiClient.get(`/api/PublicProfile/${author.id}`);
-                    const profile = res.data;
-                    
-                    return {
-                        ...author,
-                        // Cập nhật số liệu từ profile
-                        stories: profile.author?.publishedStoryCount || 0,
-                        followers: profile.author?.followerCount || 0,
-                        // Có thể cập nhật thêm avatar nếu cần
-                    };
-                } catch (err) {
-                    console.error(`Lỗi tải profile cho ${author.name}`, err);
-                    return author; // Trả về data cũ nếu lỗi
-                }
-            })
-        );
-
-        setAuthors(authorsWithStats);
+        // Lọc: Chỉ lấy những đơn KHÔNG có nội dung JSON rank (để tránh lấy nhầm đơn rank up đã approved)
+        // Hoặc nếu backend trả về tất cả approved thì tạm chấp nhận hiển thị
+        const approvedAuthors: Author[] = data.map((req) => ({
+          id: req.requesterId,
+          name: req.requesterUsername || `User ID: ${req.requesterId}`,
+          email: req.requesterEmail || "(Chưa có email)",
+          stories: 0,
+          views: 0,
+          status: "active",
+          revenue: 0,
+        }));
+        setAuthors(approvedAuthors);
       } catch (error) {
-        console.error("Failed to fetch authors:", error);
+        console.error(error);
       } finally {
         setIsLoadingAuthors(false);
       }
@@ -181,21 +157,26 @@ export default function AuthorManagement() {
     fetchApprovedAuthors();
   }, []);
 
-  // --- 2. Load Sponsored/Rank Requests (Tab 2) ---
+  // --- 2. ✅ SỬA: Load Sponsored/Rank Requests (Tab 2 - API Thật) ---
   useEffect(() => {
     async function fetchRankRequests() {
       try {
-        const data = await getRankRequests("pending");
+        // Gọi API: GET /api/OperationMod/rank-requests
+        const data = await getRankRequests("pending"); 
         
+        // Map dữ liệu từ API Swagger vào Interface
         const mappedData: SponsorRequest[] = data.map((item: any) => ({
           requestId: item.requestId,
           authorId: item.authorId,
-          authorName: item.authorUsername || item.requesterUsername || "Unknown",
-          email: item.authorEmail || item.requesterEmail || "No Email",
-          currentRank: item.currentRankName || "Casual",
+          authorName: item.authorUsername || "Unknown",
+          email: item.authorEmail || "No Email",
+          
+          currentRank: item.currentRankName || "Casual", 
+          targetRank: item.targetRankName || "Unknown",
           followers: item.totalFollowers || 0,
+          
           createdAt: item.createdAt,
-          reason: item.commitment || item.reason || "Không có nội dung cam kết",
+          reason: item.commitment || "No commitment",
           status: item.status
         }));
 
@@ -218,7 +199,19 @@ export default function AuthorManagement() {
     async function fetchAuthorUpgradeRequests() {
       try {
         const data: AuthorUpgradeRequest[] = await getUpgradeRequests("pending");
-        setAuthorUpgradeRequests(data);
+        
+        // ✅ QUAN TRỌNG: Lọc dữ liệu
+        // API /requests trả về cả rank-up (có content là JSON) và become-author (text thường)
+        // Chúng ta chỉ giữ lại cái nào KHÔNG PHẢI là Rank Request cho Tab 3
+        const onlyBecomeAuthorRequests = data.filter((req: any) => {
+            // Nếu content chứa "TargetRankId" hoặc "CurrentRankId" thì đó là Rank Request -> Bỏ qua
+            if (req.content && (req.content.includes("TargetRankId") || req.content.includes("CurrentRankName"))) {
+                return false; 
+            }
+            return true;
+        });
+
+        setAuthorUpgradeRequests(onlyBecomeAuthorRequests);
       } catch (error) {
         console.error(error);
       } finally {
@@ -258,19 +251,13 @@ export default function AuthorManagement() {
       async () => {
         await approveRequest(request.requestId);
         setAuthorUpgradeRequests((prev) => prev.filter((r) => r.requestId !== request.requestId));
-        
-        // Thêm vào danh sách Author (Tab 1)
-        setAuthors((prev) => {
-            if (prev.some(a => a.id === request.requesterId)) return prev;
-            // Lúc mới thêm chưa có số liệu, có thể load lại sau
-            const newAuthor: Author = {
-                id: request.requesterId,
-                name: name,
-                email: request.requesterEmail || "(Chưa có email)",
-                stories: 0, followers: 0, status: "active", revenue: 0,
-            };
-            return [newAuthor, ...prev];
-        });
+        const newAuthor: Author = {
+          id: request.requesterId,
+          name: name,
+          email: request.requesterEmail || "(Chưa có email)",
+          stories: 0, views: 0, status: "active", revenue: 0,
+        };
+        setAuthors((prev) => [newAuthor, ...prev]);
       },
       { loading: `Đang duyệt ${name}...`, success: `Đã duyệt ${name}!`, error: "Lỗi khi duyệt." }
     );
@@ -291,16 +278,17 @@ export default function AuthorManagement() {
     );
   };
   
-  // --- Logic: Author -> Sponsored/Rank (Tab 2) ---
+  // --- ✅ SỬA: Logic: Author -> Sponsored/Rank (Tab 2) ---
   const handleApproveSponsorRequest = async (request: SponsorRequest) => {
     toast.promise(
       async () => {
+        // Gọi API approveRankRequest
         await approveRankRequest(request.requestId);
         setSponsorRequests((prev) => prev.filter((r) => r.requestId !== request.requestId));
       },
       {
         loading: `Đang duyệt yêu cầu của ${request.authorName}...`,
-        success: `Đã duyệt yêu cầu nâng hạng cho ${request.authorName}!`,
+        success: `Đã nâng hạng cho ${request.authorName} lên ${request.targetRank}!`,
         error: "Duyệt thất bại.",
       }
     );
@@ -310,6 +298,7 @@ export default function AuthorManagement() {
     if (selectedSponsorRequest && sponsorRejectReason) {
       toast.promise(
         async () => {
+          // Gọi API rejectRankRequest
           await rejectRankRequest(selectedSponsorRequest.requestId, sponsorRejectReason);
           setSponsorRequests((prev) => prev.filter((r) => r.requestId !== selectedSponsorRequest.requestId));
         },
@@ -395,7 +384,7 @@ export default function AuthorManagement() {
             <TabsTrigger value="authors">Danh sách Authors</TabsTrigger>
             <TabsTrigger value="sponsor-requests" className="relative">
               Yêu cầu Sponsored
-              {sponsorRequests.length > 0 && <span className="ml-2 px-2 py-0.5 bg-red-500 text-white rounded-full text-xs">{sponsorRequests.length}</span>}
+              {sponsorRequests.length > 0 && <span className="ml-2 px-2 py-0.5 bg-[var(--primary)] text-white rounded-full text-xs">{sponsorRequests.length}</span>}
             </TabsTrigger>
             <TabsTrigger value="author-requests" className="relative">
               Yêu cầu lên Author
@@ -422,7 +411,7 @@ export default function AuthorManagement() {
                       <TableHead>Tên</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Số truyện</TableHead>
-                      <TableHead>Followers</TableHead> {/* ✅ Đổi header */}
+                      <TableHead>Views</TableHead>
                       <TableHead>Doanh thu</TableHead>
                       <TableHead>Trạng thái</TableHead>
                     </TableRow>
@@ -436,7 +425,7 @@ export default function AuthorManagement() {
                           <TableCell>{a.name}</TableCell>
                           <TableCell>{a.email}</TableCell>
                           <TableCell>{a.stories}</TableCell>
-                          <TableCell>{a.followers.toLocaleString()}</TableCell> {/* ✅ Hiển thị Followers */}
+                          <TableCell>{a.views}</TableCell>
                           <TableCell>{a.revenue > 0 ? `${a.revenue.toLocaleString()}₫` : "-"}</TableCell>
                           <TableCell>{getStatusBadge(a.status)}</TableCell>
                         </TableRow>
@@ -450,7 +439,7 @@ export default function AuthorManagement() {
             </Card>
           </TabsContent>
 
-          {/* Tab 2: Yêu cầu Sponsored/Rank */}
+          {/* ✅ SỬA: Tab 2 - Yêu cầu Sponsored/Rank (UI mới - Giữ nguyên layout) */}
           <TabsContent value="sponsor-requests" className="space-y-4">
               <div className="grid gap-4">
                 {isLoadingSponsorRequests ? (
@@ -461,19 +450,23 @@ export default function AuthorManagement() {
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div>
-                          <CardTitle className="text-[var(--primary)]">{request.authorName}</CardTitle>
+                          {/* Hiển thị Tên Tác Giả + Rank Đang Xin */}
+                          <CardTitle className="text-[var(--primary)] flex items-center gap-2">
+                            {request.authorName} 
+                            <Badge variant="secondary" className="ml-2">xin lên {request.targetRank}</Badge>
+                          </CardTitle>
                           <CardDescription>{request.email}</CardDescription>
                         </div>
                         <Badge variant="outline">{new Date(request.createdAt).toLocaleDateString('vi-VN')}</Badge>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {/* Rank & Followers */}
+                      {/* UI Đã sửa: Rank & Followers */}
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <p className="text-sm text-[var(--muted-foreground)] flex items-center gap-1">
                             <Trophy className="w-4 h-4 text-yellow-500" /> 
-                            Hạng hiện tại
+                            Rank hiện tại
                           </p>
                           <p className="font-medium">{request.currentRank}</p>
                         </div>
@@ -487,7 +480,7 @@ export default function AuthorManagement() {
                       </div>
                       
                       <div>
-                        <p className="text-sm text-[var(--muted-foreground)] mb-1">Lý do xin nâng cấp</p>
+                        <p className="text-sm text-[var(--muted-foreground)] mb-1">Cam kết / Lý do</p>
                         <p className="text-sm bg-[var(--muted)] p-3 rounded-lg">{request.reason}</p>
                       </div>
                       <div className="flex gap-2">
@@ -515,7 +508,7 @@ export default function AuthorManagement() {
                   </Card>
                 ))
                 ) : (
-                  <Card className="border border-dashed"><CardContent className="py-12 text-center text-muted-foreground">Không có yêu cầu Sponsored nào.</CardContent></Card>
+                  <Card className="border border-dashed"><CardContent className="py-12 text-center text-muted-foreground">Không có yêu cầu Sponsored/Rank nào.</CardContent></Card>
                 )}
               </div>
             </TabsContent>
@@ -542,7 +535,7 @@ export default function AuthorManagement() {
                 <div><p className="text-sm text-[var(--muted-foreground)]">Tên</p><p>{selectedAuthor.name}</p></div>
                 <div><p className="text-sm text-[var(--muted-foreground)]">Email</p><p>{selectedAuthor.email}</p></div>
                 <div><p className="text-sm text-[var(--muted-foreground)]">Số truyện</p><p>{selectedAuthor.stories}</p></div>
-                <div><p className="text-sm text-[var(--muted-foreground)]">Followers</p><p>{selectedAuthor.followers.toLocaleString()}</p></div>
+                <div><p className="text-sm text-[var(--muted-foreground)]">Total Views</p><p>{selectedAuthor.views.toLocaleString()}</p></div>
                 <div><p className="text-sm text-[var(--muted-foreground)]">Doanh thu</p><p>{selectedAuthor.revenue > 0 ? `${selectedAuthor.revenue.toLocaleString()}₫` : 'Chưa có'}</p></div>
                 <div><p className="text-sm text-[var(--muted-foreground)] mb-2">Trạng thái</p>{getStatusBadge(selectedAuthor.status)}</div>
               </div>
