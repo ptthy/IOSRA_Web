@@ -1,129 +1,9 @@
-// // services/chapterCatalogService.ts
-// import apiClient from "./apiClient";
-// export interface ChapterVoice {
-//   voiceId: string;
-//   voiceName: string;
-//   voiceCode: string; // vd: "male_high"
-//   status: string; // vd: "ready"
-//   priceDias: number;
-//   hasAudio: boolean;
-//   owned: boolean; // Quan trọng: true = hiện nút Play, false = hiện nút Mua
-//   audioUrl: string | null;
-// }
-// export interface ChapterSummary {
-//   chapterId: string;
-//   chapterNo: number;
-//   title: string;
-//   isLocked: boolean;
-//   wordCount: number;
-//   charCount: number;
-//   publishedAt: string;
-//   languageCode: string;
-//   accessType: "free" | "dias"; // "free" hoặc "dias"
-//   priceDias: number;
-// }
-
-// export interface ChapterDetail {
-//   chapterId: string;
-//   storyId: string;
-//   chapterNo: number;
-//   title: string;
-//   contentUrl: string;
-//   wordCount: number;
-//   charCount: number;
-//   publishedAt: string;
-//   isLocked: boolean;
-//   languageCode: string;
-//   accessType: "free" | "dias";
-//   priceDias: number;
-//   voices?: ChapterVoice[];
-// }
-
-// export interface PaginatedResponse<T> {
-//   items: T[];
-//   total: number;
-//   page: number;
-//   pageSize: number;
-// }
-
-// export interface ChapterCatalogParams {
-//   StoryId: string;
-//   Page?: number;
-//   PageSize?: number;
-// }
-
-// export const chapterCatalogApi = {
-//   // Lấy danh sách chương
-//   getChapters: (
-//     params: ChapterCatalogParams
-//   ): Promise<PaginatedResponse<ChapterSummary>> => {
-//     return apiClient
-//       .get("/api/ChapterCatalog", { params })
-//       .then((response) => response.data);
-//   },
-//   // Lấy chi tiết chương
-//   getChapterDetail: (chapterId: string): Promise<ChapterDetail> => {
-//     return apiClient
-//       .get(`/api/ChapterCatalog/${chapterId}`)
-//       .then((response) => response.data);
-//   },
-//   // Lấy danh sách giọng đọc (Dùng interface ChapterVoice vừa tạo)
-//   getChapterVoices: (chapterId: string): Promise<ChapterVoice[]> => {
-//     return apiClient
-//       .get(`/api/ChapterCatalog/${chapterId}/voices`)
-//       .then((response) => response.data);
-//   },
-
-//   // Lấy chi tiết 1 giọng
-//   getChapterVoiceDetail: (
-//     chapterId: string,
-//     voiceId: string
-//   ): Promise<ChapterVoice> => {
-//     return apiClient
-//       .get(`/api/ChapterCatalog/${chapterId}/voices/${voiceId}`)
-//       .then((response) => response.data);
-//   },
-//   getChapterContent: async (contentUrl: string): Promise<string> => {
-//     try {
-//       // Xử lý contentUrl - nếu là relative path thì build full URL
-//       let fullUrl = contentUrl;
-//       if (!contentUrl.startsWith("http")) {
-//         // Nếu contentUrl là relative path như "stories/.../chapters/....txt"
-//         // thì build thành full URL với R2 base
-//         const R2_BASE_URL =
-//           "https://pub-15618311c0ec468282718f80c66bcc13.r2.dev";
-//         fullUrl = `${R2_BASE_URL}/${contentUrl}`;
-//       }
-
-//       // Sử dụng fetch trực tiếp thay vì apiClient để tránh CORS issues
-//       const response = await fetch(fullUrl, {
-//         method: "GET",
-//         headers: {
-//           Accept: "text/plain, */*",
-//         },
-//       });
-
-//       if (!response.ok) {
-//         throw new Error(`HTTP error! status: ${response.status}`);
-//       }
-
-//       const content = await response.text();
-//       console.log(
-//         "✅ [Service] Successfully fetched content, length:",
-//         content.length
-//       );
-//       return content;
-//     } catch (error) {
-//       console.error("❌ [Service] Error fetching chapter content:", error);
-//       // Xử lý lỗi TypeScript
-//       const errorMessage =
-//         error instanceof Error ? error.message : "Unknown error";
-//       throw new Error(`Không thể tải nội dung: ${errorMessage}`);
-//     }
-//   },
-// };
+// services/chapterCatalogService.ts
 import apiClient from "./apiClient";
-
+export interface Mood {
+  code: string;
+  name: string;
+}
 export interface ChapterVoice {
   voiceId: string;
   voiceName: string;
@@ -146,6 +26,8 @@ export interface ChapterSummary {
   languageCode: string;
   accessType: "free" | "dias"; // "free" hoặc "dias"
   priceDias: number;
+  mood?: Mood;
+  moodMusicPaths?: string[];
 }
 
 export interface ChapterDetail {
@@ -163,6 +45,8 @@ export interface ChapterDetail {
   accessType: "free" | "dias";
   priceDias: number;
   voices?: ChapterVoice[];
+  mood?: Mood;
+  moodMusicPaths?: string[];
 }
 
 export interface PaginatedResponse<T> {

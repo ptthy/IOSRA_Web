@@ -193,7 +193,7 @@ export default function StoryDetailPage() {
           <Alert className="mb-6 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
             <Clock className="h-4 w-4 text-blue-600" />
             <AlertDescription>
-              Truyện đang chờ được AI đánh giá. Vui lòng chờ kết quả.
+              Truyện đang chờ được Content Mod đánh giá. Vui lòng chờ kết quả.
             </AlertDescription>
           </Alert>
         );

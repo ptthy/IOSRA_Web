@@ -17,6 +17,9 @@ import {
   Loader2,
   AlertCircle,
   Gem,
+  Music, // Thêm icon nhạc
+  Music2,
+  Crown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -72,8 +75,11 @@ interface ReaderToolbarProps {
   onSettings: () => void;
   onChapterChange: (chapterId: string) => void;
   children?: React.ReactNode;
-  autoPlayAfterUnlock?: boolean; // 🔥 PROP MỚI: Tự động phát sau khi mở khóa
+  autoPlayAfterUnlock?: boolean; //  PROP MỚI: Tự động phát sau khi mở khóa
   setShowTopUpModal: (show: boolean) => void;
+  mood?: { code: string; name: string };
+  moodMusicPaths?: string[];
+  hasActiveSubscription?: boolean;
 }
 
 export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
@@ -88,8 +94,11 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
   onSettings,
   onChapterChange,
   children,
-  autoPlayAfterUnlock = false, // 🔥 Mặc định là false
+  autoPlayAfterUnlock = false, //  Mặc định là false
   setShowTopUpModal,
+  mood,
+  moodMusicPaths = [],
+  hasActiveSubscription = false,
 }) => {
   const [openChapterList, setOpenChapterList] = useState(false);
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(
@@ -105,7 +114,11 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
 
   const [voiceToBuy, setVoiceToBuy] = useState<ChapterVoice | null>(null);
   const [isBuying, setIsBuying] = useState(false);
-
+  const [activeMusicPath, setActiveMusicPath] = useState<string | null>(null);
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [musicVolume, setMusicVolume] = useState(30);
+  const [showMusicVolume, setShowMusicVolume] = useState(false);
+  const bgMusicRef = useRef<HTMLAudioElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const getFullAudioUrl = (path: string | undefined | null) => {
@@ -122,7 +135,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
       console.log("🎯 VOICES DATA:", data);
       setVoices(data);
 
-      // 🔥 QUAN TRỌNG: Nếu có autoPlayAfterUnlock, chọn giọng đầu tiên và phát ngay
+      //  QUAN TRỌNG: Nếu có autoPlayAfterUnlock, chọn giọng đầu tiên và phát ngay
       if (autoPlayAfterUnlock && data.length > 0) {
         const firstOwnedVoice = data.find((v) => v.owned);
         if (firstOwnedVoice) {
@@ -150,7 +163,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
     setCurrentVoice(null);
   }, [chapterId]);
 
-  // 🔥 EFFECT: Xử lý auto play sau khi mở khóa chapter
+  //  EFFECT: Xử lý auto play sau khi mở khóa chapter
   useEffect(() => {
     if (autoPlayAfterUnlock && chapterId) {
       console.log("🎯 AUTO PLAY TRIGGERED, reloading voices...");
@@ -305,7 +318,50 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
       console.error("Reload error", e);
     }
   };
+  // 1. Reset khi đổi chương
+  useEffect(() => {
+    setIsMusicPlaying(false);
+    if (moodMusicPaths && moodMusicPaths.length > 0) {
+      setActiveMusicPath(moodMusicPaths[0]); // Mặc định chọn bài đầu
+    } else {
+      setActiveMusicPath(null);
+    }
+  }, [chapterId, moodMusicPaths]);
 
+  // 2. Điều khiển Audio Element
+  useEffect(() => {
+    const bgAudio = bgMusicRef.current;
+    if (bgAudio) {
+      bgAudio.volume = musicVolume / 100;
+      if (isMusicPlaying && activeMusicPath) {
+        bgAudio.play().catch((e) => {
+          console.error("Music Play Error:", e);
+          setIsMusicPlaying(false);
+        });
+      } else {
+        bgAudio.pause();
+      }
+    }
+  }, [isMusicPlaying, activeMusicPath, musicVolume]);
+
+  // 3. Hàm chọn nhạc (Check VIP)
+  const handleMusicSelect = (path: string) => {
+    if (!hasActiveSubscription) {
+      toast.error("Tính năng giới hạn", {
+        description: "Bạn phải mua gói Hội viên để nghe nhạc nền.",
+        icon: <Crown className="w-4 h-4 text-orange-500" />,
+        action: { label: "Xem gói", onClick: () => setShowTopUpModal(true) },
+      });
+      setIsMusicPlaying(false);
+      return;
+    }
+    setActiveMusicPath(path);
+    setIsMusicPlaying(true);
+    toast.success("Đang phát nhạc nền", {
+      description: `Giai điệu: ${mood?.name || "Tâm trạng"}`,
+      icon: <Music className="w-4 h-4 text-pink-500" />,
+    });
+  };
   const formatTime = (seconds: number) => {
     if (!seconds || isNaN(seconds)) return "00:00";
     const mins = Math.floor(seconds / 60);
@@ -345,6 +401,14 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
             onLoadedMetadata={handleLoadedMetadata}
             onEnded={handleEnded}
             onError={(e) => console.error("Audio Load Error:", e)}
+          />
+        )}
+        {activeMusicPath && (
+          <audio
+            ref={bgMusicRef}
+            src={getFullAudioUrl(activeMusicPath)}
+            loop={true}
+            preload="auto"
           />
         )}
 
@@ -620,10 +684,89 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                 )}
               </SelectContent>
             </Select>
+            {moodMusicPaths.length > 0 && (
+              <Select
+                value={activeMusicPath || ""}
+                onValueChange={handleMusicSelect}
+              >
+                <SelectTrigger className="h-8 w-[140px] text-xs bg-black/5 dark:bg-white/10 border-0 rounded-full px-3 truncate">
+                  <div className="flex items-center gap-2 truncate">
+                    {isMusicPlaying ? (
+                      <Music className="w-3 h-3 text-pink-500 animate-pulse" />
+                    ) : (
+                      <Music2 className="w-3 h-3 opacity-50" />
+                    )}
+                    <span className="truncate">
+                      {activeMusicPath
+                        ? `Giai điệu ${
+                            moodMusicPaths.indexOf(activeMusicPath) + 1
+                          }`
+                        : "Chọn nhạc nền"}
+                    </span>
+                  </div>
+                </SelectTrigger>
+
+                <SelectContent>
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/30">
+                    Mood: {mood?.name || "Tâm trạng"}
+                  </div>
+                  {moodMusicPaths.map((path, index) => (
+                    <SelectItem key={path} value={path}>
+                      <div className="flex items-center justify-between w-full min-w-[140px] gap-2">
+                        <span>Giai điệu {index + 1}</span>
+                        {hasActiveSubscription ? (
+                          <div className="flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">
+                            <Crown className="w-3 h-3" /> <span>Đã mở</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full">
+                            <Crown className="w-3 h-3" /> <span>VIP</span>
+                          </div>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
 
         <div className="flex items-center justify-end gap-1 w-fit shrink-0">
+          {activeMusicPath && hasActiveSubscription && (
+            <Popover open={showMusicVolume} onOpenChange={setShowMusicVolume}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "hidden lg:flex h-9 w-9",
+                    isMusicPlaying
+                      ? "text-pink-500 bg-pink-50 dark:bg-pink-900/10"
+                      : themeClasses.textMuted,
+                    themeClasses.hover
+                  )}
+                  title="Âm lượng nhạc nền"
+                >
+                  <Music2 className="h-5 w-5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="end" className="w-32 p-3">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-medium text-muted-foreground">
+                    <span>Nhạc nền</span>
+                    <span>{musicVolume}%</span>
+                  </div>
+                  <Slider
+                    value={[musicVolume]}
+                    max={100}
+                    step={1}
+                    onValueChange={(val) => setMusicVolume(val[0])}
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
           <Popover open={showVolume} onOpenChange={setShowVolume}>
             <PopoverTrigger asChild>
               <Button

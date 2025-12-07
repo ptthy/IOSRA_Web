@@ -3,8 +3,6 @@ import apiClient from "./apiClient";
 import type { Chapter, ChapterDetails, CreateChapterRequest } from "./apiTypes";
 
 export const chapterService = {
-  // === TẤT CẢ HÀM CŨ GIỮ NGUYÊN 100% === (không sửa gì ở trên)
-
   // === Endpoint 1  GET /api/AuthorChapter/{storyId} ===
   async getAllChapters(storyId: string, status?: string): Promise<Chapter[]> {
     console.log(
