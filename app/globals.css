@@ -1,9 +1,9 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"); /* Move this to the very top */
 @import "tailwindcss";
-@import "tw-animate-css"; /* Giữ lại từ nhánh main */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"); /* Giữ lại từ nhánh main */
+@import "tw-animate-css";
 
 /* ✅ Base setup */
-@custom-variant dark (&:is(.dark *)); /* Giữ lại từ nhánh main */
+@custom-variant dark (&:is(.dark *));
 
 /* ✅ Định nghĩa theme cho Tailwind v4 */
 @theme inline {
