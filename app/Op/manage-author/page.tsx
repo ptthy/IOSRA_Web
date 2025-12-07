@@ -1,9 +1,10 @@
+// File: page.tsx (Trang quản lý yêu cầu Author)
 "use client";
 
 import { useState, useEffect } from "react";
-import { AppSidebar } from "@/components/op-sidebar";
-import { SiteHeader } from "@/components/site-header";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+// import { AppSidebar } from "@/components/op-sidebar"; // Nếu cần
+// import { SiteHeader } from "@/components/site-header"; // Nếu cần
+// import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"; // Nếu cần
 import {
   Card,
   CardContent,
@@ -48,6 +49,7 @@ import {
   Loader2,
   Users, // Icon cho Follows
   Trophy, // Icon cho Rank
+  AlertTriangle // Icon cảnh báo lỗi
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -204,7 +206,7 @@ export default function AuthorManagement() {
         // API /requests trả về cả rank-up (có content là JSON) và become-author (text thường)
         // Chúng ta chỉ giữ lại cái nào KHÔNG PHẢI là Rank Request cho Tab 3
         const onlyBecomeAuthorRequests = data.filter((req: any) => {
-            // Nếu content chứa "TargetRankId" hoặc "CurrentRankId" thì đó là Rank Request -> Bỏ qua
+            // Nếu content chứa "TargetRankId" hoặc "CurrentRankName" thì đó là Rank Request -> Bỏ qua
             if (req.content && (req.content.includes("TargetRankId") || req.content.includes("CurrentRankName"))) {
                 return false; 
             }
@@ -244,22 +246,47 @@ export default function AuthorManagement() {
     }
   };
 
+  // --- ✅ VALIDATE: Hàm kiểm tra Author Promotion (Tab 3) ---
+  const validateAuthorPromotion = (request: AuthorUpgradeRequest) => {
+    // 1. Check AlreadyPending (Giả sử list authorUpgradeRequests có thể chứa trùng lặp)
+    const duplicate = authorUpgradeRequests.filter(r => r.requesterId === request.requesterId).length > 1;
+    if (duplicate) {
+        toast.warning(`Cảnh báo: User ${request.requesterUsername} đang có nhiều yêu cầu trùng lặp.`);
+        // Vẫn cho phép duyệt nhưng cảnh báo
+    }
+    // 2. Check CannotPromoteAuthor: Có thể thêm logic gọi API check role user ở đây nếu cần thiết
+    return true;
+  };
+
   // --- Logic: User -> Author (Tab 3) ---
   const handleApproveAuthorRequest = async (request: AuthorUpgradeRequest) => {
+    if (!validateAuthorPromotion(request)) return;
+
     const name = request.requesterUsername || `User ID: ${request.requesterId}`;
     toast.promise(
       async () => {
-        await approveRequest(request.requestId);
-        setAuthorUpgradeRequests((prev) => prev.filter((r) => r.requestId !== request.requestId));
-        const newAuthor: Author = {
-          id: request.requesterId,
-          name: name,
-          email: request.requesterEmail || "(Chưa có email)",
-          stories: 0, views: 0, status: "active", revenue: 0,
-        };
-        setAuthors((prev) => [newAuthor, ...prev]);
+        try {
+            await approveRequest(request.requestId);
+            setAuthorUpgradeRequests((prev) => prev.filter((r) => r.requestId !== request.requestId));
+            const newAuthor: Author = {
+              id: request.requesterId,
+              name: name,
+              email: request.requesterEmail || "(Chưa có email)",
+              stories: 0, views: 0, status: "active", revenue: 0,
+            };
+            setAuthors((prev) => [newAuthor, ...prev]);
+        } catch (error: any) {
+            // ✅ VALIDATE: Bắt lỗi CannotPromoteAuthor và AlreadyPending từ API
+            const code = error.response?.data?.code || error.code;
+            if (code === "CannotPromoteAuthor") {
+                throw new Error("Không thể thăng cấp: Tài khoản này đã là Author hoặc Role cao hơn.");
+            } else if (code === "AlreadyPending") {
+                throw new Error("Yêu cầu này đang được xử lý hoặc đã tồn tại.");
+            }
+            throw error; // Ném tiếp lỗi khác để toast hiển thị
+        }
       },
-      { loading: `Đang duyệt ${name}...`, success: `Đã duyệt ${name}!`, error: "Lỗi khi duyệt." }
+      { loading: `Đang duyệt ${name}...`, success: `Đã duyệt ${name}!`, error: (err) => err.message || "Lỗi khi duyệt." }
     );
   };
 
@@ -445,68 +472,80 @@ export default function AuthorManagement() {
                 {isLoadingSponsorRequests ? (
                    <Card className="border border-dashed"><CardContent className="py-12 text-center text-muted-foreground"><Loader2 className="w-6 h-6 mx-auto animate-spin" /> Đang tải...</CardContent></Card>
                 ) : sponsorRequests.length > 0 ? (
-                  sponsorRequests.map((request) => (
-                  <Card key={request.requestId} className="border border-[var(--border)] bg-[var(--card)] shadow-sm">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          {/* Hiển thị Tên Tác Giả + Rank Đang Xin */}
-                          <CardTitle className="text-[var(--primary)] flex items-center gap-2">
-                            {request.authorName} 
-                            <Badge variant="secondary" className="ml-2">xin lên {request.targetRank}</Badge>
-                          </CardTitle>
-                          <CardDescription>{request.email}</CardDescription>
-                        </div>
-                        <Badge variant="outline">{new Date(request.createdAt).toLocaleDateString('vi-VN')}</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {/* UI Đã sửa: Rank & Followers */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-[var(--muted-foreground)] flex items-center gap-1">
-                            <Trophy className="w-4 h-4 text-yellow-500" /> 
-                            Rank hiện tại
-                          </p>
-                          <p className="font-medium">{request.currentRank}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-[var(--muted-foreground)] flex items-center gap-1">
-                            <Users className="w-4 h-4 text-blue-500" /> 
-                            Total Follows
-                          </p>
-                          <p className="font-medium">{request.followers.toLocaleString()}</p>
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <p className="text-sm text-[var(--muted-foreground)] mb-1">Cam kết / Lý do</p>
-                        <p className="text-sm bg-[var(--muted)] p-3 rounded-lg">{request.reason}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={() => handleApproveSponsorRequest(request)}
-                          className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                        >
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          Duyệt
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedSponsorRequest(request);
-                            setSponsorRejectReason(""); 
-                            setShowSponsorRejectDialog(true);
-                          }}
-                          className="flex-1 border-red-500 text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
-                        >
-                          <XCircle className="w-4 h-4 mr-2" />
-                          Từ chối
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
+                  sponsorRequests.map((request) => {
+                    // ✅ VALIDATE: Check RankMissing khi render
+                    const isRankMissing = !request.currentRank || request.currentRank === "Unknown";
+
+                    return (
+                        <Card key={request.requestId} className="border border-[var(--border)] bg-[var(--card)] shadow-sm">
+                            <CardHeader>
+                            <div className="flex items-start justify-between">
+                                <div>
+                                {/* Hiển thị Tên Tác Giả + Rank Đang Xin */}
+                                <CardTitle className="text-[var(--primary)] flex items-center gap-2">
+                                    {request.authorName} 
+                                    <Badge variant="secondary" className="ml-2">xin lên {request.targetRank}</Badge>
+                                </CardTitle>
+                                <CardDescription>{request.email}</CardDescription>
+                                </div>
+                                <Badge variant="outline">{new Date(request.createdAt).toLocaleDateString('vi-VN')}</Badge>
+                            </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                            {/* UI Đã sửa: Rank & Followers */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-sm text-[var(--muted-foreground)] flex items-center gap-1">
+                                        <Trophy className="w-4 h-4 text-yellow-500" /> 
+                                        Rank hiện tại
+                                    </p>
+                                    {isRankMissing ? (
+                                        <p className="font-bold text-red-500 flex items-center gap-1">
+                                            <AlertTriangle className="w-3 h-3"/> Lỗi: Rank Missing
+                                        </p>
+                                    ) : (
+                                        <p className="font-medium">{request.currentRank}</p>
+                                    )}
+                                </div>
+                                <div>
+                                <p className="text-sm text-[var(--muted-foreground)] flex items-center gap-1">
+                                    <Users className="w-4 h-4 text-blue-500" /> 
+                                    Total Follows
+                                </p>
+                                <p className="font-medium">{request.followers.toLocaleString()}</p>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <p className="text-sm text-[var(--muted-foreground)] mb-1">Cam kết / Lý do</p>
+                                <p className="text-sm bg-[var(--muted)] p-3 rounded-lg">{request.reason}</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
+                                    onClick={() => handleApproveSponsorRequest(request)}
+                                    disabled={isRankMissing} // ✅ VALIDATE: Disable nếu RankMissing
+                                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                                >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Duyệt
+                                </Button>
+                                <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setSelectedSponsorRequest(request);
+                                    setSponsorRejectReason(""); 
+                                    setShowSponsorRejectDialog(true);
+                                }}
+                                className="flex-1 border-red-500 text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
+                                >
+                                <XCircle className="w-4 h-4 mr-2" />
+                                Từ chối
+                                </Button>
+                            </div>
+                            </CardContent>
+                        </Card>
+                    );
+                  })
                 ) : (
                   <Card className="border border-dashed"><CardContent className="py-12 text-center text-muted-foreground">Không có yêu cầu Sponsored/Rank nào.</CardContent></Card>
                 )}
@@ -609,7 +648,6 @@ export default function AuthorManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </OpLayout>
   );
 }

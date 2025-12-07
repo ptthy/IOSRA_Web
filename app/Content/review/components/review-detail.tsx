@@ -1,4 +1,4 @@
-// File: app/Content/review/components/story-detail.tsx
+// File: app/Content/review/components/review-detail.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -12,11 +12,12 @@ import {
   Clock,
   User,
   Info,
-  FileText
+  FileText,
+  Tag
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { postModerationDecision } from "@/services/moderationApi";
@@ -38,79 +39,78 @@ export interface StoryFromAPI {
   lengthPlan: string;
   submittedAt: string;
   pendingNote: string | null;
-  tags: {
-    tagId: string;
-    tagName: string;
-  }[];
+  tags: { tagId: string; tagName: string }[];
 }
 
-interface StoryDetailProps {
-  content: StoryFromAPI;
-  onBack: () => void;
-}
-
-// Hàm tiện ích: Chuyển đổi URL trong văn bản thành thẻ <a href>
-const linkify = (text: string) => {
-  if (!text) return "";
-  
-  // Regex bắt URL (http/https)
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  
-  return text.split(urlRegex).map((part, index) => {
-    if (part.match(urlRegex)) {
-      return (
-        <a
-          key={index}
-          href={part}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 hover:underline break-all"
-          onClick={(e) => e.stopPropagation()} // Ngăn sự kiện click lan truyền nếu cần
-        >
-          {part}
-        </a>
-      );
-    }
-    return part;
-  });
-};
-
-export function ReviewDetail({ content, onBack }: StoryDetailProps) {
+export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBack: () => void }) {
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- HÀM XỬ LÝ DUYỆT ---
+  // 1. Xử lý Duyệt (Approve) - Có Validate
   const handleApprove = async (reason: string) => {
+    // ✅ VALIDATE: StoryRejectedByAi
+    if (content.aiResult === 'rejected') {
+        const confirmAi = confirm(
+            "CẢNH BÁO QUAN TRỌNG: AI đã từ chối truyện này vì vi phạm nội dung.\n" +
+            "Hành động duyệt này có thể gây rủi ro.\n\n" +
+            "Bạn vẫn muốn DUYỆT?"
+        );
+        if (!confirmAi) return;
+    }
+
+    if (!reason) {
+        toast.error("Vui lòng nhập lý do duyệt.");
+        return;
+    }
+
     setIsSubmitting(true);
     try {
-      await postModerationDecision(content.reviewId, true, reason || "Approved"); 
-      toast.success("Phê duyệt truyện thành công!");
-      setShowApprovalModal(false);
+      await postModerationDecision(content.reviewId, true, reason);
+      toast.success("Đã duyệt truyện thành công!");
       onBack();
-    } catch (err: any) {
-      toast.error(`Lỗi khi phê duyệt: ${err.message}`);
+    } catch (error: any) {
+      // ✅ VALIDATE: ModerationAlreadyHandled & StoryNotPending
+      const code = error.response?.data?.code || error.code;
+
+      if (code === "ModerationAlreadyHandled") {
+          toast.error("Lỗi: Truyện này đã được xử lý bởi người khác.");
+          onBack(); // Refresh lại
+      } else if (code === "StoryNotPending") {
+          toast.error("Truyện không ở trạng thái chờ duyệt.");
+      } else {
+          toast.error("Có lỗi xảy ra: " + error.message);
+      }
     } finally {
       setIsSubmitting(false);
+      setShowApprovalModal(false);
     }
   };
 
-  // --- HÀM XỬ LÝ TỪ CHỐI ---
+  // 2. Xử lý Từ chối (Reject) - Có Validate
   const handleReject = async (reason: string) => {
     if (!reason) {
-      toast.error("Vui lòng cung cấp lý do từ chối.");
-      return;
+        toast.error("Vui lòng nhập lý do từ chối.");
+        return;
     }
+
     setIsSubmitting(true);
     try {
-      await postModerationDecision(content.reviewId, false, reason); 
-      toast.success("Từ chối truyện thành công!");
-      setShowRejectModal(false);
+      await postModerationDecision(content.reviewId, false, reason);
+      toast.success("Đã từ chối truyện.");
       onBack();
-    } catch (err: any) {
-      toast.error(`Lỗi khi từ chối: ${err.message}`);
+    } catch (error: any) {
+      // ✅ VALIDATE: ModerationAlreadyHandled
+      const code = error.response?.data?.code || error.code;
+      if (code === "ModerationAlreadyHandled") {
+          toast.error("Lỗi: Truyện này đã được xử lý bởi người khác.");
+          onBack();
+      } else {
+          toast.error("Lỗi: " + error.message);
+      }
     } finally {
       setIsSubmitting(false);
+      setShowRejectModal(false);
     }
   };
 
@@ -123,143 +123,111 @@ export function ReviewDetail({ content, onBack }: StoryDetailProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] flex flex-col">
-      
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-[var(--card)] border border-[var(--border)] rounded-xl mx-6 mt-6 p-6 shadow-sm z-10"
-      >
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] mb-4 transition-colors"
-        >
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] pb-10">
+  {/* ⭐ FIX STICKY CHUẨN — header nằm riêng 1 layer */}
+      <div className="sticky top-0 z-50 bg-[var(--card)] border-b border-[var(--border)] px-6 py-4 shadow-md">
+        <button onClick={onBack} className="flex items-center gap-2 mb-2">
           <ArrowLeft className="w-5 h-5" />
           Quay lại danh sách
         </button>
+
         <h1 className="text-2xl font-semibold">Kiểm Duyệt Truyện</h1>
         <p className="text-[var(--muted-foreground)]">
-          Đọc và đánh giá nội dung truyện theo tiêu chuẩn cộng đồng
+          Đánh giá nội dung truyện và thông tin liên quan
         </p>
-      </motion.div>
+      </div>
 
-      {/* Alert Info */}
+      {/* 2. Alert Info */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="max-w-7xl mx-auto px-8 pt-6 w-full"
+        className="max-w-7xl mx-auto px-8 pt-6"
       >
         <div className="p-4 rounded-xl bg-[color-mix(in_srgb,_var(--accent)_8%,_var(--card)_92%)] border border-[var(--accent)]/20 flex gap-3 text-[var(--foreground)]">
           <AlertTriangle className="w-5 h-5 text-yellow-600" />
           <p className="text-sm">
-            Truyện này đang chờ kiểm duyệt. Vui lòng xem xét kỹ các thông tin (Mô tả, Đại cương) trước khi quyết định.
+            Truyện này đang chờ kiểm duyệt. Vui lòng kiểm tra kỹ đại cương, bìa và các tag.
           </p>
         </div>
       </motion.div>
 
-      <div className="p-8 max-w-7xl mx-auto w-full">
+      {/* 3. Main Content Grid */}
+      <div className="p-8 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* Cột trái - Chiếm 2/3 màn hình */}
+          {/* --- CỘT TRÁI (2/3) --- */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Card thông tin truyện */}
-            <Card className="border border-[var(--border)] shadow-sm overflow-hidden">
-                <div className="flex flex-col md:flex-row">
+            {/* Card 1: Thông tin tổng quan (Ảnh bìa + Chi tiết) */}
+            <Card className="p-6 border-l-4 border-l-[var(--primary)]">
+                <div className="flex flex-col md:flex-row gap-6">
                     {/* Ảnh bìa */}
-                    <div className="w-full md:w-48 h-64 md:h-auto relative bg-gray-100 flex-shrink-0">
-                        {content.coverUrl ? (
-                            <img 
-                                src={content.coverUrl} 
-                                alt={content.title} 
-                                className="w-full h-full object-cover"
-                            />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                <BookOpen className="w-12 h-12" />
-                            </div>
-                        )}
+                    <div className="shrink-0">
+                        <img 
+                            src={content.coverUrl} 
+                            alt="Cover" 
+                            className="w-32 h-48 object-cover rounded-lg shadow-md border border-[var(--border)]"
+                        />
                     </div>
                     
-                    {/* Thông tin chi tiết */}
-                    <div className="p-6 flex-1 flex flex-col justify-center space-y-4">
+                    {/* Thông tin */}
+                    <div className="flex-1 space-y-4">
                         <div>
-                            <h2 className="text-2xl font-bold mb-2">{content.title}</h2>
-                            <div className="flex flex-wrap gap-2 mb-3">
-                                {content.tags.map(tag => (
-                                    <Badge key={tag.tagId} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400">
-                                        {tag.tagName}
-                                    </Badge>
-                                ))}
+                            <div className="flex justify-between items-start">
+                                <h2 className="text-xl font-bold text-[var(--foreground)] leading-tight">{content.title}</h2>
+                                <Badge 
+                                    variant="outline" 
+                                    className={
+                                        content.aiResult === "approved" ? "bg-green-100 text-green-800 border-green-200" : 
+                                        content.aiResult === "rejected" ? "bg-red-100 text-red-800 border-red-200" : 
+                                        "bg-yellow-100 text-yellow-800 border-yellow-200"
+                                    }
+                                >
+                                    {content.aiResult === "rejected" && <AlertTriangle className="w-3 h-3 mr-1" />}
+                                    AI: {content.aiResult.toUpperCase()} ({content.aiScore})
+                                </Badge>
+                            </div>
+                            <div className="mt-2 text-sm text-[var(--muted-foreground)] space-y-1">
+                                <p className="flex items-center gap-2"><User className="w-4 h-4"/> Tác giả: <span className="font-medium text-[var(--foreground)]">{content.authorUsername}</span></p>
+                                <p className="flex items-center gap-2"><Clock className="w-4 h-4"/> Gửi lúc: {new Date(content.submittedAt).toLocaleString('vi-VN')}</p>
+                                <p className="flex items-center gap-2"><Info className="w-4 h-4"/> Kế hoạch: <Badge variant="secondary" className="text-xs">{content.lengthPlan}</Badge></p>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-[var(--muted-foreground)]">
-                            <div className="flex items-center gap-2">
-                                <User className="w-4 h-4" />
-                                <span>Tác giả: <strong className="text-[var(--foreground)]">{content.authorUsername}</strong></span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Clock className="w-4 h-4" />
-                                <span>Gửi lúc: {new Date(content.submittedAt).toLocaleString('vi-VN')}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Info className="w-4 h-4" />
-                                <span>Độ dài: <strong className="text-[var(--foreground)]">{content.lengthPlan}</strong></span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                                <span>AI Score: <strong className="text-[var(--foreground)]">{content.aiScore.toFixed(1)}</strong></span>
-                            </div>
+                        <div className="bg-[var(--muted)]/50 p-3 rounded-lg border border-[var(--border)]">
+                            <h4 className="text-xs font-semibold text-[var(--muted-foreground)] uppercase mb-1">Mô tả ngắn</h4>
+                            <p className="text-sm text-[var(--foreground)] leading-relaxed line-clamp-3 hover:line-clamp-none transition-all">
+                                {content.description}
+                            </p>
                         </div>
                     </div>
                 </div>
             </Card>
 
-            {/* Card Mô tả (Description) */}
-            <Card className="p-6">
+            {/* Card 2: Đại cương (Outline) */}
+            <Card className="p-6 min-h-[300px]">
                 <CardHeader className="px-0 pt-0 border-b border-[var(--border)] pb-4 mb-4">
-                    <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
                         <BookOpen className="w-5 h-5 text-blue-500" />
-                        Mô tả truyện
-                    </CardTitle>
+                       Nội dung truyện (Outline)
+                    </h3>
                 </CardHeader>
                 <CardContent className="px-0">
-                    <div className="text-[var(--foreground)] leading-relaxed whitespace-pre-line text-justify">
-                        {/* Sử dụng hàm linkify để hiển thị link */}
-                        {linkify(content.description)}
+                    <div className="prose dark:prose-invert max-w-none text-[var(--foreground)] whitespace-pre-line leading-relaxed">
+                        {content.outline}
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Card Đại cương / Chi tiết truyện (Outline) */}
+            {/* Card 3: Quyết định (Lặp lại ở dưới cùng để tiện thao tác) */}
             <Card className="p-6">
-                <CardHeader className="px-0 pt-0 border-b border-[var(--border)] pb-4 mb-4">
-                    <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                        <FileText className="w-5 h-5 text-orange-500" />
-                    Nội dung chi tiết 
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="px-0">
-                    <div className="bg-gray-50 dark:bg-gray-900/50 p-6 rounded-lg min-h-[150px] border border-[var(--border)]">
-                        <div className="text-[var(--foreground)] leading-relaxed whitespace-pre-line text-justify">
-                             {/* Sử dụng hàm linkify để hiển thị link */}
-                            {content.outline ? linkify(content.outline) : <span className="italic text-[var(--muted-foreground)]">Không có nội dung đại cương.</span>}
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Card Quyết định */}
-            <Card className="p-6">
-              <h3 className="mb-4 font-semibold text-lg">Quyết định kiểm duyệt</h3>
+              <h3 className="mb-4 font-semibold">Quyết định kiểm duyệt</h3>
               <div className="grid grid-cols-2 gap-4">
                 <Button 
                   onClick={() => setShowApprovalModal(true)} 
                   disabled={isSubmitting} 
-                  className="bg-green-600 hover:bg-green-700 text-white h-11"
+                  className="bg-green-600 hover:bg-green-700 text-white"
                 >
                   {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5 mr-2" />} 
                   Phê duyệt
@@ -268,18 +236,19 @@ export function ReviewDetail({ content, onBack }: StoryDetailProps) {
                   variant="outline" 
                   onClick={() => setShowRejectModal(true)} 
                   disabled={isSubmitting}
-                  className="border-red-500 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 h-11"
+                  className="border-red-500 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
                 >
                   {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5 mr-2" />} 
                   Từ chối
                 </Button>
               </div>
             </Card>
-
           </div>
 
-          {/* Cột phải - Chiếm 1/3 màn hình */}
+          {/* --- CỘT PHẢI (1/3) --- */}
           <div className="space-y-6">
+            
+            {/* Card Tiêu chuẩn */}
             <Card className="p-6">
               <h3 className="mb-4 font-semibold flex items-center gap-2">
                 <BookOpen className="w-5 h-5" />
@@ -295,6 +264,23 @@ export function ReviewDetail({ content, onBack }: StoryDetailProps) {
               </ul>
             </Card>
 
+            {/* Card Tags */}
+            <Card className="p-6">
+                <h3 className="mb-4 font-semibold flex items-center gap-2">
+                    <Tag className="w-4 h-4"/> Thể loại 
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                    {content.tags.length > 0 ? content.tags.map(tag => (
+                        <Badge key={tag.tagId} variant="secondary" className="px-3 py-1 text-xs">
+                            {tag.tagName}
+                        </Badge>
+                    )) : <span className="text-sm text-[var(--muted-foreground)]">Không có thẻ nào</span>}
+                </div>
+            </Card>
+
+           
+
+            {/* Card Thông tin kỹ thuật */}
             <Card className="p-6">
               <h3 className="mb-4 font-semibold">Thông tin bổ sung</h3>
               <div className="space-y-3 text-sm text-[var(--muted-foreground)] bg-[var(--muted)] p-4 rounded-lg">
@@ -312,25 +298,25 @@ export function ReviewDetail({ content, onBack }: StoryDetailProps) {
                 </div>
               </div>
             </Card>
+
           </div>
         </div>
       </div>
 
       {/* Modals */}
       <ApprovalModal 
-  isOpen={showApprovalModal} 
-  onClose={() => setShowApprovalModal(false)} 
-  onConfirm={handleApprove}
-  isSubmitting={isSubmitting}
-/>
+        isOpen={showApprovalModal} 
+        onClose={() => setShowApprovalModal(false)} 
+        onConfirm={handleApprove}
+        isSubmitting={isSubmitting}
+      />
 
-<RejectModal 
-  isOpen={showRejectModal} 
-  onClose={() => setShowRejectModal(false)} 
-  onConfirm={handleReject}
-  isSubmitting={isSubmitting}
-/>
-
+      <RejectModal 
+        isOpen={showRejectModal} 
+        onClose={() => setShowRejectModal(false)} 
+        onConfirm={handleReject}
+        isSubmitting={isSubmitting}
+      />
     </div>
   );
 }
