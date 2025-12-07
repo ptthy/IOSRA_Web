@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { SentBackList } from "./components/sent-back-list";
+
 import { ApprovalModal } from "./components/approval-modal";
 import { RejectModal } from "./components/reject-modal";
 import { ReportsList } from "./components/report-list";
@@ -57,13 +57,7 @@ export default function ModerationPage() {
       {/* ✅ SỬA 3: Xóa prop 'onHandle' */}
       {activeTab === "reports" && <ReportsList />}
 
-      {/* Sent back list (list view) */}
-      {activeTab === "sent-back" && !selectedStory && (
-        <div className="space-y-6">
-          <SentBackList onReview={handleSentBackReview} />
-        </div>
-      )}
-
+    
       {/* Sent back — chi tiết 1 item (Giữ nguyên) */}
       {activeTab === "sent-back" && selectedStory && (
         <div className="bg-[var(--card)] text-[var(--foreground)] p-6 rounded-xl shadow-sm border border-[var(--border)]">

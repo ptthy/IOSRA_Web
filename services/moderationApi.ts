@@ -160,10 +160,7 @@ export async function getRealtimeStats(): Promise<RealtimeStats> {
 export async function getModerationStories(status: 'pending' | 'published' | 'rejected') {
     try {
         const apiStatus = status.toUpperCase(); 
-        
-        const response = await apiClient.get('/api/moderation/stories', { 
-            params: { status: apiStatus }
-        });
+        const response = await apiClient.get('/api/moderation/stories', { params: { status: apiStatus } });
         return response.data;
     } catch (error: any) {
         throw new Error(error.response?.data?.message || error.message || "Lỗi khi tải danh sách truyện");
@@ -296,9 +293,15 @@ export async function getReportDetail(reportId: string): Promise<ReportItem> {
 }
 
 // --- API 10. Chốt trạng thái Report (Resolved - Phạt / Rejected - Bỏ qua) ---
-export async function updateReportStatus(reportId: string, status: 'resolved' | 'rejected') {
+export async function updateReportStatus(
+    reportId: string, 
+    status: 'resolved' | 'rejected',
+    data?: { strike?: number; restrictedUntil?: string | null }
+) {
     try {
-        const response = await apiClient.put(`/api/ContentModHandling/reports/${reportId}/status`, { status });
+        // Gộp status và data vào body request
+        const payload = { status, ...data };
+        const response = await apiClient.put(`/api/ContentModHandling/reports/${reportId}/status`, payload);
         return response.data;
     } catch (error: any) {
         throw new Error(error.response?.data?.message || "Lỗi khi cập nhật trạng thái báo cáo");

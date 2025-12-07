@@ -47,7 +47,7 @@ export async function rejectRankRequest(requestId: string, reason: string) {
   const res = await apiClient.post(
     `/api/OperationMod/rank-requests/${requestId}/reject`,
     {
-      reason: reason, // hoặc "note": reason tùy backend quy định, nhưng thường là reason
+      reason: reason, 
     }
   );
   return res.data;

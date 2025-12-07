@@ -1,4 +1,4 @@
-// File: review/components/history-page.tsx
+// File: app/Content/review/components/history-page.tsx
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
@@ -12,6 +12,8 @@ import {
   AlertCircle,
   User,
   Loader2,
+  FileText,
+  Info
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -33,6 +35,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import moment from "moment";
 import "moment/locale/vi";
@@ -55,6 +64,9 @@ export function HistoryPage() {
   const [historyData, setHistoryData] = useState<StoryFromAPI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // State quản lý item đang được chọn để xem chi tiết
+  const [selectedRejectItem, setSelectedRejectItem] = useState<StoryFromAPI | null>(null);
 
   const stats = useMemo(() => {
     const publishedCount = historyData.filter(
@@ -106,11 +118,13 @@ export function HistoryPage() {
 
   return (
     <div className="min-h-screen bg-[var(--background)] p-8 transition-colors duration-300">
+      {/* Header */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
         <h1 className="text-3xl font-bold text-[var(--primary)] mb-2">Lịch Sử Kiểm Duyệt</h1>
         <p className="text-[var(--muted-foreground)]">Theo dõi các quyết định kiểm duyệt đã thực hiện</p>
       </motion.div>
 
+      {/* Filter Bar */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
         className="mb-6 flex flex-col sm:flex-row gap-4 items-stretch"
       >
@@ -152,6 +166,7 @@ export function HistoryPage() {
         </Button>
       </motion.div>
 
+      {/* Stats Cards */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
         className="grid grid-cols-2 md:grid-cols-5 gap-5 mb-8"
       >
@@ -163,6 +178,7 @@ export function HistoryPage() {
         ))}
       </motion.div>
 
+      {/* Main Table */}
       <Card className="overflow-hidden border border-[var(--border)] bg-[var(--card)] rounded-xl shadow-sm">
         <Table className={cn("w-full text-sm", isLoading && "opacity-50 pointer-events-none")}>
           <TableHeader>
@@ -171,7 +187,7 @@ export function HistoryPage() {
               <TableHead className="py-4 px-6">Tiêu đề</TableHead>
               <TableHead className="py-4 px-6">Tác giả</TableHead>
               <TableHead className="py-4 px-6">Trạng thái</TableHead>
-              <TableHead className="py-4 px-6">Ghi chú</TableHead>
+              <TableHead className="py-4 px-6">Ghi chú / Lý do</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -194,7 +210,7 @@ export function HistoryPage() {
               <TableRow><TableCell colSpan={5} className="h-48 text-center text-[var(--muted-foreground)]">Không có dữ liệu</TableCell></TableRow>
             ) : (
               historyData.map((item) => (
-                <TableRow key={item.reviewId} className="border-b hover:bg-[var(--muted)]/20 transition cursor-pointer">
+                <TableRow key={item.reviewId} className="border-b hover:bg-[var(--muted)]/20 transition">
                   <TableCell className="py-4 px-6 text-[var(--muted-foreground)] flex items-center gap-2">
                     <Clock className="w-4 h-4" />
                     {moment(item.submittedAt).fromNow()}
@@ -227,10 +243,18 @@ export function HistoryPage() {
                     </Badge>
                   </TableCell>
 
-                  <TableCell className="py-4 px-6">
-                    <p title={item.pendingNote} className="text-[var(--muted-foreground)] text-sm truncate max-w-[200px]">
-                      {item.pendingNote || "-"}
-                    </p>
+                  {/* Nút Xem chi tiết */}
+                  <TableCell className="py-4 px-6 text-sm">
+                    {item.status === "rejected" ? (
+                      <button
+                        onClick={() => setSelectedRejectItem(item)}
+                        className="text-blue-600 hover:underline font-medium flex items-center gap-1"
+                      >
+                        <Info className="w-4 h-4" /> Xem chi tiết
+                      </button>
+                    ) : (
+                      <span className="text-[var(--muted-foreground)]">-</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -238,6 +262,49 @@ export function HistoryPage() {
           </TableBody>
         </Table>
       </Card>
+
+      {/* Modal hiển thị chi tiết lý do */}
+      <Dialog open={!!selectedRejectItem} onOpenChange={() => setSelectedRejectItem(null)}>
+        <DialogContent className="bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)] sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-red-600 flex items-center gap-2">
+                <XCircle className="w-5 h-5"/> Chi tiết từ chối
+            </DialogTitle>
+            <DialogDescription>
+                Thông tin chi tiết về lý do tác phẩm bị từ chối.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedRejectItem && (
+            <div className="space-y-4 pt-2">
+                <div className="grid grid-cols-3 gap-2 text-sm bg-[var(--muted)]/50 p-3 rounded-md">
+                    <span className="text-[var(--muted-foreground)]">Tiêu đề:</span>
+                    <span className="col-span-2 font-medium truncate">{selectedRejectItem.title}</span>
+                    
+                    <span className="text-[var(--muted-foreground)]">Tác giả:</span>
+                    <span className="col-span-2 font-medium">{selectedRejectItem.authorUsername}</span>
+                    
+                    <span className="text-[var(--muted-foreground)]">Ngày gửi:</span>
+                    <span className="col-span-2">{new Date(selectedRejectItem.submittedAt).toLocaleString('vi-VN')}</span>
+                </div>
+
+                <div className="p-4 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-lg">
+                    <h4 className="text-red-700 dark:text-red-400 font-semibold mb-2 text-sm flex items-center gap-2">
+                        <FileText className="w-4 h-4"/> Lý do từ chối:
+                    </h4>
+                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line leading-relaxed">
+                        {selectedRejectItem.pendingNote || "Không có lý do cụ thể."}
+                    </p>
+                </div>
+                
+                <div className="flex justify-end pt-2">
+                    <Button variant="outline" onClick={() => setSelectedRejectItem(null)}>Đóng</Button>
+                </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

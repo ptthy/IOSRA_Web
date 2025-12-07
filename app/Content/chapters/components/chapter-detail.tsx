@@ -1,3 +1,4 @@
+// File: app/Content/chapters/components/chapter-detail.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -21,15 +22,26 @@ import { ApprovalModal } from "@/app/Content/moderation/components/approval-moda
 import { RejectModal } from "@/app/Content/moderation/components/reject-modal";
 
 // 1. Cấu hình URL Cloud Storage (R2)
-// File nằm ở đây chứ không phải trên API Server
 const R2_BASE_URL = "https://pub-15618311c0ec468282718f80c66bcc13.r2.dev";
+
+// ✅ Fix lỗi TS: Mở rộng interface nếu ChapterFromAPI thiếu trường này
+// (Dùng kỹ thuật intersection type để gộp ChapterFromAPI với các trường AI)
+type ChapterWithAI = ChapterFromAPI & {
+  aiScore: number;
+  aiResult: "flagged" | "rejected" | "approved";
+  aiFeedback?: string;
+  pendingNote?: string;
+};
 
 interface ChapterDetailProps {
   content: ChapterFromAPI;
   onBack: () => void;
 }
 
-export function ChapterDetail({ content, onBack }: ChapterDetailProps) {
+export function ChapterDetail({ content: initialContent, onBack }: ChapterDetailProps) {
+  // Cast kiểu dữ liệu để dùng các trường AI mà không báo lỗi TS
+  const content = initialContent as ChapterWithAI;
+
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,7 +50,7 @@ export function ChapterDetail({ content, onBack }: ChapterDetailProps) {
   const [chapterText, setChapterText] = useState<string>("");
   const [isLoadingContent, setIsLoadingContent] = useState(true);
 
-  // --- 2. LOGIC TẢI NỘI DUNG ĐÃ SỬA ---
+  // --- 2. LOGIC TẢI NỘI DUNG (Giữ nguyên logic của bạn) ---
   useEffect(() => {
     async function fetchContent() {
       // Nếu dữ liệu API không có đường dẫn file
@@ -86,8 +98,18 @@ export function ChapterDetail({ content, onBack }: ChapterDetailProps) {
     fetchContent();
   }, [content.contentPath]); 
 
-  // --- HÀM XỬ LÝ DUYỆT ---
+  // --- HÀM XỬ LÝ DUYỆT (Đã thêm Validate) ---
   const handleApprove = async (reason: string) => {
+    // ✅ VALIDATE: ChapterRejectedByAi (Cảnh báo UI trước khi gọi API)
+    if (content.aiResult === 'rejected') {
+        const confirmAi = confirm(
+            "CẢNH BÁO: AI đã đánh dấu TỪ CHỐI (Rejected) cho chương này.\n\n" + 
+            "Điểm AI: " + (content.aiScore ? content.aiScore.toFixed(1) : "N/A") + "\n" +
+            "Bạn có chắc chắn muốn ghi đè AI và DUYỆT không?"
+        );
+        if (!confirmAi) return;
+    }
+
     if (!reason) {
       toast.error("Vui lòng cung cấp lý do phê duyệt.");
       return;
@@ -97,16 +119,26 @@ export function ChapterDetail({ content, onBack }: ChapterDetailProps) {
     try {
       await postChapterDecision(content.reviewId, true, reason); 
       toast.success("Phê duyệt chương thành công!");
-      setShowApprovalModal(false);
       onBack();
     } catch (err: any) {
-      toast.error(`Lỗi khi phê duyệt: ${err.message}`);
+      // ✅ VALIDATE: Bắt lỗi ModerationAlreadyHandled & ChapterNotPending
+      const code = err.response?.data?.code || err.code; 
+      
+      if (code === "ModerationAlreadyHandled") {
+          toast.error("Chậm tay rồi! kiểm duyệt chương khác đã xử lý chương này.");
+          onBack(); 
+      } else if (code === "ChapterNotPending") {
+          toast.error("Trạng thái chương không hợp lệ (Không phải Pending).");
+      } else {
+          toast.error(`Lỗi khi phê duyệt: ${err.message}`);
+      }
     } finally {
       setIsSubmitting(false);
+      setShowApprovalModal(false);
     }
   };
 
-  // --- HÀM XỬ LÝ TỪ CHỐI ---
+  // --- HÀM XỬ LÝ TỪ CHỐI (Đã thêm Validate) ---
   const handleReject = async (reason: string) => {
     if (!reason) {
       toast.error("Vui lòng cung cấp lý do từ chối.");
@@ -116,12 +148,19 @@ export function ChapterDetail({ content, onBack }: ChapterDetailProps) {
     try {
       await postChapterDecision(content.reviewId, false, reason); 
       toast.success("Từ chối chương thành công!");
-      setShowRejectModal(false);
       onBack();
     } catch (err: any) {
-      toast.error(`Lỗi khi từ chối: ${err.message}`);
+      // ✅ VALIDATE: Bắt lỗi ModerationAlreadyHandled
+      const code = err.response?.data?.code || err.code;
+      if (code === "ModerationAlreadyHandled") {
+          toast.error("Chậm tay rồi! kiểm duyệt chương khác đã xử lý chương này.");
+          onBack();
+      } else {
+          toast.error(`Lỗi khi từ chối: ${err.message}`);
+      }
     } finally {
       setIsSubmitting(false);
+      setShowRejectModal(false);
     }
   };
 
@@ -135,24 +174,17 @@ export function ChapterDetail({ content, onBack }: ChapterDetailProps) {
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-[var(--card)] border border-[var(--border)] rounded-xl mx-6 mt-6 p-6 sticky top-6 z-10 shadow-sm"
-      >
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] mb-4 transition-colors"
-        >
+     <div className="sticky top-0 z-50 bg-[var(--card)] border-b border-[var(--border)] px-6 py-4 shadow-md">
+        <button onClick={onBack} className="flex items-center gap-2 mb-2">
           <ArrowLeft className="w-5 h-5" />
           Quay lại danh sách
         </button>
+
         <h1 className="text-2xl font-semibold">Kiểm Duyệt Chương</h1>
         <p className="text-[var(--muted-foreground)]">
-          Đọc và đánh giá nội dung chương theo tiêu chuẩn cộng đồng
+          Đọc và đánh giá nội dung chương
         </p>
-      </motion.div>
+      </div>
 
       {/* Alert Info */}
       <motion.div
@@ -184,7 +216,7 @@ export function ChapterDetail({ content, onBack }: ChapterDetailProps) {
                     className="bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400"
                   >
                     <AlertTriangle className="w-3 h-3 mr-1" />
-                    {content.aiScore.toFixed(1)} Điểm AI
+                    {content.aiScore ? content.aiScore.toFixed(1) : "N/A"} Điểm AI
                   </Badge>
                 </div>
                 <div className="text-[var(--muted-foreground)] space-y-2">
@@ -226,11 +258,11 @@ export function ChapterDetail({ content, onBack }: ChapterDetailProps) {
                     </div>
                   ) : chapterText ? (
                   <article className="prose dark:prose-invert max-w-none">
-  <div 
-    className="leading-relaxed text-[var(--foreground)] text-justify content-html"
-    dangerouslySetInnerHTML={{ __html: chapterText }}
-  />
-</article>
+                    <div 
+                        className="leading-relaxed text-[var(--foreground)] text-justify content-html"
+                        dangerouslySetInnerHTML={{ __html: chapterText }}
+                    />
+                  </article>
                   ) : (
                     <div className="flex flex-col items-center justify-center h-40 text-[var(--muted-foreground)] italic">
                       <BookOpen className="w-8 h-8 mb-2 opacity-20" />

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { SentBackList } from "../moderation/components/sent-back-list";
+
 import Dashboard from "./components/dashboard";
 
 export default function DashboardPage() {
@@ -25,9 +25,9 @@ export default function DashboardPage() {
         {currentPage === "dashboard" && <Dashboard />}
 
        
-        {currentPage === "sent-back" && (
+        {/* {currentPage === "sent-back" && (
           <SentBackList onReview={handleReview} /> 
-        )}
+        )} */}
 
         {currentPage === "review" && selectedReport && (
           <div className="text-foreground">
