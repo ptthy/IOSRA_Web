@@ -237,12 +237,13 @@ apiClient.interceptors.response.use(
           window.location.href = "/author-upgrade";
         }
       }
-      // 3. 403 khác (token invalid, etc.) -> đá ra login
+      // 3. 403 khác (token invalid, etc.) -> đá ra trang home
       else {
         if (typeof window !== "undefined") {
+          // Xóa token và thông tin người dùng khỏi localStorage
           localStorage.removeItem("authToken");
           localStorage.removeItem("authUser");
-          window.location.href = "/login";
+          window.location.href = "/";
         }
       }
     }
