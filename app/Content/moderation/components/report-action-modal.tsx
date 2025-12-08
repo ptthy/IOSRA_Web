@@ -12,7 +12,7 @@ import { Loader2, EyeOff, CheckCircle, XCircle, AlertTriangle } from "lucide-rea
 import { toast } from "sonner";
 import { updateReportStatus, updateContentStatus } from "@/services/moderationApi";
 
-// --- INTERFACE: Đảm bảo khớp với ReportList ---
+
 interface ReportItem {
   id: string;
   targetType: "story" | "chapter" | "comment" | string;
@@ -48,8 +48,7 @@ export function ReportActionModal({ report, isOpen, onClose, onSuccess }: Report
     if (!confirm(`Bạn có chắc chắn muốn ẨN nội dung ${report.targetType} này không?`)) return;
     setLoading(true);
     try {
-      // Comment dùng status 'hidden', Story/Chapter cũng dùng 'hidden'
-      // Cần ép kiểu cho targetType vì updateContentStatus yêu cầu union type nghiêm ngặt
+
       await updateContentStatus(report.targetType as 'story' | 'chapter' | 'comment', report.targetId, 'hidden');
       toast.success(`Đã ẩn ${report.targetType} thành công!`);
     } catch (error: any) {
@@ -63,6 +62,12 @@ export function ReportActionModal({ report, isOpen, onClose, onSuccess }: Report
       setLoading(false);
     }
   };
+const reasonMapping: Record<string, string> = {
+  spam: "Nội dung rác",
+  negative_content: "Nội dung tiêu cực,xúc phạm",
+  misinformation: "Thông tin sai lệch",
+  ip_infringement: "Vi phạm bản quyền",
+};
 
   // 2. Xử lý: Report Đúng (Resolved) -> User bị phạt Strike
   const handleResolve = async () => {
@@ -85,9 +90,8 @@ export function ReportActionModal({ report, isOpen, onClose, onSuccess }: Report
     
     setLoading(true);
     try {
-      // ✅ Gửi thêm payload xử lý phạt vào hàm updateReportStatus
-      // Lưu ý: Cần cập nhật hàm updateReportStatus trong moderationApi.ts để nhận thêm tham số thứ 3 là data
-      await updateReportStatus(report.id, 'resolved', {
+     
+      await updateReportStatus(report.id, 'approved', {
         strike: parseInt(strikeLevel),
         restrictedUntil: banDate ? new Date(banDate).toISOString() : null
       });
@@ -142,7 +146,9 @@ export function ReportActionModal({ report, isOpen, onClose, onSuccess }: Report
             </div>
             <div>
               <span className="font-semibold text-gray-500 block">Lý do báo cáo:</span>
-              <span className="font-medium text-red-600">{report.reason}</span>
+              <span className="font-medium text-red-600">
+  {reasonMapping[report.reason] || report.reason}
+</span>
             </div>
             <div className="col-span-2">
               <span className="font-semibold text-gray-500 block">Chi tiết mô tả:</span>
@@ -159,7 +165,7 @@ export function ReportActionModal({ report, isOpen, onClose, onSuccess }: Report
           {/* Khu vực hành động với Nội dung */}
           <div className="border-t pt-4">
             <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                <EyeOff className="w-4 h-4"/> Hành động với nội dung:
+              Hành động với nội dung:
             </h4>
             <div className="flex gap-3">
               <Button variant="destructive" size="sm" onClick={handleHideContent} disabled={loading}>
