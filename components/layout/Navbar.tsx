@@ -143,7 +143,7 @@ export function Navbar() {
   // Ẩn Navbar ở các trang đọc truyện
   if (
     pathname &&
-    (pathname.startsWith("/Op") || pathname.startsWith("/Content"))
+    (pathname.startsWith("/Op") || pathname.startsWith("/Content")) || pathname.startsWith("/Admin")
   ) {
     return null;
   }
