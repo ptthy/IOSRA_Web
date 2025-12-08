@@ -284,28 +284,32 @@ export async function getHandlingReports(
 
 // --- API 9: Xem chi tiết 1 Report ---
 export async function getReportDetail(reportId: string): Promise<ReportItem> {
-    try {
-        const response: AxiosResponse<ReportItem> = await apiClient.get(`/api/ContentModHandling/reports/${reportId}`);
-        return response.data;
-    } catch (error: any) {
-        throw new Error(error.response?.data?.message || "Lỗi khi xem chi tiết báo cáo");
-    }
+  try {
+    const response: AxiosResponse<ReportItem> = await apiClient.get(
+      `/api/ContentModHandling/reports/${reportId}`
+    );
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Lỗi khi xem chi tiết báo cáo");
+  }
 }
 
 // --- API 10. Chốt trạng thái Report (Resolved - Phạt / Rejected - Bỏ qua) ---
 export async function updateReportStatus(
-    reportId: string, 
-    status: 'resolved' | 'rejected',
-    data?: { strike?: number; restrictedUntil?: string | null }
+  reportId: string,
+  status: "approved" | "rejected",
+  data?: { strike?: number; restrictedUntil?: string | null }
 ) {
-    try {
-        // Gộp status và data vào body request
-        const payload = { status, ...data };
-        const response = await apiClient.put(`/api/ContentModHandling/reports/${reportId}/status`, payload);
-        return response.data;
-    } catch (error: any) {
-        throw new Error(error.response?.data?.message || "Lỗi khi cập nhật trạng thái báo cáo");
-    }
+  try {
+    const payload = { status, ...data };
+    const response = await apiClient.put(
+      `/api/ContentModHandling/reports/${reportId}/status`,
+      payload
+    );
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Lỗi khi cập nhật trạng thái báo cáo");
+  }
 }
 
 // --- API 11. Ẩn/Hiện Nội dung (Story, Chapter, Comment) ---
