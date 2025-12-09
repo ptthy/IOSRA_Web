@@ -30,7 +30,7 @@ import { chapterService } from "@/services/chapterService";
 import type { Story, Chapter } from "@/services/apiTypes";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ImageWithFallback } from "@/components/ui/ImageWithFallback";
-
+import { toast } from "sonner";
 const extractVietnameseFeedback = (
   feedback: string | null | undefined
 ): string | null => {
@@ -53,7 +53,34 @@ export default function StoryDetailPage() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isChaptersLoading, setIsChaptersLoading] = useState(false);
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message, details } = error.response.data.error;
 
+      // Ưu tiên Validation (details)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          // Nối các lỗi lại thành 1 câu
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
+          return;
+        }
+      }
+
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+
+    // 2. Fallback
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
+  // -------------------
   useEffect(() => {
     loadStory();
   }, [storyId]);
@@ -66,8 +93,14 @@ export default function StoryDetailPage() {
 
       // Load chapters cho tất cả trạng thái, không chỉ published
       await loadChapters(data.storyId);
-    } catch (error) {
-      console.error("Error loading story:", error);
+      // } catch (error) {
+      //   console.error("Error loading story:", error);
+      // } finally {
+      //   setIsLoading(false);
+      // }
+    } catch (error: any) {
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Không thể tải thông tin truyện.");
     } finally {
       setIsLoading(false);
     }
@@ -79,9 +112,16 @@ export default function StoryDetailPage() {
       // Load tất cả chapters, không filter theo status
       const data = await chapterService.getAllChapters(storyId);
       setChapters(data);
-    } catch (error) {
-      console.error("Error loading chapters:", error);
-      setChapters([]);
+      // } catch (error) {
+      //   console.error("Error loading chapters:", error);
+      //   setChapters([]);
+      // } finally {
+      //   setIsChaptersLoading(false);
+      // }
+    } catch (error: any) {
+      setChapters([]); // Giữ nguyên logic reset mảng rỗng để tránh lỗi UI
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Không thể tải danh sách chương.");
     } finally {
       setIsChaptersLoading(false);
     }

@@ -224,7 +224,37 @@ export default function AuthorChapterViewPage() {
   const [chapter, setChapter] = useState<ChapterDetails | null>(null);
   const [chapterContent, setChapterContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
   const [isLoadingContent, setIsLoadingContent] = useState(false);
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message, details } = error.response.data.error;
+
+      // Ưu tiên Validation (details)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          // Nối các lỗi lại thành 1 câu
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
+          return;
+        }
+      }
+
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+
+    // 2. Fallback
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
+  // -------------------
+
   useEffect(() => {
     profileService.getAuthorRank().then((rank) => {
       setAuthorRank(rank);
@@ -252,9 +282,15 @@ export default function AuthorChapterViewPage() {
       } else {
         setChapterContent("");
       }
+      // } catch (error: any) {
+      //   console.error("Error loading chapter:", error);
+      //   toast.error(error.message || "Không thể tải thông tin chương");
+      // } finally {
+      //   setIsLoading(false);
+      // }
     } catch (error: any) {
-      console.error("Error loading chapter:", error);
-      toast.error(error.message || "Không thể tải thông tin chương");
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Không thể tải thông tin chương");
     } finally {
       setIsLoading(false);
     }
@@ -519,7 +555,9 @@ export default function AuthorChapterViewPage() {
           <div className="space-y-6">
             {/* Giá */}
             <div>
-              <p className="text-sm text-slate-400 mb-1">Giá (Dias)</p>
+              <p className="text-sm text-slate-400 mb-1">
+                Giá cho 1 chương nếu mất phí (Dias)
+              </p>
               <p className="font-medium">{chapter?.priceDias} Dias</p>
             </div>
 

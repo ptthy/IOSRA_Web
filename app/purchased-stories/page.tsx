@@ -61,6 +61,30 @@ export default function PurchasedStoriesPage() {
     loadChapterHistory();
   }, []);
 
+  const handleApiError = (err: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (err.response && err.response.data && err.response.data.error) {
+      const { message, details } = err.response.data.error;
+
+      // Ưu tiên Validation
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          toast.error(details[firstKey].join(" "));
+          return;
+        }
+      }
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+    // 2. Fallback
+    const fallbackMsg = err.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
+
   // 1. Gọi API lấy Audio
   const loadAudioStories = async () => {
     setLoadingAudio(true);
@@ -68,6 +92,8 @@ export default function PurchasedStoriesPage() {
       const data = await chapterPurchaseApi.getAllVoiceHistory();
       setStories(data);
     } catch (err) {
+      // CẬP NHẬT: thông báo Toast
+      handleApiError(err, "Không thể tải danh sách Audio.");
       console.error("Error loading voice history:", err);
     } finally {
       setLoadingAudio(false);
@@ -81,6 +107,8 @@ export default function PurchasedStoriesPage() {
       const data = await chapterPurchaseApi.getChapterHistory();
       setHistoryItems(data);
     } catch (err) {
+      //  CẬP NHẬT:  thông báo Toast
+      handleApiError(err, "Không thể tải lịch sử giao dịch.");
       console.error("Error loading chapter history:", err);
     } finally {
       setLoadingHistory(false);

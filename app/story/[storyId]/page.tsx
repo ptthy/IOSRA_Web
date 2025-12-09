@@ -95,6 +95,26 @@ export default function StoryDetailPage() {
   const router = useRouter();
   const params = useParams();
   const storyId = params.storyId as string;
+  const handleApiError = (err: any, defaultMessage: string) => {
+    if (err.response && err.response.data && err.response.data.error) {
+      const { message, details } = err.response.data.error;
+      // Lỗi chi tiết (Validation)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          toast.error(details[firstKey].join(" "));
+          return;
+        }
+      }
+      // Thông báo message từ backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+    // Lỗi mạng hoặc lỗi 500
+    toast.error(err.response?.data?.message || defaultMessage);
+  };
   const { user } = useAuth();
 
   const [story, setStory] = useState<Story | null>(null);
@@ -185,7 +205,7 @@ export default function StoryDetailPage() {
   ): ChapterComment[] => {
     return comments.map((c) => {
       if (c.commentId === parentId) {
-        // 🔥 FIX: Thêm vào đầu mảng replies
+        //  FIX: Thêm vào đầu mảng replies
         return {
           ...c,
           replies: c.replies ? [newReply, ...c.replies] : [newReply],
@@ -284,7 +304,7 @@ export default function StoryDetailPage() {
     }
   };
 
-  // 🔥 FIX QUAN TRỌNG: Handle Add Comment có hỗ trợ ParentId (Reply)
+  //  FIX QUAN TRỌNG: Handle Add Comment có hỗ trợ ParentId (Reply)
   const handleAddComment = async (
     content: string,
     parentCommentId?: string
@@ -331,7 +351,8 @@ export default function StoryDetailPage() {
         return newComment;
       }
     } catch (error) {
-      console.error("Error creating comment:", error);
+      //console.error("Error creating comment:", error);
+      handleApiError(error, "Gửi bình luận thất bại.");
       throw error;
     }
   };
@@ -343,9 +364,15 @@ export default function StoryDetailPage() {
       await chapterCommentService.updateComment(comment.chapterId, commentId, {
         content,
       });
+      // Cập nhật giao diện
       setComments((prev) => updateCommentRecursive(prev, commentId, content));
-    } catch (error) {
-      console.error(error);
+      toast.success("Đã cập nhật bình luận."); // (Tuỳ chọn) Thêm thông báo thành công
+    } catch (error: any) {
+      //  Gọi hàm xử lý lỗi chung (đã viết ở trên)
+      handleApiError(error, "Chỉnh sửa bình luận thất bại.");
+
+      // Vẫn cần throw error để Component con (CommentSection) biết là lỗi
+      // và tắt trạng thái loading/đóng form edit
       throw error;
     }
   };
@@ -357,9 +384,11 @@ export default function StoryDetailPage() {
       await chapterCommentService.deleteComment(comment.chapterId, commentId);
       setComments((prev) => deleteCommentRecursive(prev, commentId));
       setTotalComments((prev) => (prev > 0 ? prev - 1 : 0));
-    } catch (error) {
-      console.error(error);
-      throw error;
+      toast.success("Đã xóa bình luận."); // Thêm thông báo thành công
+    } catch (error: any) {
+      //  Gọi hàm xử lý lỗi
+      handleApiError(error, "Xóa bình luận thất bại.");
+      throw error; // Ném lỗi để component con xử lý (nếu cần)
     }
   };
 
@@ -424,8 +453,10 @@ export default function StoryDetailPage() {
           comment.viewerReaction === "like" ? null : "like"
         )
       );
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      //  Gọi hàm xử lý lỗi
+      handleApiError(error, "Thao tác Like thất bại.");
+      // Với reaction, thường không cần throw error để tránh làm phiền UI quá mức,
     }
   };
 
@@ -441,8 +472,9 @@ export default function StoryDetailPage() {
           comment.viewerReaction === "dislike" ? null : "dislike"
         )
       );
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      // Gọi hàm xử lý lỗi
+      handleApiError(error, "Thao tác Dislike thất bại.");
     }
   };
 
@@ -455,8 +487,9 @@ export default function StoryDetailPage() {
         commentId
       );
       setComments((prev) => updateReactionRecursive(prev, commentId, null));
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      //  Gọi hàm xử lý lỗi
+      handleApiError(error, "Không thể gỡ cảm xúc.");
     }
   };
 
@@ -546,8 +579,8 @@ export default function StoryDetailPage() {
         <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-card via-card to-muted/20">
           <CardContent className="p-0 relative">
             {" "}
-            {/* 🔥 QUAN TRỌNG: Thêm 'relative' ở đây */}
-            {/* 👇 KHỐI NÚT BÁO CÁO (Nằm ngay đầu CardContent) 👇 */}
+            {/* QUAN TRỌNG: Thêm 'relative' ở đây */}
+            {/*  KHỐI NÚT BÁO CÁO (Nằm ngay đầu CardContent) 👇 */}
             <div className="absolute top-4 right-4 z-20">
               {" "}
               {/* Tăng z-index lên 20 */}

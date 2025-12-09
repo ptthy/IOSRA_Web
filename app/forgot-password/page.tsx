@@ -27,7 +27,40 @@ export default function ForgotPasswordPage() {
 
   const ERROR_IMG_SRC =
     "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==";
+  // --- HELPER: Xử lý lỗi API ---
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message, details } = error.response.data.error;
 
+      // Ưu tiên Validation (details)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          // --- SỬA CHỖ NÀY ---
+          // Dùng .join(' ') để nối tất cả thông báo lỗi lại thành một câu nguyên văn
+          // Thay vì lấy [0] chỉ được 1 dòng.
+          const msg = details[firstKey].join(" ");
+
+          toast.error(msg);
+          setError(msg); // Hiện khung đỏ
+          return;
+        }
+      }
+
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        setError(message);
+        return;
+      }
+    }
+
+    // 2. Fallback
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+    setError(fallbackMsg);
+  };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -41,12 +74,18 @@ export default function ForgotPasswordPage() {
       );
 
       router.push(`/reset-password?email=${email}`);
-    } catch (err: any) {
-      const errMsg =
-        err.response?.data?.message ||
-        "Gửi yêu cầu thất bại. Vui lòng thử lại.";
-      setError(errMsg);
-      toast.error(errMsg);
+      // } catch (err: any) {
+      //   const errMsg =
+      //     err.response?.data?.message ||
+      //     "Gửi yêu cầu thất bại. Vui lòng thử lại.";
+      //   setError(errMsg);
+      //   toast.error(errMsg);
+      //   setIsLoading(false);
+      // }
+    } catch (error: any) {
+      // ---  ---
+      handleApiError(error, "Gửi yêu cầu thất bại. Vui lòng thử lại.");
+    } finally {
       setIsLoading(false);
     }
   };

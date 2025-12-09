@@ -84,7 +84,34 @@ export default function OutlineEditorPage() {
   const [editForm, setEditForm] = useState({ title: "", content: "" });
   const [isSaving, setIsSaving] = useState(false);
   const [viewMode, setViewMode] = useState<"editor" | "preview">("editor");
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message, details } = error.response.data.error;
 
+      // Ưu tiên Validation (details)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          // Nối các lỗi lại thành 1 câu
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
+          return;
+        }
+      }
+
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+
+    // 2. Fallback
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
+  // -------------------
   useEffect(() => {
     loadStoryAndOutline();
   }, [storyId]);
@@ -113,9 +140,16 @@ export default function OutlineEditorPage() {
       } else {
         createNewOutline();
       }
-    } catch (error) {
+      // } catch (error) {
+      //   console.error("Error loading:", error);
+      //   toast.error("Không thể tải dữ liệu");
+      // } finally {
+      //   setIsLoading(false);
+      // }
+    } catch (error: any) {
       console.error("Error loading:", error);
-      toast.error("Không thể tải dữ liệu");
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Không thể tải dữ liệu.");
     } finally {
       setIsLoading(false);
     }
@@ -217,8 +251,14 @@ export default function OutlineEditorPage() {
       setEditForm({ title: "", content: "" });
       setEditingSection(null);
       toast.success("Đã thêm phần mới");
-    } catch (error) {
-      toast.error("Không thể thêm phần mới");
+      // } catch (error) {
+      //   toast.error("Không thể thêm phần mới");
+      // } finally {
+      //   setIsSaving(false);
+      // }
+    } catch (error: any) {
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Không thể thêm phần mới.");
     } finally {
       setIsSaving(false);
     }
@@ -260,8 +300,14 @@ export default function OutlineEditorPage() {
       setEditForm({ title: "", content: "" });
       setEditingSection(null);
       toast.success("Đã cập nhật");
-    } catch (error) {
-      toast.error("Không thể cập nhật");
+      // } catch (error) {
+      //   toast.error("Không thể cập nhật");
+      // } finally {
+      //   setIsSaving(false);
+      // }
+    } catch (error: any) {
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Không thể cập nhật nội dung.");
     } finally {
       setIsSaving(false);
     }
@@ -288,8 +334,12 @@ export default function OutlineEditorPage() {
         saveOutlineToStorage(updatedOutline);
       }
       toast.success("Đã xóa phần");
-    } catch (error) {
-      toast.error("Không thể xóa");
+      // } catch (error) {
+      //   toast.error("Không thể xóa");
+      // }
+    } catch (error: any) {
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Không thể xóa phần này.");
     }
   };
 

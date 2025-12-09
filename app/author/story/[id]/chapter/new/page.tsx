@@ -77,7 +77,34 @@ export default function CreateChapterPage() {
     title: 0,
     content: 0,
   });
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message, details } = error.response.data.error;
 
+      // Ưu tiên Validation (details)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          // Nối các lỗi lại thành 1 câu
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
+          return;
+        }
+      }
+
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+
+    // 2. Fallback
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
+  // -------------------
   const LIMITS = {
     TITLE: 200,
     CONTENT: 50000,
@@ -220,9 +247,15 @@ export default function CreateChapterPage() {
 
       toast.success("Tạo chương mới thành công!");
       router.push(`/author/story/${storyId}/chapters`);
+      // } catch (error: any) {
+      //   console.error("Error creating chapter:", error);
+      //   toast.error(error.message || "Có lỗi xảy ra khi tạo chương");
+      // } finally {
+      //   setIsSubmitting(false);
+      // }
     } catch (error: any) {
-      console.error("Error creating chapter:", error);
-      toast.error(error.message || "Có lỗi xảy ra khi tạo chương");
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Có lỗi xảy ra khi tạo chương");
     } finally {
       setIsSubmitting(false);
     }
@@ -411,7 +444,7 @@ export default function CreateChapterPage() {
                   )}
                 </Button>
 
-                <Button
+                {/* <Button
                   type="button"
                   onClick={handleSaveDraft}
                   variant="outline"
@@ -422,7 +455,7 @@ export default function CreateChapterPage() {
                 >
                   <Bookmark className="h-4 w-4 mr-2" />
                   Lưu nháp
-                </Button>
+                </Button> */}
                 <Button
                   type="button"
                   variant="outline"
@@ -438,7 +471,7 @@ export default function CreateChapterPage() {
                   <AlertTriangle className="h-4 w-4 text-amber-600" />
                   <AlertDescription className="text-sm">
                     Bạn có thay đổi chưa lưu. Nhấn{" "}
-                    <strong>&quot;Lưu nháp&quot;</strong> để lưu lại.
+                    <strong>&quot;Lưu chương&quot;</strong> để lưu lại.
                   </AlertDescription>
                 </Alert>
               )}

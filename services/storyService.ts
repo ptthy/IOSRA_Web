@@ -147,7 +147,7 @@ export const storyService = {
         data.tagIds.forEach((tagId) => formData.append("TagIds", tagId));
       }
 
-      // 🔥 Chỉ gửi CoverMode khi có coverFile hoặc coverMode được cung cấp
+      //  Chỉ gửi CoverMode khi có coverFile hoặc coverMode được cung cấp
       // Nếu không có coverFile mới, không gửi coverMode
       if (data.coverFile instanceof File && data.coverMode) {
         formData.append("CoverMode", data.coverMode);
@@ -182,7 +182,7 @@ export const storyService = {
         throw new Error("Bạn không có quyền chỉnh sửa truyện này.");
       }
       if (error.response?.status === 400) {
-        // 🔥 HIỂN THỊ CHI TIẾT LỖI TỪ SERVER
+        //  HIỂN THỊ CHI TIẾT LỖI TỪ SERVER
         const serverError = error.response?.data;
         console.error("Chi tiết lỗi 400:", serverError);
 
@@ -306,6 +306,72 @@ export const storyService = {
     return response.data;
   },
 
+  // // === Endpoint 7: POST /api/AuthorStory/{storyId}/complete ===
+  // async completeStory(storyId: string): Promise<void> {
+  //   try {
+  //     console.log(`📘 Calling API: POST /api/AuthorStory/${storyId}/complete`);
+
+  //     if (!storyId || storyId === "undefined") {
+  //       throw new Error("Story ID không hợp lệ");
+  //     }
+
+  //     const response = await apiClient.post(
+  //       `/api/AuthorStory/${storyId}/complete`,
+  //       {},
+  //       {
+  //         timeout: 15000,
+  //         headers: {
+  //           "Content-Type": "application/json",
+  //         },
+  //       }
+  //     );
+
+  //     console.log("✅ Complete story response:", response.data);
+  //     return response.data;
+  //   } catch (error: any) {
+  //     console.error("❌ Error completing story:", error);
+
+  //     if (error.response) {
+  //       if (error.response.status === 400) {
+  //         const errorData = error.response.data;
+
+  //         // Xử lý lỗi đặc thù
+  //         if (errorData.error?.code === "StoryCompletionCooldown") {
+  //           throw new Error(
+  //             "Truyện cần được xuất bản ít nhất 30 ngày trước khi có thể hoàn thành."
+  //           );
+  //         }
+
+  //         const serverMessage = errorData?.message || errorData;
+  //         let errorMessage = "Không thể hoàn thành truyện";
+
+  //         if (typeof serverMessage === "string") {
+  //           if (serverMessage.includes("chapter")) {
+  //             errorMessage =
+  //               "Cần ít nhất 1 chương đã xuất bản để hoàn thành truyện";
+  //           } else if (serverMessage.includes("status")) {
+  //             errorMessage = "Truyện không ở trạng thái phù hợp để hoàn thành";
+  //           } else {
+  //             errorMessage = serverMessage;
+  //           }
+  //         }
+  //         throw new Error(errorMessage);
+  //       }
+  //       if (error.response.status === 404) {
+  //         throw new Error("API endpoint không tồn tại.");
+  //       }
+  //     } else if (error.request) {
+  //       if (error.code === "ECONNABORTED") {
+  //         throw new Error(
+  //           "Request timeout - Server không phản hồi sau 15 giây"
+  //         );
+  //       } else {
+  //         throw new Error("Lỗi kết nối mạng hoặc server không phản hồi.");
+  //       }
+  //     }
+  //     throw new Error(`Lỗi khi gửi request: ${error.message}`);
+  //   }
+  // },
   // === Endpoint 7: POST /api/AuthorStory/{storyId}/complete ===
   async completeStory(storyId: string): Promise<void> {
     try {
@@ -331,45 +397,11 @@ export const storyService = {
     } catch (error: any) {
       console.error("❌ Error completing story:", error);
 
-      if (error.response) {
-        if (error.response.status === 400) {
-          const errorData = error.response.data;
-
-          // Xử lý lỗi đặc thù
-          if (errorData.error?.code === "StoryCompletionCooldown") {
-            throw new Error(
-              "Truyện cần được xuất bản ít nhất 30 ngày trước khi có thể hoàn thành."
-            );
-          }
-
-          const serverMessage = errorData?.message || errorData;
-          let errorMessage = "Không thể hoàn thành truyện";
-
-          if (typeof serverMessage === "string") {
-            if (serverMessage.includes("chapter")) {
-              errorMessage =
-                "Cần ít nhất 1 chương đã xuất bản để hoàn thành truyện";
-            } else if (serverMessage.includes("status")) {
-              errorMessage = "Truyện không ở trạng thái phù hợp để hoàn thành";
-            } else {
-              errorMessage = serverMessage;
-            }
-          }
-          throw new Error(errorMessage);
-        }
-        if (error.response.status === 404) {
-          throw new Error("API endpoint không tồn tại.");
-        }
-      } else if (error.request) {
-        if (error.code === "ECONNABORTED") {
-          throw new Error(
-            "Request timeout - Server không phản hồi sau 15 giây"
-          );
-        } else {
-          throw new Error("Lỗi kết nối mạng hoặc server không phản hồi.");
-        }
-      }
-      throw new Error(`Lỗi khi gửi request: ${error.message}`);
+      // QUAN TRỌNG:
+      // Không tự ý biến đổi lỗi thành new Error("string") nữa.
+      // Hãy throw nguyên cái error gốc ra để bên component (page.tsx)
+      // có thể đọc được error.response.data.message
+      throw error;
     }
   },
 };

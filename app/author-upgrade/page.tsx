@@ -25,7 +25,8 @@ import {
 } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { AxiosError } from "axios";
-
+// THÊM IMPORT profileService
+import { profileService } from "@/services/profileService";
 import {
   authorUpgradeService,
   ApiUpgradeStatus,
@@ -117,19 +118,48 @@ export default function AuthorUpgradePage() {
   // ---------------------------------
   const { user, isLoading: isAuthLoading } = useAuth(); // Lấy trạng thái auth
   const router = useRouter();
+
+  // ---------------------
   // State chính quản lý trạng thái UI
   const [upgradeRequest, setUpgradeRequest] = useState<LocalUpgradeRequest>({
     status: "default",
   });
 
   // State loading cho lần tải trang ĐẦU TIÊN
-  const [isLoadingPage, setIsLoadingPage] = useState(true);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
 
   const [typedCommitment, setTypedCommitment] = useState("");
 
   // State khi đang nhấn nút "Gửi"
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message, details } = error.response.data.error;
 
+      // Ưu tiên Validation (details)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          // Nối các lỗi lại thành 1 câu
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
+          return;
+        }
+      }
+
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+
+    // 2. Fallback
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
+  // -------------------
   // BIẾN SO SÁNH CAM KẾT
   const isCommitmentMatched = typedCommitment === COMMITMENT_TEXT;
   const { updateUser } = useAuth();
@@ -215,16 +245,23 @@ export default function AuthorUpgradePage() {
           // 3. Sử dụng lý do vừa bóc tách
           rejectionReason: reason || undefined,
         });
+        if (mapApiStatusToLocal(latestRequest.status) === "approved") {
+          updateUser({ role: "author" });
+        }
       }
     } catch (error) {
       const axiosError = error as AxiosError;
       // Nếu lỗi là 404 (Not Found) cũng có nghĩa là chưa gửi
       if (axiosError.response?.status === 404) {
         setUpgradeRequest({ status: "default" });
+        // } else {
+        //   // Lỗi mạng hoặc lỗi server khác
+        //   console.error("Lỗi fetch trạng thái:", error);
+        //   toast.error("Không thể tải trạng thái yêu cầu. Vui lòng thử lại.");
+        // }
       } else {
-        // Lỗi mạng hoặc lỗi server khác
-        console.error("Lỗi fetch trạng thái:", error);
-        toast.error("Không thể tải trạng thái yêu cầu. Vui lòng thử lại.");
+        // --- DÙNG HELPER ---
+        handleApiError(error, "Không thể tải trạng thái yêu cầu.");
       }
     } finally {
       setIsLoadingPage(false);
@@ -291,8 +328,15 @@ export default function AuthorUpgradePage() {
             "Bạn đã gửi yêu cầu quá nhiều lần. Vui lòng chờ một thời gian trước khi thử lại."
           );
         }
+        // } else {
+        //   toast.error("Có lỗi xảy ra khi gửi yêu cầu. Vui lòng thử lại.");
+        // }
       } else {
-        toast.error("Có lỗi xảy ra khi gửi yêu cầu. Vui lòng thử lại.");
+        // --- CÁC LỖI KHÁC DÙNG HELPER CHUẨN ---
+        handleApiError(
+          error,
+          "Có lỗi xảy ra khi gửi yêu cầu. Vui lòng thử lại."
+        );
       }
     } finally {
       setIsSubmitting(false);
@@ -312,26 +356,26 @@ export default function AuthorUpgradePage() {
   /**
    * Xử lý điều hướng đến trang sáng tác (Giữ nguyên)
    */
-  const handleStartWriting = () => {
-    toast.success("Chào mừng bạn đến với thế giới sáng tác !");
-    router.push("/author/overview");
-  };
+  // const handleStartWriting = () => {
+  //   toast.success("Chào mừng bạn đến với thế giới sáng tác !");
+  //   router.push("/author/overview");
+  // };
 
   /**
    * Màn hình Loading chính (khi đang fetch trạng thái lần đầu)
    */
-  if (isLoadingPage) {
-    return (
-      <>
-        <div className="min-h-screen flex items-center justify-center p-4 py-12 bg-background">
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="text-muted-foreground">Đang tải trạng thái...</p>
-          </div>
-        </div>
-      </>
-    );
-  }
+  // if (isLoadingPage) {
+  //   return (
+  //     <>
+  //       <div className="min-h-screen flex items-center justify-center p-4 py-12 bg-background">
+  //         <div className="flex flex-col items-center gap-4">
+  //           <Loader2 className="h-12 w-12 animate-spin text-primary" />
+  //           <p className="text-muted-foreground">Đang tải trạng thái...</p>
+  //         </div>
+  //       </div>
+  //     </>
+  //   );
+  // }
   /** * Render nội dung chính khi đã có trạng thái */ // LẤY CONFIG CHO
   const currentStatusConfig =
     STATUS_DISPLAY_CONFIG[upgradeRequest.status] ||
@@ -720,9 +764,13 @@ export default function AuthorUpgradePage() {
               </CardContent>
 
               <CardFooter className="pt-2 relative z-10">
-                <Button onClick={handleStartWriting} className="w-full h-11">
+                <Button
+                  // ĐỔI onClick THÀNH CÁI NÀY
+                  //  onClick={() => router.push("/author/overview")}
+                  className="w-full h-11"
+                >
                   <BookOpen className="mr-2 h-4 w-4" />
-                  Bắt đầu Sáng Tác
+                  Vào trang quản lý ngay
                 </Button>
               </CardFooter>
             </Card>

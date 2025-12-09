@@ -26,7 +26,20 @@ export interface FollowersResponse {
   page: number;
   pageSize: number;
 }
-
+// --- endpoint mine) ---
+export interface FollowedAuthor {
+  authorId: string;
+  username: string;
+  avatarUrl: string | null;
+  notificationsEnabled: boolean;
+  followedAt: string;
+}
+export interface FollowedAuthorsResponse {
+  items: FollowedAuthor[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
 // --- Service ---
 export const authorFollowService = {
   /**
@@ -76,5 +89,21 @@ export const authorFollowService = {
     return apiClient.patch(`/api/AuthorFollow/${authorId}/notification`, {
       enableNotifications: enableNotifications,
     });
+  },
+  /**
+   * GET /api/AuthorFollow/mine
+   * Lấy danh sách tác giả mà tôi đang theo dõi
+   */
+  getFollowedAuthors: (params?: { page?: number; pageSize?: number }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append("page", params.page.toString());
+    if (params?.pageSize)
+      queryParams.append("pageSize", params.pageSize.toString());
+
+    const url = `/api/AuthorFollow/mine${
+      queryParams.toString() ? `?${queryParams.toString()}` : ""
+    }`;
+
+    return apiClient.get<FollowedAuthorsResponse>(url);
   },
 };

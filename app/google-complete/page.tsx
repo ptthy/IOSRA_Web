@@ -1,3 +1,4 @@
+//app/google-complete/page.tsx
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
@@ -60,6 +61,36 @@ function GoogleCompleteContent() {
       router.push("/login");
     }
   }, [idToken, googleEmail, router]);
+  // --- HELPER: Xử lý lỗi API ---
+  const handleApiError = (err: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend (cấu trúc nested)
+    if (err.response && err.response.data && err.response.data.error) {
+      const { message, details } = err.response.data.error;
+
+      // Ưu tiên Validation (details): Lấy lỗi đầu tiên ra hiển thị
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
+          setError(msg); // Cập nhật state để hiện khung đỏ
+          return;
+        }
+      }
+
+      // Message chung từ Backend
+      if (message) {
+        toast.error(message);
+        setError(message);
+        return;
+      }
+    }
+
+    // 2. Fallback (Lỗi mạng hoặc lỗi không xác định)
+    const fallbackMsg = err.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+    setError(fallbackMsg);
+  };
 
   // Hàm handler từ route (sẽ dùng cho onSubmit của form)
   const handleCompleteRegistration = async (
@@ -69,8 +100,8 @@ function GoogleCompleteContent() {
     setError(""); // Xóa lỗi cũ
 
     // Validation (từ route)
-    if (username.length < 3) {
-      setError("Username phải có ít nhất 3 ký tự");
+    if (username.length < 6) {
+      setError("Username phải có ít nhất 6 ký tự");
       return;
     }
     if (password.length < 6) {
@@ -97,14 +128,20 @@ function GoogleCompleteContent() {
       // 2. Gọi hàm login từ AuthContext để đăng nhập người dùng
       await login({ identifier: googleEmail, password: password });
       // AuthContext sẽ tự xử lý cập nhật state và chuyển hướng về "/"
+      // } catch (err: any) {
+      //   // Xử lý lỗi từ API
+      //   const errMsg =
+      //     err.response?.data?.message || // Lỗi cụ thể từ backend
+      //     "Hoàn tất đăng ký thất bại. Username có thể đã tồn tại hoặc có lỗi xảy ra.";
+      //   setError(errMsg); // Cập nhật state lỗi để hiển thị
+      //   toast.error(errMsg);
+      //   setIsLoading(false); // Dừng loading khi có lỗi
+      // }
     } catch (err: any) {
-      // Xử lý lỗi từ API
-      const errMsg =
-        err.response?.data?.message || // Lỗi cụ thể từ backend
-        "Hoàn tất đăng ký thất bại. Username có thể đã tồn tại hoặc có lỗi xảy ra.";
-      setError(errMsg); // Cập nhật state lỗi để hiển thị
-      toast.error(errMsg);
-      setIsLoading(false); // Dừng loading khi có lỗi
+      // --- THay đổi  CHỖ NÀY ---
+      handleApiError(err, "Hoàn tất đăng ký thất bại. Vui lòng thử lại sau.");
+    } finally {
+      setIsLoading(false);
     }
   };
 

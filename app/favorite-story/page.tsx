@@ -27,7 +27,34 @@ export default function FavoritePage() {
   const [pageSize] = useState(20);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  // --- HELPER: Xử lý lỗi API ---
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message, details } = error.response.data.error;
 
+      // Ưu tiên Validation (details)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          // Nối các lỗi lại thành 1 câu
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
+          return;
+        }
+      }
+
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+
+    // 2. Fallback
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
   useEffect(() => {
     loadFavorites();
   }, [page]);
@@ -40,7 +67,8 @@ export default function FavoritePage() {
       setTotal(response.total);
     } catch (error) {
       console.error("Lỗi tải danh sách yêu thích:", error);
-      toast.error("Không thể tải tủ truyện của bạn.");
+      // toast.error("Không thể tải tủ truyện của bạn.");
+      handleApiError(error, "Không thể tải tủ truyện của bạn.");
     } finally {
       setLoading(false);
     }
@@ -73,8 +101,14 @@ export default function FavoritePage() {
       toast.success(
         newState ? "Đã bật thông báo chương mới" : "Đã tắt thông báo"
       );
-    } catch (error) {
-      toast.error("Lỗi cập nhật trạng thái thông báo");
+      // } catch (error) {
+      //   toast.error("Lỗi cập nhật trạng thái thông báo");
+      // } finally {
+      //   setUpdatingId(null);
+      // }
+    } catch (error: any) {
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Lỗi cập nhật trạng thái thông báo.");
     } finally {
       setUpdatingId(null);
     }
@@ -88,8 +122,12 @@ export default function FavoritePage() {
       await favoriteStoryService.removeFavorite(storyId);
       toast.success("Đã xóa khỏi tủ truyện");
       loadFavorites(); // Reload lại list
-    } catch (error) {
-      toast.error("Lỗi khi xóa truyện");
+      // } catch (error) {
+      //   toast.error("Lỗi khi xóa truyện");
+      // }
+    } catch (error: any) {
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Lỗi khi xóa truyện khỏi danh sách.");
     }
   };
 

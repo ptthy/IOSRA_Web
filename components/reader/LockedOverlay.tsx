@@ -51,7 +51,7 @@ export const LockedOverlay: React.FC<LockedOverlayProps> = ({
       });
       onUnlockSuccess();
     } catch (error: any) {
-      // 🔥 LOGIC MỚI: BẮT LỖI 409 (ChapterPurchased)
+      //  LOGIC MỚI: BẮT LỖI 409 (ChapterPurchased)
       if (error.response && error.response.status === 409) {
         toast.success("Bạn đã sở hữu chương này!", {
           description: "Đang tải nội dung...",

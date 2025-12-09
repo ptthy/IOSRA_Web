@@ -55,7 +55,34 @@ export default function EditChapterPage() {
     title: 0,
     content: 0,
   });
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message, details } = error.response.data.error;
 
+      // Ưu tiên Validation (details)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          // Nối các lỗi lại thành 1 câu
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
+          return;
+        }
+      }
+
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+
+    // 2. Fallback
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
+  // -------------------
   const LIMITS = {
     TITLE: 200,
     CONTENT: 50000, // 50k ký tự cho nội dung chương
@@ -103,11 +130,28 @@ export default function EditChapterPage() {
             content: safeContent.length,
           });
         }
-      } catch (error: any) {
-        console.error("Error loading chapter:", error);
-        toast.error(error.message || "Không thể tải thông tin chương");
+        // } catch (error: any) {
+        //   console.error("Error loading chapter:", error);
+        //   toast.error(error.message || "Không thể tải thông tin chương");
 
-        // Đặt giá trị mặc định nếu có lỗi
+        //   // Đặt giá trị mặc định nếu có lỗi
+        //   setFormData({
+        //     title: "",
+        //     content: "",
+        //     languageCode: "vi-VN",
+        //   });
+        //   setCharacterCounts({
+        //     title: 0,
+        //     content: 0,
+        //   });
+        // } finally {
+        //   setIsLoading(false);
+        // }
+      } catch (error: any) {
+        // --- DÙNG HELPER ---
+        handleApiError(error, "Không thể tải thông tin chương");
+
+        // Giữ lại logic reset form để tránh lỗi UI nếu cần thiết
         setFormData({
           title: "",
           content: "",
@@ -201,9 +245,15 @@ export default function EditChapterPage() {
 
       toast.success("✅ Cập nhật chương thành công!");
       router.push(`/author/story/${storyId}/chapter/${chapterId}`);
+      // } catch (error: any) {
+      //   console.error("Error updating chapter:", error);
+      //   toast.error(error.message || "Có lỗi xảy ra khi cập nhật chương");
+      // } finally {
+      //   setIsSubmitting(false);
+      // }
     } catch (error: any) {
-      console.error("Error updating chapter:", error);
-      toast.error(error.message || "Có lỗi xảy ra khi cập nhật chương");
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Có lỗi xảy ra khi cập nhật chương");
     } finally {
       setIsSubmitting(false);
     }

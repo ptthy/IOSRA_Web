@@ -88,6 +88,30 @@ export default function PaymentHistoryPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const pageSize = 20;
+  // --- HELPER: Xử lý lỗi API ---
+  const handleApiError = (err: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (err.response && err.response.data && err.response.data.error) {
+      const { message, details } = err.response.data.error;
+
+      // Ưu tiên Validation
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          toast.error(details[firstKey].join(" "));
+          return;
+        }
+      }
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+    // 2. Fallback
+    const fallbackMsg = err.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
 
   useEffect(() => {
     loadPaymentHistory();
@@ -102,7 +126,14 @@ export default function PaymentHistoryPage() {
       });
       setPayments(data.items);
       setTotal(data.total);
-    } catch (error) {
+      // } catch (error) {
+      //   console.error("Lỗi tải lịch sử giao dịch:", error);
+      // } finally {
+      //   setLoading(false);
+      // }
+    } catch (error: any) {
+      //  GỌI HÀM XỬ LÝ LỖI
+      handleApiError(error, "Không thể tải lịch sử giao dịch.");
       console.error("Lỗi tải lịch sử giao dịch:", error);
     } finally {
       setLoading(false);

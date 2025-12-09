@@ -80,6 +80,30 @@ function OTPForm() {
       );
       setIsLoading(false);
       setOtp(""); // Xóa OTP khi lỗi
+      // --- XỬ LÝ LỖI CHI TIẾT ---
+      if (err.response && err.response.data && err.response.data.error) {
+        const { code, message, details } = err.response.data.error;
+
+        // 1. Ưu tiên Validation (Ví dụ: format OTP sai)
+        if (details) {
+          const firstKey = Object.keys(details)[0];
+          if (firstKey && details[firstKey].length > 0) {
+            toast.error(details[firstKey].join(" "));
+            return;
+          }
+        }
+
+        // 2. Xử lý message từ Backend (Ví dụ: "Mã OTP đã hết hạn", "Mã không đúng")
+        if (message) {
+          toast.error(message);
+          return;
+        }
+      }
+
+      // 3. Fallback: Lỗi chung
+      const fallbackMsg =
+        err.response?.data?.message || "Mã OTP không đúng hoặc hết hạn.";
+      toast.error(fallbackMsg);
     }
   };
 

@@ -212,7 +212,7 @@ apiClient.interceptors.response.use(
       const errorCode = responseData?.error?.code;
       const errorMessage = responseData?.error?.message?.toLowerCase();
 
-      // 🔥 PHÂN BIỆT CÁC LOẠI 403:
+      //  PHÂN BIỆT CÁC LOẠI 403:
 
       // 1. 403 ChapterLocked -> KHÔNG đá ra login, để component xử lý
       if (errorCode === "ChapterLocked") {

@@ -55,10 +55,10 @@ import {
 
 // --- HELPERS ---
 const formatVND = (amount: number) => {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-  }).format(amount);
+  const value = new Intl.NumberFormat("vi-VN").format(amount);
+
+  // Trả về số kèm chữ AP
+  return `${value} AP`;
 };
 
 const formatDate = (dateString: string) => {
@@ -94,8 +94,8 @@ const parseNumberInput = (value: string): number => {
 // Cấu hình Việt hóa tên trường
 const LABELS_MAP: Record<string, string> = {
   // --- TÀI CHÍNH ---
-  grossVnd: "Doanh thu ban đầu (VNĐ)",
-  priceDias: "Giá (Dias)",
+  grossAmount: "Doanh thu ban đầu ",
+  priceDias: "Giá cho 1 chương nếu mất phí (Dias)",
   rewardRate: "Tỷ lệ thưởng (%)",
 
   // --- NỘI DUNG ---
@@ -158,7 +158,7 @@ const DetailModal = ({
             <h2 className="text-2xl font-bold text-[var(--primary)]">
               {type === "transaction"
                 ? "Chi Tiết Giao Dịch"
-                : "Chi Tiết Yêu Cầu Rút Tiền"}
+                : "Chi Tiết Yêu Cầu Đối Soát"}
             </h2>
             <p className="text-sm text-[var(--muted-foreground)] mt-1">
               Mã ID Chính:{" "}
@@ -172,17 +172,15 @@ const DetailModal = ({
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 bg-[var(--muted)]/30 rounded-lg border border-[var(--border)]">
               <span className="text-sm font-medium text-[var(--muted-foreground)]">
-                Số tiền
+                Số AP
               </span>
               <div
                 className={`text-2xl font-bold ${
-                  data.amountVnd > 0 || data.amount > 0
-                    ? "text-green-600"
-                    : "text-red-600"
+                  data.amount > 0 ? "text-green-600" : "text-red-600"
                 }`}
               >
                 {type === "transaction"
-                  ? (data.amountVnd > 0 ? "+" : "") + formatVND(data.amountVnd)
+                  ? (data.amount > 0 ? "+" : "") + formatVND(data.amount)
                   : formatVND(data.amount)}
               </div>
             </div>
@@ -256,7 +254,7 @@ const DetailModal = ({
 
                             {/* Cột Phải: Giá trị */}
                             <TableCell className="text-[var(--foreground)] break-all">
-                              {key === "grossVnd"
+                              {key === "grossAmount"
                                 ? formatVND(Number(value))
                                 : Array.isArray(value) // Nếu còn mảng nào khác thì join lại
                                 ? value.join(", ")
@@ -363,7 +361,34 @@ export default function AuthorRevenuePage() {
   const [accountHolder, setAccountHolder] = useState("");
   const [commitmentText, setCommitmentText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message, details } = error.response.data.error;
 
+      // Ưu tiên Validation (details)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          // Nối các lỗi lại thành 1 câu
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
+          return;
+        }
+      }
+
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+
+    // 2. Fallback
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
+  // -------------------
   // --- DATA FETCHING ---
   const fetchAllData = async () => {
     try {
@@ -383,10 +408,10 @@ export default function AuthorRevenuePage() {
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       );
       sortedTrans.forEach((item) => {
-        if (item.amountVnd > 0) {
+        if (item.amount > 0) {
           const dateKey = formatShortDate(item.createdAt);
           const currentVal = chartMap.get(dateKey) || 0;
-          chartMap.set(dateKey, currentVal + item.amountVnd);
+          chartMap.set(dateKey, currentVal + item.amount);
         }
       });
       setChartData(
@@ -403,9 +428,16 @@ export default function AuthorRevenuePage() {
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
       );
-    } catch (error) {
+      // } catch (error) {
+      //   console.error("Lỗi tải dữ liệu doanh thu:", error);
+      //   toast.error("Không thể tải dữ liệu.");
+      // } finally {
+      //   setLoading(false);
+      // }
+    } catch (error: any) {
       console.error("Lỗi tải dữ liệu doanh thu:", error);
-      toast.error("Không thể tải dữ liệu.");
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Không thể tải dữ liệu.");
     } finally {
       setLoading(false);
     }
@@ -422,12 +454,12 @@ export default function AuthorRevenuePage() {
     const rawAmountStr = String(withdrawAmount).replace(/\./g, "");
     const amountNum = Number(rawAmountStr);
 
-    if (!amountNum || amountNum < 100000) {
-      toast.error("Số tiền rút tối thiểu là 100.000 VNĐ");
+    if (!amountNum || amountNum < 1000) {
+      toast.error("Số AP luân chuyển tối thiểu là 1.000 AP");
       return;
     }
-    if (amountNum > summary.revenueBalanceVnd) {
-      toast.error("Số dư khả dụng không đủ.");
+    if (amountNum > summary.revenueBalance) {
+      toast.error("Số AP khả dụng không đủ.");
       return;
     }
     if (!bankName || !bankAccount || !accountHolder) {
@@ -449,39 +481,47 @@ export default function AuthorRevenuePage() {
         commitment: commitmentText,
       });
 
-      toast.success("Gửi yêu cầu rút tiền thành công!");
+      toast.success("Gửi yêu cầu đối soát thành công!");
       setWithdrawAmount("");
       setCommitmentText("");
       await fetchAllData();
       setWdPage(1);
+      // } catch (error: any) {
+      //   // Log lỗi để debug nếu cần
+      //   console.error("Lỗi rút tiền:", error);
+
+      //   // Lấy data response từ server
+      //   const resData = error.response?.data;
+      //   const status = error.response?.status;
+
+      //   // --- BẮT LỖI 409 (CONFLICT) ---
+      //   if (status === 409) {
+      //     // Kiểm tra mã lỗi cụ thể từ server
+      //     if (resData?.error?.code === "WithdrawPending") {
+      //       toast.error(
+      //         "Bạn đang có yêu cầu rút tiền đang chờ xử lý. Vui lòng đợi yêu cầu trước hoàn tất."
+      //       );
+      //       return;
+      //     }
+      //   }
+
+      //   // --- BẮT CÁC LỖI KHÁC ---
+      //   // Lưu ý: Cấu trúc JSON của bạn là { error: { message: "..." } }
+      //   // Nên cần lấy resData?.error?.message trước
+      //   const msg =
+      //     resData?.error?.message || // Lấy message trong object error
+      //     resData?.message || // Lấy message lỡ như nó nằm ngoài
+      //     "Có lỗi xảy ra, vui lòng thử lại.";
+
+      //   toast.error(msg);
+      // } finally {
+      //   setIsSubmitting(false);
+      // }
     } catch (error: any) {
-      // Log lỗi để debug nếu cần
-      console.error("Lỗi rút tiền:", error);
-
-      // Lấy data response từ server
-      const resData = error.response?.data;
-      const status = error.response?.status;
-
-      // --- BẮT LỖI 409 (CONFLICT) ---
-      if (status === 409) {
-        // Kiểm tra mã lỗi cụ thể từ server
-        if (resData?.error?.code === "WithdrawPending") {
-          toast.error(
-            "Bạn đang có yêu cầu rút tiền đang chờ xử lý. Vui lòng đợi yêu cầu trước hoàn tất."
-          );
-          return;
-        }
-      }
-
-      // --- BẮT CÁC LỖI KHÁC ---
-      // Lưu ý: Cấu trúc JSON của bạn là { error: { message: "..." } }
-      // Nên cần lấy resData?.error?.message trước
-      const msg =
-        resData?.error?.message || // Lấy message trong object error
-        resData?.message || // Lấy message lỡ như nó nằm ngoài
-        "Có lỗi xảy ra, vui lòng thử lại.";
-
-      toast.error(msg);
+      console.error("Lỗi :", error);
+      // --- DÙNG HELPER ---
+      // Helper sẽ tự lấy message chi tiết (ví dụ: "Bạn đang có yêu cầu chờ xử lý...")
+      handleApiError(error, "Gửi yêu cầu chuyển đối/đối soát thất bại.");
     } finally {
       setIsSubmitting(false);
     }
@@ -555,22 +595,43 @@ export default function AuthorRevenuePage() {
       case "withdraw_release":
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium  bg-red-100 text-red-800 border border-red-200">
-            <XCircle className="w-3 h-3 mr-1" /> Hoàn lại vào ví
+            <XCircle className="w-3 h-3 mr-1" /> Hoàn lại vào
           </span>
         );
       case "purchase":
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium  bg-green-100 text-green-800 border border-green-200">
-            <CheckCircle2 className="w-3 h-3 mr-1" /> Cộng vào ví
+            <CheckCircle2 className="w-3 h-3 mr-1" /> Cộng vào
           </span>
         );
 
       case "withdraw_reserve":
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
-            <Clock className="w-3 h-3 mr-1" /> Rút tiền khỏi ví
+            <Clock className="w-3 h-3 mr-1" /> Luân chuyển khỏi
           </span>
         );
+      // 2. Trạng thái yêu cầu đối soát (Withdraw Request) - MỚI THÊM
+      case "approved":
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+            <CheckCircle2 className="w-3 h-3 mr-1" /> Thành công
+          </span>
+        );
+      case "rejected":
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
+            <XCircle className="w-3 h-3 mr-1" /> Từ chối
+          </span>
+        );
+      case "pending":
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+            <Clock className="w-3 h-3 mr-1" /> Đang xử lý
+          </span>
+        );
+
+      // Default
       default:
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--muted)] text-[var(--muted-foreground)]">
@@ -617,7 +678,7 @@ export default function AuthorRevenuePage() {
             Quản Lý Doanh Thu
           </h1>
           <p className="text-sm text-[var(--muted-foreground)]">
-            Theo dõi thu nhập thực tế và lịch sử giao dịch
+            Theo dõi thu nhập thực tế và lịch sử đối soát
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -644,32 +705,32 @@ export default function AuthorRevenuePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
           {
-            title: "Số dư khả dụng",
-            value: formatVND(summary?.revenueBalanceVnd || 0),
+            title: "Số AP khả dụng",
+            value: formatVND(summary?.revenueBalance || 0),
             icon: <Wallet className="w-5 h-5" />,
             color: "var(--primary)",
-            desc: "Có thể rút ngay",
+            desc: "Có thể đối soát ngay",
           },
           {
             title: "Đang chờ xử lý",
-            value: formatVND(summary?.revenuePendingVnd || 0),
+            value: formatVND(summary?.revenuePending || 0),
             icon: <History className="w-5 h-5" />,
             color: "#f59e0b",
-            desc: "Yêu cầu rút đang duyệt",
+            desc: "Yêu cầu đối soát đang duyệt",
           },
           {
-            title: "Đã rút thành công",
-            value: formatVND(summary?.revenueWithdrawnVnd || 0),
+            title: "Đã đối soát thành công",
+            value: formatVND(summary?.revenueWithdrawn || 0),
             icon: <CheckCircle2 className="w-5 h-5" />,
             color: "#10b981",
-            desc: "Tổng tiền đã về túi",
+            desc: "Tổng AP đã đối soát về",
           },
           {
-            title: "Tổng doanh thu",
-            value: formatVND(summary?.totalRevenueVnd || 0),
+            title: "Tổng Lũy Kế",
+            value: formatVND(summary?.totalRevenue || 0),
             icon: <TrendingUp className="w-5 h-5" />,
             color: "#7c3aed",
-            desc: "Doanh thu trọn đời",
+            desc: "Bao gồm cả số AP đã đối soát ",
           },
         ].map((item, idx) => (
           <Card
@@ -710,12 +771,13 @@ export default function AuthorRevenuePage() {
             <form onSubmit={handleWithdraw} className="space-y-4">
               <div className="space-y-1.5">
                 <Label>
-                  Số tiền rút (VNĐ) <span className="text-red-500 ml-1">*</span>
+                  Số lượng AP mong muốn{" "}
+                  <span className="text-red-500 ml-1">*</span>
                 </Label>
                 <Input
                   type="text"
                   inputMode="numeric"
-                  placeholder="100.000"
+                  placeholder="1.000"
                   value={withdrawAmount}
                   ref={amountInputRef}
                   onChange={(e) => {
@@ -733,7 +795,7 @@ export default function AuthorRevenuePage() {
                   className="font-mono text-lg tracking-wider text-right bg-[var(--background)] dark:border-[#f0ead6]"
                 />
                 <p className="text-[10px] text-right text-[var(--muted-foreground)]">
-                  Khả dụng: {formatVND(summary?.revenueBalanceVnd || 0)}
+                  Khả dụng: {formatVND(summary?.revenueBalance || 0)}
                 </p>
               </div>
 
@@ -870,7 +932,7 @@ export default function AuthorRevenuePage() {
             Lịch Sử Giao Dịch (Chi Tiết)
           </TabsTrigger>
           <TabsTrigger value="withdraws">
-            Lịch Sử Trạng Thái Rút Tiền
+            Lịch Sử Trạng Thái Đối Soát
           </TabsTrigger>
         </TabsList>
 
@@ -882,7 +944,7 @@ export default function AuthorRevenuePage() {
                 Danh Sách Giao Dịch
               </CardTitle>
               <CardDescription>
-                Bao gồm doanh thu từ truyện, giọng đọc và các lệnh rút tiền.
+                Bao gồm doanh thu từ truyện, giọng đọc và các lệnh đối soát.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -894,7 +956,7 @@ export default function AuthorRevenuePage() {
                     <TableHead className="hidden md:table-cell">
                       Mã giao dịch
                     </TableHead>
-                    <TableHead className="text-right">Số tiền</TableHead>
+                    <TableHead className="text-right">Số AP</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -917,13 +979,13 @@ export default function AuthorRevenuePage() {
                         </TableCell>
                         <TableCell
                           className={`text-right font-bold text-sm ${
-                            tx.amountVnd > 0
+                            tx.amount > 0
                               ? "text-[var(--primary)]"
                               : "text-red-600"
                           }`}
                         >
-                          {tx.amountVnd > 0 ? "+" : ""}
-                          {formatVND(tx.amountVnd)}
+                          {tx.amount > 0 ? "+" : ""}
+                          {formatVND(tx.amount)}
                         </TableCell>
                         <TableCell>
                           <Button
@@ -964,7 +1026,7 @@ export default function AuthorRevenuePage() {
           <Card className="border border-[var(--border)] bg-[var(--card)]">
             <CardHeader>
               <CardTitle className="text-[var(--primary)]">
-                Lịch Sử Yêu Cầu Rút Tiền
+                Lịch Sử Yêu Cầu Đối Soát
               </CardTitle>
               <CardDescription>
                 Theo dõi trạng thái duyệt của các yêu cầu.
@@ -975,7 +1037,7 @@ export default function AuthorRevenuePage() {
                 <TableHeader className="bg-[var(--muted)]/50">
                   <TableRow className="hover:bg-transparent border-b border-[var(--border)]">
                     <TableHead className="w-[150px]">Thời gian</TableHead>
-                    <TableHead>Số tiền</TableHead>
+                    <TableHead>Số AP</TableHead>
                     <TableHead>Ngân hàng</TableHead>
                     <TableHead>Trạng thái</TableHead>
                     <TableHead className="w-[50px]"></TableHead>

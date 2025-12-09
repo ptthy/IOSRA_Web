@@ -33,6 +33,7 @@ import {
   ChevronRight,
   Receipt,
   Flag,
+  Bell,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
@@ -95,8 +96,30 @@ export default function ProfilePage() {
     gender: "" as UserGender,
     birthday: "",
   });
-
-  // --- HÀM XỬ LÝ NHẬN QUÀ HÀNG NGÀY (GỌI API THẬT) ---
+  // --- HELPER: Xử lý lỗi API ---
+  const handleApiError = (err: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic
+    if (err.response && err.response.data && err.response.data.error) {
+      const { message, details } = err.response.data.error;
+      // Ưu tiên Validation
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          toast.error(details[firstKey].join(" "));
+          return;
+        }
+      }
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+    // 2. Fallback
+    const fallbackMsg = err.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
+  // --- HÀM XỬ LÝ NHẬN QUÀ HÀNG NGÀY  ---
   const handleClaimDaily = async () => {
     if (isClaiming) return;
     setIsClaiming(true);
@@ -122,9 +145,10 @@ export default function ProfilePage() {
       // 3. Bắn sự kiện để Navbar cập nhật số dư (Quan trọng)
       window.dispatchEvent(new Event("wallet-updated"));
     } catch (error: any) {
-      // Nếu lỗi 400 từ backend trả về (VD: SubscriptionNotFound)
-      const msg = error.response?.data?.error?.message || "Lỗi nhận quà.";
-      toast.error(msg);
+      // // Nếu lỗi 400 từ backend trả về (VD: SubscriptionNotFound)
+      // const msg = error.response?.data?.error?.message || "Lỗi nhận quà.";
+      // toast.error(msg);
+      handleApiError(error, "Lỗi nhận quà hàng ngày.");
     } finally {
       setIsClaiming(false);
     }
@@ -200,7 +224,8 @@ export default function ProfilePage() {
       }
     } catch (error: any) {
       console.error("Lỗi tải data:", error);
-      toast.error("Không thể tải đầy đủ thông tin.");
+      //toast.error("Không thể tải đầy đủ thông tin.");
+      handleApiError(error, "Không thể tải đầy đủ thông tin.");
     } finally {
       setPageIsLoading(false);
     }
@@ -227,8 +252,13 @@ export default function ProfilePage() {
       const res = await profileService.uploadAvatar(file);
       updateUser({ avatar: res.data.avatarUrl });
       toast.success("Đã cập nhật ảnh đại diện!");
-    } catch {
-      toast.error("Lỗi upload ảnh");
+      // } catch {
+      //   toast.error("Lỗi upload ảnh");
+      // } finally {
+    } catch (error: any) {
+      //  Thêm biến error vào đây
+      // GỌI HÀM XỬ LÝ LỖI (VD: Ảnh quá lớn, sai định dạng)
+      handleApiError(error, "Lỗi upload ảnh.");
     } finally {
       setIsSubmitting(false);
     }
@@ -245,27 +275,32 @@ export default function ProfilePage() {
       fetchProfileData();
       setIsEditing(false);
       toast.success("Đã lưu hồ sơ!");
-    } catch {
-      toast.error("Lỗi lưu hồ sơ");
+      // } catch {
+      //   toast.error("Lỗi lưu hồ sơ");
+      // // } finally {
+    } catch (error: any) {
+      //  Thêm biến error vào đây
+      // GỌI HÀM XỬ LÝ LỖI (VD: Tên quá dài, ngày sinh không hợp lệ)
+      handleApiError(error, "Lỗi lưu hồ sơ.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleCancelPending = async () => {
-    const pendingId = localStorage.getItem("pendingTransactionId");
-    if (!pendingId) return;
-    try {
-      await paymentService.cancelPaymentLink({
-        transactionId: pendingId,
-        cancellationReason: "User hủy thủ công tại profile",
-      });
-      toast.success("Đã hủy đơn chờ.");
-      localStorage.removeItem("pendingTransactionId");
-    } catch (e) {
-      toast.error("Không thể hủy đơn.");
-    }
-  };
+  // const handleCancelPending = async () => {
+  //   const pendingId = localStorage.getItem("pendingTransactionId");
+  //   if (!pendingId) return;
+  //   try {
+  //     await paymentService.cancelPaymentLink({
+  //       transactionId: pendingId,
+  //       cancellationReason: "User hủy thủ công tại profile",
+  //     });
+  //     toast.success("Đã hủy đơn chờ.");
+  //     localStorage.removeItem("pendingTransactionId");
+  //   } catch (e) {
+  //     toast.error("Không thể hủy đơn.");
+  //   }
+  // };
 
   if (pageIsLoading) {
     return (
@@ -687,7 +722,7 @@ export default function ProfilePage() {
             </CardHeader>
             <CardContent className="space-y-4 pt-0">
               <div className="flex items-center justify-between px-3.5 py-2.5 bg-muted/40 rounded-lg">
-                <span className="text-sm font-medium">Voice Characters</span>
+                <span className="text-sm font-medium">VC</span>
                 <span className="font-bold text-lg font-mono text-indigo-600 dark:text-indigo-400">
                   {wallet.voiceCharBalance.toLocaleString()}
                 </span>
@@ -702,7 +737,7 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
           <Card className="shadow-sm border-border/60">
-            <CardContent className="p-4">
+            <CardContent className="p-4 flex flex-col gap-3">
               <Button
                 variant="outline"
                 onClick={() => router.push("/all-report")}
@@ -720,6 +755,26 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-orange-600" />
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push("/notification")}
+                className="w-full h-auto py-3 px-4 flex items-center justify-between bg-card hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 shadow-sm rounded-xl transition-all group border-dashed border-2 dark:border-[#f0ead6]"
+              >
+                <div className="flex items-center gap-3">
+                  {/* Icon Container: Đổi sang màu xanh */}
+                  <div className="p-2 bg-blue-100 rounded-lg text-blue-600 group-hover:scale-110 transition-transform">
+                    <Bell className="h-5 w-5" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-bold text-sm">Thông báo</p>
+                    <p className="text-[10px] text-muted-foreground font-normal">
+                      Xem tin tức mới nhất
+                    </p>
+                  </div>
+                </div>
+                {/* Chevron: Đổi hover sang màu xanh */}
+                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-blue-600" />
               </Button>
             </CardContent>
           </Card>

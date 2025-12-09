@@ -24,12 +24,17 @@ import { subscriptionService } from "@/services/subscriptionService";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-
+import { usePathname } from "next/navigation";
+// 1. Import hook useAuth
+import { useAuth } from "@/context/AuthContext";
 export function ChatBotWidget() {
+  // 2. Lấy thông tin user từ AuthContext
+  const pathname = usePathname(); // Lấy đường dẫn hiện tại
+  const { user } = useAuth();
   const { openTopUpModal } = useModal();
   const { theme, setTheme } = useTheme();
 
-  // 🔥 isOpen: false = Hiện bong bóng tròn | true = Hiện cửa sổ chat
+  //  isOpen: false = Hiện bong bóng tròn | true = Hiện cửa sổ chat
   const [isOpen, setIsOpen] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
@@ -148,7 +153,28 @@ export function ChatBotWidget() {
       handleSendMessage();
     }
   };
+  // --- 3. ĐIỀU KIỆN ẨN CHATBOT (AUTH PAGE + ROLE) ---
 
+  // A. Check Role (omod, cmod)
+  const hiddenRoles = ["omod", "cmod"];
+  const isHiddenRole = user?.roles?.some((role: string) =>
+    hiddenRoles.includes(role)
+  );
+
+  // B. Check Auth Pages (Login, Register, OTP...)
+  const authPaths = [
+    "/login",
+    "/register",
+    "/verify-otp",
+    "/forgot-password",
+    "/google-complete",
+  ];
+  const isAuthPage = authPaths.includes(pathname);
+
+  // C. Nếu thuộc Role ẩn HOẶC đang ở trang Auth -> Return null
+  if (isHiddenRole || isAuthPage) {
+    return null;
+  }
   // --- TRẠNG THÁI 1: BONG BÓNG TRÒN (KHI ĐÓNG) ---
   if (!isOpen) {
     return (

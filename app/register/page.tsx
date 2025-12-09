@@ -61,11 +61,35 @@ export default function RegisterRoute() {
       toast.success("Đăng ký thành công! Vui lòng kiểm tra email để xác thực.");
       router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
     } catch (err: any) {
-      const errMsg =
-        err.response?.data?.message || "Đăng ký thất bại. Vui lòng thử lại.";
-      setError(errMsg);
-      toast.error(errMsg);
       setIsLoading(false);
+      // Kiểm tra cấu trúc lỗi { error: { code, message, details } }
+      if (err.response && err.response.data && err.response.data.error) {
+        const { message, details } = err.response.data.error;
+
+        // 1. Ưu tiên tìm trong 'details' để lấy message cụ thể (VD: "Email/Username không được có space")
+        if (details) {
+          const firstKey = Object.keys(details)[0]; // Lấy key đầu tiên (VD: Identifier)
+          if (firstKey && details[firstKey].length > 0) {
+            const specificMsg = details[firstKey].join(" ");
+            setError(specificMsg);
+            toast.error(specificMsg);
+            return;
+          }
+        }
+
+        // 2. Nếu không có details, lấy message chung của error
+        if (message) {
+          setError(message);
+          toast.error(message);
+          return;
+        }
+      }
+
+      // --- FALLBACK (Cho các lỗi mạng hoặc lỗi không đúng chuẩn trên) ---
+      const fallbackMsg =
+        err.response?.data?.message || "Đăng ký thất bại. Vui lòng thử lại.";
+      setError(fallbackMsg);
+      toast.error(fallbackMsg);
     }
   };
 
