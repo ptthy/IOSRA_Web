@@ -93,30 +93,46 @@ export default function CreateStoryPage() {
 
   const LIMITS = { TITLE: 100, OUTLINE: 3000, PROMPT: 500 };
   const handleApiError = (error: any, defaultMessage: string) => {
-    // 1. Check lỗi Validation/Logic từ Backend
-    if (error.response && error.response.data && error.response.data.error) {
-      const { message, details } = error.response.data.error;
-
-      // Ưu tiên Validation (details)
-      if (details) {
-        const firstKey = Object.keys(details)[0];
-        if (firstKey && details[firstKey].length > 0) {
-          // Nối các lỗi lại thành 1 câu
-          const msg = details[firstKey].join(" ");
-          toast.error(msg);
+    if (error.response?.data?.error) {
+      const { code, message, details } = error.response.data.error;
+      // 1. Check lỗi Validation/Logic từ Backend
+      // --- A. Xử lý riêng cho AccountRestricted (để format ngày cho đẹp) ---
+      if (code === "AccountRestricted") {
+        // Backend trả: "Your account is restricted from posting until 2025-12-19T08:25:29..."
+        // Ta format lại tiếng Việt cho thân thiện
+        const dateMatch = message.match(
+          /(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/
+        );
+        if (dateMatch) {
+          const date = new Date(dateMatch[0]);
+          const dateStr = date.toLocaleString("vi-VN"); // Ra dạng: 08:25:29 19/12/2025
+          toast.error(`Tài khoản bị hạn chế đăng bài đến: ${dateStr}`);
           return;
         }
+        // Nếu không parse được ngày thì hiển thị luôn message gốc
+        toast.error(message);
+        return;
       }
 
-      // Message từ Backend
+      // --- B. Nếu có message từ Backend -> HIỂN THỊ LUÔN ---
+      // Đây là chỗ giúp "lỗi gì cũng trả ra được message"
       if (message) {
         toast.error(message);
         return;
       }
+
+      // --- C. Nếu là lỗi Validation (có details) ---
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          toast.error(details[firstKey].join(" "));
+          return;
+        }
+      }
     }
 
-    // 2. Fallback
-    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    // 2. Các lỗi khác (Mất mạng, Server sập, 401 không có body...)
+    const fallbackMsg = error.message || defaultMessage;
     toast.error(fallbackMsg);
   };
   // -------------------
@@ -374,26 +390,25 @@ export default function CreateStoryPage() {
       console.error(error);
 
       // === GIỮ NGUYÊN LOGIC NẾU ID BỊ LỖI (NOT FOUND) ===
-      if (
-        error.code === "STORY_NOT_FOUND" ||
-        error.message === "Truyện không tồn tại"
-      ) {
-        toast.error(
-          "Truyện cũ không tìm thấy. Hệ thống sẽ tạo truyện mới khi bạn lưu lại."
-        );
-        // Reset ID để lần sau bấm nút sẽ nhảy vào TRƯỜNG HỢP 1
-        setCreatedStoryId(null);
+      // if (
+      //   error.code === "STORY_NOT_FOUND" ||
+      //   error.message === "Truyện không tồn tại"
+      // ) {
+      //   toast.error(
+      //     "Truyện cũ không tìm thấy. Hệ thống sẽ tạo truyện mới khi bạn lưu lại."
+      //   );
+      //   // Reset ID để lần sau bấm nút sẽ nhảy vào TRƯỜNG HỢP 1
+      //   setCreatedStoryId(null);
 
-        // // Cập nhật lại localStorage
-        // const currentDraft = JSON.parse(
-        //   localStorage.getItem(LOCAL_STORAGE_KEY) || "{}"
-        // );
-        // delete currentDraft.createdStoryId;
-        // localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentDraft));
-      } else {
-        // --- DÙNG HELPER CHO CÁC LỖI KHÁC ---
-        handleApiError(error, "Có lỗi xảy ra khi tạo truyện");
-      }
+      //   // // Cập nhật lại localStorage
+      //   // const currentDraft = JSON.parse(
+      //   //   localStorage.getItem(LOCAL_STORAGE_KEY) || "{}"
+      //   // );
+      //   // delete currentDraft.createdStoryId;
+      //   // localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentDraft));
+      // } else {
+      // --- DÙNG HELPER CHO CÁC LỖI KHÁC ---
+      handleApiError(error, "Có lỗi xảy ra khi tạo truyện");
     } finally {
       setIsSubmitting(false);
     }

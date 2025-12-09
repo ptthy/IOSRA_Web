@@ -224,6 +224,11 @@ apiClient.interceptors.response.use(
         console.log("🎯 Cần gói Premium - giữ nguyên trên trang");
         return Promise.reject(error);
       }
+      // 3.  403 AccountRestricted (Bị cấm đăng/tương tác) -> KHÔNG đá ra login
+      else if (errorCode === "AccountRestricted") {
+        console.log("🎯 Tài khoản bị hạn chế - giữ nguyên để hiện thông báo");
+        return Promise.reject(error); // Trả lỗi về để component hiện thông báo thời gian bị ban
+      }
       // 2. 403 do không có quyền author
       else if (
         errorMessage?.includes("author") ||
