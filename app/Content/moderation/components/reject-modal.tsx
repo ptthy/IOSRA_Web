@@ -1,131 +1,148 @@
 // File: moderation/components/reject-modal.tsx
-import { X, XCircle, Loader2 } from 'lucide-react'; // ✅ Thêm Loader2
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState } from "react";
+import { X, XCircle, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface RejectModalProps {
   isOpen: boolean;
-  onReject?: (id: string) => void;
   onClose: () => void;
   onConfirm: (reason: string) => void;
-  isSubmitting?: boolean; // ✅ SỬA 1: Thêm prop isSubmitting
+  isSubmitting?: boolean;
 }
 
-export function RejectModal({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  isSubmitting // ✅ SỬA 2: Nhận prop
+export function RejectModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  isSubmitting,
 }: RejectModalProps) {
-  const [reason, setReason] = useState('');
-
-  if (!isOpen) return null;
+  const [reason, setReason] = useState("");
 
   const handleConfirm = () => {
-    // Không đóng modal ở đây, để 'review-detail.tsx' xử lý
     onConfirm(reason);
-    // setReason('');
-    // onClose();
+  };
+
+  const handleSelectReason = (selectedReason: string) => {
+    if (reason === selectedReason) {
+      setReason("");
+    } else {
+      setReason(selectedReason);
+    }
   };
 
   const commonReasons = [
-    'Nội dung không phù hợp với tiêu chuẩn cộng đồng',
-    'Vi phạm bản quyền',
-    'Chứa nội dung bạo lực hoặc khiêu dâm',
-    'Spam hoặc quảng cáo',
-    'Ngôn ngữ không phù hợp',
+    "Nội dung không phù hợp",
+    "Vi phạm bản quyền",
+    "Bạo lực / Khiêu dâm",
+    "Spam hoặc quảng cáo",
+    "Ngôn ngữ không phù hợp",
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-gray-200"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
-              <XCircle className="w-6 h-6 text-red-600" />
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-3">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.92 }}
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-[360px] max-w-[90%] border border-gray-200 dark:border-gray-700"
+          >
+            {/* HEADER */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                  <XCircle className="w-5 h-5 text-red-600" />
+                </div>
+                <h3 className="text-gray-900 dark:text-white font-semibold text-sm">
+                  Từ chối truyện
+                </h3>
+              </div>
+              <button
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <h3 className="text-gray-900 font-semibold">Từ chối truyện</h3>
-          </div>
-          <button 
-            onClick={onClose} 
-            className="text-gray-500 hover:text-gray-700 transition-colors"
-            disabled={isSubmitting} // ✅ SỬA 3: Thêm disabled
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-4 bg-white">
-          <p className="text-gray-600">
-            Vui lòng chọn hoặc nhập lý do từ chối truyện này. Thông tin này sẽ được gửi cho tác giả.
-          </p>
+            {/* BODY */}
+            <div className="p-4 space-y-4">
+              <p className="text-gray-600 dark:text-gray-400 text-xs leading-relaxed">
+                Vui lòng chọn hoặc nhập <strong>lý do từ chối</strong>.
+              </p>
 
-          <div>
-            <label className="text-sm text-gray-900 font-medium mb-2 block">
-              Lý do thường gặp
-            </label>
-            <div className="space-y-2">
-              {commonReasons.map((commonReason, index) => (
-                <button
-                  key={index}
-                  onClick={() => setReason(commonReason)}
-                  disabled={isSubmitting} // ✅ SỬA 3: Thêm disabled
-                  className={`w-full text-left p-3 rounded-xl border transition-all bg-white ${
-                    reason === commonReason
-                      ? 'border-blue-500 bg-blue-50 text-gray-900'
-                      : 'border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-gray-50'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  <p className="text-sm">{commonReason}</p>
-                </button>
-              ))}
+              {/* Lý do thường gặp */}
+              <div>
+                <label className="text-xs text-gray-900 dark:text-white font-medium mb-2 block">
+                  Lý do thường gặp
+                </label>
+
+                <div className="space-y-2">
+                  {commonReasons.map((commonReason, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleSelectReason(commonReason)}
+                      disabled={isSubmitting}
+                      className={`w-full text-left p-2 rounded-lg border text-xs transition-all ${
+                        reason === commonReason
+                          ? "border-red-500 bg-red-50 dark:bg-red-900/30 text-gray-900 dark:text-red-300 shadow-sm"
+                          : "border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-red-300 dark:hover:border-red-500/50 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      {commonReason}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Lý do chi tiết */}
+              <div>
+                <label className="text-xs text-gray-900 dark:text-white font-medium mb-2 block border-t border-gray-200 dark:border-gray-700 pt-3">
+                  Hoặc nhập lý do chi tiết
+                </label>
+
+                <Textarea
+                  placeholder="Nhập lý do..."
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  disabled={isSubmitting}
+                  className="min-h-[90px] text-sm bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:ring-red-500 focus:border-red-500"
+                />
+              </div>
             </div>
-          </div>
 
-          <div>
-            <label className="text-sm text-gray-900 font-medium mb-2 block">
-              Hoặc nhập lý do chi tiết
-            </label>
-            <Textarea
-              placeholder="Nhập lý do từ chối..."
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              disabled={isSubmitting} // ✅ SỬA 3: Thêm disabled
-              className="min-h-[120px] bg-white border-gray-300 text-gray-900"
-            />
-          </div>
-        </div>
+            {/* FOOTER */}
+            <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 rounded-b-xl">
+              <Button
+                variant="outline"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="h-8 px-3 text-xs border-gray-300 dark:border-gray-600"
+              >
+                Hủy
+              </Button>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-white">
-          <Button 
-            variant="outline" 
-            onClick={onClose}
-            disabled={isSubmitting} // ✅ SỬA 3: Thêm disabled
-            className="border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            Hủy
-          </Button>
-          <Button 
-            className="bg-red-600 hover:bg-red-700 text-white"
-            onClick={handleConfirm}
-            // ✅ SỬA 3: Cập nhật logic disabled
-            disabled={!reason.trim() || isSubmitting}
-          >
-            {/* ✅ SỬA 4: Hiển thị loading */}
-            {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Xác nhận từ chối"}
-          </Button>
+              <Button
+                className="h-8 px-3 text-xs bg-red-600 hover:bg-red-700 text-white disabled:bg-red-400"
+                onClick={handleConfirm}
+                disabled={!reason.trim() || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-1" /> Đang gửi
+                  </>
+                ) : (
+                  "Xác nhận"
+                )}
+              </Button>
+            </div>
+          </motion.div>
         </div>
-      </motion.div>
-    </div>
+      )}
+    </AnimatePresence>
   );
 }

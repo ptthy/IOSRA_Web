@@ -42,7 +42,7 @@ export function EnhancedSidebar({
     { id: "dashboard", label: "Tổng quan", icon: BarChart3, href: "/Content/dashboard" },
     { id: "content-list", label: "Duyệt Truyện", icon: BookOpen, badge: counts.pending, href: "/Content/review" },
     { id: "chapters", label: "Duyệt Chương", icon: FileCheck, badge: counts.chaptersPending, href: "/Content/chapters" }, 
-    { id: "sent-back", label: "Truyện gửi lại", icon: FileText, badge: counts.sentBack, href: "/Content/moderation?tab=sent-back" },
+    // { id: "sent-back", label: "Truyện gửi lại", icon: FileText, badge: counts.sentBack, href: "/Content/moderation?tab=sent-back" },
     { id: "reports", label: "Báo cáo vi phạm", icon: MessageSquare, badge: counts.reports, href: "/Content/moderation?tab=reports" },
     { id: "statistics", label: "Thống kê", icon: ChartPie, href: "/Content/statistics" },
     { id: "history", label: "Lịch sử kiểm duyệt", icon: History, href: "/Content/review?tab=history" },

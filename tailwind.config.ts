@@ -1,6 +1,6 @@
 import type { Config } from "tailwindcss";
 
-const animatePlugin = require("tw-animate-css");
+
 const tailwindcssAnimate = require("tailwindcss-animate");
 
 const config: Config = {
@@ -12,7 +12,7 @@ const config: Config = {
   ],
   plugins: [
     tailwindcssAnimate, // Plugin của shadcn
-    animatePlugin, // Plugin của bạn
+
   ],
 };
 

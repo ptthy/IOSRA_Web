@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 
 // ========================= TYPES =========================
 
-type ReportStatus = "pending" | "resolved" | "rejected" | null;
+type ReportStatus = "pending" | "approved" | "rejected" | null;
 
 interface ReportItem {
   id: string;
@@ -32,12 +32,14 @@ interface ReportItem {
   targetId: string;
   reason: string;
   details: string;
-  status: "pending" | "resolved" | "rejected" | string;
+  status: "pending" | "approved" | "rejected" | string;
   reporterId: string;
   reportedAt: string;
 
-  resolvedBy?: string;
-  resolvedAt?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
 }
 
 interface ApiResponse {
@@ -50,17 +52,11 @@ interface ApiResponse {
 // ========================= MOTION VARIANTS =========================
 
 const tabContentVariants: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 15,
-  },
+  hidden: { opacity: 0, y: 15 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: {
-      duration: 0.25,
-      ease: [0.42, 0, 0.58, 1],
-    },
+    transition: { duration: 0.25, ease: [0.42, 0, 0.58, 1] },
   },
 };
 
@@ -84,12 +80,10 @@ export function ReportsList() {
     setError(null);
 
     try {
-      const response: ApiResponse | ReportItem[] = await getHandlingReports(
-        activeTab,
-        null,
-        1,
-        50
-      );
+     const apiStatus =
+  activeTab === "approved" ? "resolved" : activeTab;
+
+const response = await getHandlingReports(apiStatus, null, 1, 50);
 
       setReports(Array.isArray(response) ? response : response.items || []);
     } catch (err: any) {
@@ -123,7 +117,7 @@ export function ReportsList() {
       <Card className="overflow-hidden border border-[var(--border)] bg-[var(--card)] shadow-sm transition-colors duration-300">
         <Table>
           <TableHeader>
-            <TableRow className="bg-[var(--card)] border-b border-[var(--border)] hover:bg-[var(--muted)]/10 transition-colors">
+            <TableRow className="bg-[var(--card)] border-b">
               <TableHead className="py-4 px-6">Loại</TableHead>
               <TableHead className="py-4 px-6">Lý do</TableHead>
               <TableHead className="py-4 px-6">Chi tiết</TableHead>
@@ -136,7 +130,7 @@ export function ReportsList() {
             {data.map((report) => (
               <TableRow
                 key={report.id}
-                className="border-b border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/20 transition-colors"
+                className="border-b hover:bg-[var(--muted)]/20 transition-colors"
               >
                 <TableCell className="py-4 px-6">
                   <Badge className="uppercase bg-blue-50 text-blue-700 border-blue-200">
@@ -160,7 +154,7 @@ export function ReportsList() {
                     className={cn(
                       report.status === "pending" &&
                         "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
-                      report.status === "resolved" &&
+                      report.status === "approved" &&
                         "bg-green-100 text-green-800 hover:bg-green-200",
                       report.status === "rejected" &&
                         "bg-gray-100 text-gray-800 hover:bg-gray-200"
@@ -176,7 +170,7 @@ export function ReportsList() {
                       <Button
                         size="sm"
                         onClick={() => handleOpenProcess(report)}
-                        className="bg-[var(--primary)] hover:bg-[color-mix(in srgb, var(--primary) 75%, black)] text-[var(--primary-foreground)] shadow-sm px-4 rounded-lg"
+                        className="bg-[var(--primary)] hover:bg-[color-mix(in srgb, var(--primary) 75%, black)] text-white px-4 rounded-lg"
                       >
                         Xử lý
                       </Button>
@@ -235,42 +229,41 @@ export function ReportsList() {
       <Tabs value={activeTab ?? "pending"} onValueChange={(v) => setActiveTab(v as ReportStatus)}>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <TabsList className="bg-[var(--card)] border border-[var(--border)] h-12 p-1 flex items-center gap-1 rounded-lg">
-  {/* Pending */}
-  <TabsTrigger
-    value="pending"
-    className={cn(
-      "h-10 px-5 rounded-md font-medium transition-all",
-      "data-[state=active]:bg-yellow-500 data-[state=active]:text-white",
-      "data-[state=active]:shadow-md"
-    )}
-  >
-    Chờ xử lý
-  </TabsTrigger>
 
-  {/* Resolved */}
-  <TabsTrigger
-    value="resolved"
-    className={cn(
-      "h-10 px-5 rounded-md font-medium transition-all",
-      "data-[state=active]:bg-green-600 data-[state=active]:text-white",
-      "data-[state=active]:shadow-md"
-    )}
-  >
-    Đã xử phạt
-  </TabsTrigger>
+            {/* Pending */}
+            <TabsTrigger
+              value="pending"
+              className={cn(
+                "h-10 px-5 rounded-md font-medium transition-all",
+                "data-[state=active]:bg-yellow-500 data-[state=active]:text-white"
+              )}
+            >
+              Chờ xử lý
+            </TabsTrigger>
 
-  {/* Rejected */}
-  <TabsTrigger
-    value="rejected"
-    className={cn(
-      "h-10 px-5 rounded-md font-medium transition-all",
-      "data-[state=active]:bg-red-600 data-[state=active]:text-white",
-      "data-[state=active]:shadow-md"
-    )}
-  >
-    Đã từ chối
-  </TabsTrigger>
-</TabsList>
+            {/* Approved */}
+            <TabsTrigger
+              value="approved"
+              className={cn(
+                "h-10 px-5 rounded-md font-medium transition-all",
+                "data-[state=active]:bg-green-600 data-[state=active]:text-white"
+              )}
+            >
+              Đã xử phạt
+            </TabsTrigger>
+
+            {/* Rejected */}
+            <TabsTrigger
+              value="rejected"
+              className={cn(
+                "h-10 px-5 rounded-md font-medium transition-all",
+                "data-[state=active]:bg-red-600 data-[state=active]:text-white"
+              )}
+            >
+              Đã từ chối
+            </TabsTrigger>
+
+          </TabsList>
 
           <div className="relative w-full md:w-96">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
@@ -281,17 +274,12 @@ export function ReportsList() {
           </div>
         </div>
 
-        <motion.div
-          key={activeTab}
-          variants={tabContentVariants}
-          initial="hidden"
-          animate="visible"
-        >
+        <motion.div key={activeTab} variants={tabContentVariants} initial="hidden" animate="visible">
           <TabsContent value="pending">
             <ReportsTable data={reports} />
           </TabsContent>
 
-          <TabsContent value="resolved">
+          <TabsContent value="approved">
             <ReportsTable data={reports} />
           </TabsContent>
 

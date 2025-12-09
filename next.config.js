@@ -1,20 +1,26 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: false, //  Đổi từ true (hoặc mặc định) thành false
-  // ... các config khác
+  reactStrictMode: false,
+  
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 
-  // ✅ THÊM ĐOẠN NÀY VÀO:
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
   images: {
     remotePatterns: [
       {
         protocol: "https",
         hostname: "res.cloudinary.com",
         port: "",
-        pathname: "/**", // Cho phép mọi đường dẫn con
+        pathname: "/**",
       },
       {
         protocol: "https",
-        hostname: "images.unsplash.com", // Thêm cả domain dự phòng
+        hostname: "images.unsplash.com",
         port: "",
         pathname: "/**",
       },

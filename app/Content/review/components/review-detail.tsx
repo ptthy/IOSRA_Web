@@ -1,31 +1,33 @@
-// File: review/components/review-detail.tsx
-"use client"
+// File: app/Content/review/components/review-detail.tsx
+"use client";
 
+import React, { useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
   XCircle,
+  Loader2,
   AlertTriangle,
-  Clock,
   BookOpen,
-  Loader2
-} from "lucide-react"
-import Image from "next/image"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Card } from "@/components/ui/card"
-import { motion } from "framer-motion"
-import { useState } from "react"
-import { ApprovalModal } from "../../moderation/components/approval-modal"
-import { RejectModal } from "../../moderation/components/reject-modal"
-import { toast } from "sonner"; // ✅ SỬA 1: Import toast
-import { postModerationDecision } from "@/services/moderationApi"
+  Clock,
+  User,
+  Info,
+  FileText,
+  Tag
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
+import { postModerationDecision } from "@/services/moderationApi";
+import { ApprovalModal } from "@/app/Content/moderation/components/approval-modal";
+import { RejectModal } from "@/app/Content/moderation/components/reject-modal";
 
-// (Interface StoryFromAPI giữ nguyên)
-interface StoryFromAPI {
+// Định nghĩa Interface
+export interface StoryFromAPI {
   reviewId: string;
   storyId: string;
-  authorId: string;
   title: string;
   description: string;
   authorUsername: string;
@@ -33,32 +35,84 @@ interface StoryFromAPI {
   aiScore: number;
   aiResult: "flagged" | "rejected" | "approved";
   status: "pending" | "published" | "rejected";
+  outline: string;
+  lengthPlan: string;
   submittedAt: string;
-  tags: {
-    tagId: string;
-    tagName: string;
-  }[];
+  pendingNote: string | null;
+  tags: { tagId: string; tagName: string }[];
 }
 
-interface ReviewDetailPageProps {
-  content: StoryFromAPI 
-  onBack: () => void
-}
+export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBack: () => void }) {
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-// (Interface HistoryItem giữ nguyên)
-interface HistoryItem {
-  date: string;
-  action: string;
-  story: string;
-  moderator: string;
-}
+  // 1. Xử lý Duyệt (Approve) - Có Validate
+  const handleApprove = async (reason: string) => {
+    // ✅ VALIDATE: StoryRejectedByAi
+    if (content.aiResult === 'rejected') {
+        const confirmAi = confirm(
+            "CẢNH BÁO QUAN TRỌNG: AI đã từ chối truyện này vì vi phạm nội dung.\n" +
+            "Hành động duyệt này có thể gây rủi ro.\n\n" +
+            "Bạn vẫn muốn DUYỆT?"
+        );
+        if (!confirmAi) return;
+    }
 
-export function ReviewDetail({ content, onBack }: ReviewDetailPageProps) {
-  const [showApprovalModal, setShowApprovalModal] = useState(false)
-  const [showRejectModal, setShowRejectModal] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+    if (!reason) {
+        toast.error("Vui lòng nhập lý do duyệt.");
+        return;
+    }
 
-  if (!content) return null
+    setIsSubmitting(true);
+    try {
+      await postModerationDecision(content.reviewId, true, reason);
+      toast.success("Đã duyệt truyện thành công!");
+      onBack();
+    } catch (error: any) {
+      // ✅ VALIDATE: ModerationAlreadyHandled & StoryNotPending
+      const code = error.response?.data?.code || error.code;
+
+      if (code === "ModerationAlreadyHandled") {
+          toast.error("Lỗi: Truyện này đã được xử lý bởi người khác.");
+          onBack(); // Refresh lại
+      } else if (code === "StoryNotPending") {
+          toast.error("Truyện không ở trạng thái chờ duyệt.");
+      } else {
+          toast.error("Có lỗi xảy ra: " + error.message);
+      }
+    } finally {
+      setIsSubmitting(false);
+      setShowApprovalModal(false);
+    }
+  };
+
+  // 2. Xử lý Từ chối (Reject) - Có Validate
+  const handleReject = async (reason: string) => {
+    if (!reason) {
+        toast.error("Vui lòng nhập lý do từ chối.");
+        return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await postModerationDecision(content.reviewId, false, reason);
+      toast.success("Đã từ chối truyện.");
+      onBack();
+    } catch (error: any) {
+      // ✅ VALIDATE: ModerationAlreadyHandled
+      const code = error.response?.data?.code || error.code;
+      if (code === "ModerationAlreadyHandled") {
+          toast.error("Lỗi: Truyện này đã được xử lý bởi người khác.");
+          onBack();
+      } else {
+          toast.error("Lỗi: " + error.message);
+      }
+    } finally {
+      setIsSubmitting(false);
+      setShowRejectModal(false);
+    }
+  };
 
   const communityStandards = [
     "Không chứa nội dung bạo lực, khiêu dâm",
@@ -66,180 +120,197 @@ export function ReviewDetail({ content, onBack }: ReviewDetailPageProps) {
     "Không spam hoặc quảng cáo",
     "Ngôn ngữ phù hợp với mọi lứa tuổi",
     "Tôn trọng văn hóa và tôn giáo",
-  ]
-  const reviewHistory: HistoryItem[] = [
-    // ... (dữ liệu tĩnh)
-  ]
-
-  // ✅ SỬA 2: Sửa hàm Approve để nhận LÝ DO (reason)
-  const handleApprove = async (reason: string) => {
-    if (!reason) {
-      toast.error("Vui lòng cung cấp lý do phê duyệt."); // Dùng toast
-      return;
-    }
-    
-    setIsSubmitting(true);
-    try {
-      await postModerationDecision(content.reviewId, true, reason);
-      toast.success("Phê duyệt truyện thành công!"); // Dùng toast
-      setShowApprovalModal(false);
-      onBack();
-    } catch (err: any) {
-      toast.error(`Lỗi khi phê duyệt: ${err.message}`); // Dùng toast
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  // ✅ SỬA 3: Sửa hàm Reject để dùng TOAST
-  const handleReject = async (reason: string) => {
-    if (!reason) {
-      toast.error("Vui lòng cung cấp lý do từ chối."); // Dùng toast
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      await postModerationDecision(content.reviewId, false, reason);
-      toast.success("Từ chối truyện thành công!"); // Dùng toast
-      setShowRejectModal(false);
-      onBack();
-    } catch (err: any) {
-      toast.error(`Lỗi khi từ chối: ${err.message}`); // Dùng toast
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
+  ];
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-      {/* Header (giữ nguyên) */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-[var(--card)] border border-[var(--border)] rounded-xl mx-6 mt-6 p-6 sticky top-6 z-10"
-      >
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] mb-4"
-        >
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] pb-10">
+  {/* ⭐ FIX STICKY CHUẨN — header nằm riêng 1 layer */}
+      <div className="sticky top-0 z-50 bg-[var(--card)] border-b border-[var(--border)] px-6 py-4 shadow-md">
+        <button onClick={onBack} className="flex items-center gap-2 mb-2">
           <ArrowLeft className="w-5 h-5" />
           Quay lại danh sách
         </button>
+
         <h1 className="text-2xl font-semibold">Kiểm Duyệt Truyện</h1>
         <p className="text-[var(--muted-foreground)]">
-          Đọc và đánh giá nội dung truyện theo tiêu chuẩn cộng đồng
+          Đánh giá nội dung truyện và thông tin liên quan
         </p>
-      </motion.div>
+      </div>
 
-      {/* Alert (giữ nguyên) */}
+      {/* 2. Alert Info */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
         className="max-w-7xl mx-auto px-8 pt-6"
       >
-        <div className="p-4 rounded-xl bg-[color-mix(in_srgb,_var(--accent)_8%,_var(--card)_92%)] border flex gap-3">
-          <AlertTriangle className="w-5 h-5" />
+        <div className="p-4 rounded-xl bg-[color-mix(in_srgb,_var(--accent)_8%,_var(--card)_92%)] border border-[var(--accent)]/20 flex gap-3 text-[var(--foreground)]">
+          <AlertTriangle className="w-5 h-5 text-yellow-600" />
           <p className="text-sm">
-            Truyện này đang chờ kiểm duyệt. Vui lòng đọc kỹ nội dung và đưa ra quyết định.
+            Truyện này đang chờ kiểm duyệt. Vui lòng kiểm tra kỹ đại cương, bìa và các tag.
           </p>
         </div>
       </motion.div>
 
+      {/* 3. Main Content Grid */}
       <div className="p-8 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* --- CỘT TRÁI (2/3) --- */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Card thông tin truyện (giữ nguyên) */}
-            <Card className="p-6">
-              <div className="flex gap-6 mb-6">
-                <Image
-                  src={content.coverUrl || "https://images.unsplash.com/photo-1618173541177-883d32758e86?w=300&h=400&fit=crop"}
-                  alt={content.title}
-                  width={150}
-                  height={220}
-                  className="rounded-xl object-cover"
-                />
-                <div className="flex-1">
-                  <div className="flex justify-between mb-3">
-                    <h2 className="text-xl font-semibold">{content.title}</h2>
-                    <Badge>{content.status}</Badge>
-                  </div>
-                  <div className="text-[var(--muted-foreground)] space-y-2">
-                    <p>
-                      Tác giả: <span className="text-[var(--primary)]">{content.authorUsername}</span>
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <Clock className="w-4 h-4" /> Gửi lên: {new Date(content.submittedAt).toLocaleString('vi-VN')}
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4" /> AI: {content.aiResult} ({(content.aiScore * 100).toFixed(0)}%)
-                    </p>
-                  </div>
-                </div>
-              </div>
+            {/* Card 1: Thông tin tổng quan (Ảnh bìa + Chi tiết) */}
+            <Card className="p-6 border-l-4 border-l-[var(--primary)]">
+                <div className="flex flex-col md:flex-row gap-6">
+                    {/* Ảnh bìa */}
+                    <div className="shrink-0">
+                        <img 
+                            src={content.coverUrl} 
+                            alt="Cover" 
+                            className="w-32 h-48 object-cover rounded-lg shadow-md border border-[var(--border)]"
+                        />
+                    </div>
+                    
+                    {/* Thông tin */}
+                    <div className="flex-1 space-y-4">
+                        <div>
+                            <div className="flex justify-between items-start">
+                                <h2 className="text-xl font-bold text-[var(--foreground)] leading-tight">{content.title}</h2>
+                                <Badge 
+                                    variant="outline" 
+                                    className={
+                                        content.aiResult === "approved" ? "bg-green-100 text-green-800 border-green-200" : 
+                                        content.aiResult === "rejected" ? "bg-red-100 text-red-800 border-red-200" : 
+                                        "bg-yellow-100 text-yellow-800 border-yellow-200"
+                                    }
+                                >
+                                    {content.aiResult === "rejected" && <AlertTriangle className="w-3 h-3 mr-1" />}
+                                    AI: {content.aiResult.toUpperCase()} ({content.aiScore})
+                                </Badge>
+                            </div>
+                            <div className="mt-2 text-sm text-[var(--muted-foreground)] space-y-1">
+                                <p className="flex items-center gap-2"><User className="w-4 h-4"/> Tác giả: <span className="font-medium text-[var(--foreground)]">{content.authorUsername}</span></p>
+                                <p className="flex items-center gap-2"><Clock className="w-4 h-4"/> Gửi lúc: {new Date(content.submittedAt).toLocaleString('vi-VN')}</p>
+                                <p className="flex items-center gap-2"><Info className="w-4 h-4"/> Kế hoạch: <Badge variant="secondary" className="text-xs">{content.lengthPlan}</Badge></p>
+                            </div>
+                        </div>
 
-              <div className="pt-6 border-t">
-                <h4 className="mb-3 font-medium">Mô tả truyện</h4>
-                <p className="text-[var(--muted-foreground)] whitespace-pre-line">
-                  {content.description}
-                </p>
-              </div>
+                        <div className="bg-[var(--muted)]/50 p-3 rounded-lg border border-[var(--border)]">
+                            <h4 className="text-xs font-semibold text-[var(--muted-foreground)] uppercase mb-1">Mô tả ngắn</h4>
+                            <p className="text-sm text-[var(--foreground)] leading-relaxed line-clamp-3 hover:line-clamp-none transition-all">
+                                {content.description}
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </Card>
 
-            {/* Card nội dung chương (giữ nguyên) */}
-            {/* <Card className="p-6">
-              <h3 className="mb-4 text-lg font-semibold">Chương 1: Khởi đầu (TODO)</h3>
-              <div className="space-y-4 text-[var(--muted-foreground)]">
-                <p>(Nội dung chương 1 sẽ được tải ở đây...)</p>
-              </div>
-            </Card> */}
-            
-            {/* Card quyết định (giữ nguyên) */}
+            {/* Card 2: Đại cương (Outline) */}
+            <Card className="p-6 min-h-[300px]">
+                <CardHeader className="px-0 pt-0 border-b border-[var(--border)] pb-4 mb-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <BookOpen className="w-5 h-5 text-blue-500" />
+                       Nội dung truyện (Outline)
+                    </h3>
+                </CardHeader>
+                <CardContent className="px-0">
+                    <div className="prose dark:prose-invert max-w-none text-[var(--foreground)] whitespace-pre-line leading-relaxed">
+                        {content.outline}
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Card 3: Quyết định (Lặp lại ở dưới cùng để tiện thao tác) */}
             <Card className="p-6">
               <h3 className="mb-4 font-semibold">Quyết định kiểm duyệt</h3>
               <div className="grid grid-cols-2 gap-4">
-                <Button onClick={() => setShowApprovalModal(true)} disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />} 
+                <Button 
+                  onClick={() => setShowApprovalModal(true)} 
+                  disabled={isSubmitting} 
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5 mr-2" />} 
                   Phê duyệt
                 </Button>
-                <Button variant="outline" onClick={() => setShowRejectModal(true)} disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />} 
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowRejectModal(true)} 
+                  disabled={isSubmitting}
+                  className="border-red-500 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                >
+                  {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5 mr-2" />} 
                   Từ chối
                 </Button>
               </div>
             </Card>
           </div>
 
-          {/* Cột bên phải (giữ nguyên) */}
+          {/* --- CỘT PHẢI (1/3) --- */}
           <div className="space-y-6">
+            
+            {/* Card Tiêu chuẩn */}
             <Card className="p-6">
-              <h3 className="mb-4 font-semibold">Tiêu chuẩn cộng đồng</h3>
+              <h3 className="mb-4 font-semibold flex items-center gap-2">
+                <BookOpen className="w-5 h-5" />
+                Tiêu chuẩn cộng đồng
+              </h3>
               <ul className="space-y-3">
-                {communityStandards.map((s, i) => (
-                  <li key={i} className="flex gap-3">
-                    <div className="w-2 h-2 rounded-full bg-[var(--accent)] mt-2" />
-                    <span className="text-sm">{s}</span>
+                {communityStandards.map((standard, index) => (
+                  <li key={index} className="flex gap-3">
+                    <div className="w-2 h-2 rounded-full bg-[var(--primary)] mt-2 flex-shrink-0" />
+                    <span className="text-sm text-[var(--muted-foreground)]">{standard}</span>
                   </li>
                 ))}
               </ul>
             </Card>
 
-            {/* <Card className="p-6">
-              <h3 className="mb-4 font-semibold">Lịch sử kiểm duyệt</h3>
+            {/* Card Tags */}
+            <Card className="p-6">
+                <h3 className="mb-4 font-semibold flex items-center gap-2">
+                    <Tag className="w-4 h-4"/> Thể loại 
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                    {content.tags.length > 0 ? content.tags.map(tag => (
+                        <Badge key={tag.tagId} variant="secondary" className="px-3 py-1 text-xs">
+                            {tag.tagName}
+                        </Badge>
+                    )) : <span className="text-sm text-[var(--muted-foreground)]">Không có thẻ nào</span>}
+                </div>
+            </Card>
+
            
-            </Card> */}
+
+            {/* Card Thông tin kỹ thuật */}
+            <Card className="p-6">
+              <h3 className="mb-4 font-semibold">Thông tin bổ sung</h3>
+              <div className="space-y-3 text-sm text-[var(--muted-foreground)] bg-[var(--muted)] p-4 rounded-lg">
+                <div className="flex justify-between">
+                  <span>Review ID:</span>
+                  <span className="font-mono text-xs truncate max-w-[150px]" title={content.reviewId}>{content.reviewId}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Story ID:</span>
+                  <span className="font-mono text-xs truncate max-w-[150px]" title={content.storyId}>{content.storyId}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Trạng thái:</span>
+                  <Badge variant="secondary" className="text-xs uppercase">{content.status}</Badge>
+                </div>
+              </div>
+            </Card>
+
           </div>
         </div>
       </div>
 
-      {/* ✅ SỬA 4: Cập nhật 'onConfirm' của ApprovalModal */}
+      {/* Modals */}
       <ApprovalModal 
         isOpen={showApprovalModal} 
         onClose={() => setShowApprovalModal(false)} 
-        onConfirm={handleApprove} // onConfirm bây giờ nhận (reason: string)
+        onConfirm={handleApprove}
         isSubmitting={isSubmitting}
       />
+
       <RejectModal 
         isOpen={showRejectModal} 
         onClose={() => setShowRejectModal(false)} 
@@ -247,5 +318,5 @@ export function ReviewDetail({ content, onBack }: ReviewDetailPageProps) {
         isSubmitting={isSubmitting}
       />
     </div>
-  )
+  );
 }

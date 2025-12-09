@@ -222,7 +222,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         let redirectPath = "/";
         if (primaryRole === "omod") redirectPath = "/Op/dashboard";
         else if (primaryRole === "cmod") redirectPath = "/Content/dashboard";
-        else if (primaryRole === "admin") redirectPath = "/admin/dashboard";
+        else if (primaryRole === "admin") redirectPath = "/Admin";
 
         router.push(redirectPath);
         toast.success(`Chào mừng, ${displayName}!`);

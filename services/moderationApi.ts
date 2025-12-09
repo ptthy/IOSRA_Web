@@ -160,15 +160,23 @@ export async function getRealtimeStats(): Promise<RealtimeStats> {
 export async function getModerationStories(status: 'pending' | 'published' | 'rejected') {
     try {
         const apiStatus = status.toUpperCase(); 
-        
-        const response = await apiClient.get('/api/moderation/stories', { 
-            params: { status: apiStatus }
-        });
+        const response = await apiClient.get('/api/moderation/stories', { params: { status: apiStatus } });
         return response.data;
     } catch (error: any) {
         throw new Error(error.response?.data?.message || error.message || "Lỗi khi tải danh sách truyện");
     }
 }
+
+// --- API: Chi tiết 1 truyện cần kiểm duyệt ---
+export async function getStoryDetail(reviewId: string) {
+    try {
+        const response = await apiClient.get(`/api/moderation/stories/${reviewId}`);
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || "Lỗi khi tải chi tiết truyện");
+    }
+}
+
 
 // --- API 2: Ra quyết định TRUYỆN ---
 export async function postModerationDecision(
@@ -276,22 +284,32 @@ export async function getHandlingReports(
 
 // --- API 9: Xem chi tiết 1 Report ---
 export async function getReportDetail(reportId: string): Promise<ReportItem> {
-    try {
-        const response: AxiosResponse<ReportItem> = await apiClient.get(`/api/ContentModHandling/reports/${reportId}`);
-        return response.data;
-    } catch (error: any) {
-        throw new Error(error.response?.data?.message || "Lỗi khi xem chi tiết báo cáo");
-    }
+  try {
+    const response: AxiosResponse<ReportItem> = await apiClient.get(
+      `/api/ContentModHandling/reports/${reportId}`
+    );
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Lỗi khi xem chi tiết báo cáo");
+  }
 }
 
 // --- API 10. Chốt trạng thái Report (Resolved - Phạt / Rejected - Bỏ qua) ---
-export async function updateReportStatus(reportId: string, status: 'resolved' | 'rejected') {
-    try {
-        const response = await apiClient.put(`/api/ContentModHandling/reports/${reportId}/status`, { status });
-        return response.data;
-    } catch (error: any) {
-        throw new Error(error.response?.data?.message || "Lỗi khi cập nhật trạng thái báo cáo");
-    }
+export async function updateReportStatus(
+  reportId: string,
+  status: "approved" | "rejected",
+  data?: { strike?: number; restrictedUntil?: string | null }
+) {
+  try {
+    const payload = { status, ...data };
+    const response = await apiClient.put(
+      `/api/ContentModHandling/reports/${reportId}/status`,
+      payload
+    );
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Lỗi khi cập nhật trạng thái báo cáo");
+  }
 }
 
 // --- API 11. Ẩn/Hiện Nội dung (Story, Chapter, Comment) ---
