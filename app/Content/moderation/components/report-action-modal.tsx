@@ -1,29 +1,67 @@
 // File: app/Content/moderation/components/report-action-modal.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react"; 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label"; // ✅ Import thêm
-import { Input } from "@/components/ui/input"; // ✅ Import thêm
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // ✅ Import thêm
-import { Loader2, EyeOff, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, EyeOff, CheckCircle, XCircle, AlertTriangle, BookOpen, MessageSquare, FileText, User, UserX, Eye } from "lucide-react";
 import { toast } from "sonner";
-import { updateReportStatus, updateContentStatus } from "@/services/moderationApi";
+import { 
+    updateReportStatus, 
+    updateContentStatus,
+    updateAccountStrikeStatus 
+} from "@/services/moderationApi";
 
+// ================= CẤU HÌNH R2 =================
+const R2_BASE_URL = "https://pub-15618311c0ec468282718f80c66bcc13.r2.dev";
+
+// ================= TYPES =================
+
+interface StoryDetails {
+  storyId: string;
+  title: string;
+  description: string;
+  coverUrl: string;
+  authorUsername: string;
+  status: string;
+}
+
+interface ChapterDetails {
+  chapterId: string;
+  title: string;
+  chapterNo: number;
+  priceDias: number;
+  contentPath?: string; 
+}
+
+interface CommentDetails {
+  commentId: string;
+  content: string;
+  readerUsername: string;
+  createdAt: string;
+}
 
 interface ReportItem {
-  id: string;
+  reportId: string;
   targetType: "story" | "chapter" | "comment" | string;
   targetId: string;
+  targetAccountId: string; 
   reason: string;
   details: string;
   status: "pending" | "resolved" | "rejected" | string;
+  
   reporterId: string;
-  reportedAt: string;
-  resolvedBy?: string;
-  resolvedAt?: string;
+  reporterUsername?: string;
+  
+  createdAt: string;
+  
+  story?: StoryDetails | null;
+  chapter?: ChapterDetails | null;
+  comment?: CommentDetails | null;
 }
 
 interface ReportActionModalProps {
@@ -33,93 +71,253 @@ interface ReportActionModalProps {
   onSuccess: () => void;
 }
 
-export function ReportActionModal({ report, isOpen, onClose, onSuccess }: ReportActionModalProps) {
-  const [loading, setLoading] = useState(false);
+// ================= UTILS =================
 
-  // ✅ VALIDATE: State cho việc xử lý phạt (Strike & Ban Date)
-  const [strikeLevel, setStrikeLevel] = useState<string>("0");
-  const [banDate, setBanDate] = useState<string>("");
-
-  // Kiểm tra null được thực hiện ngay ở đây, không cần 'if (!report) return null;' nữa.
-  if (!report) return null;
-
-  // 1. Xử lý: Ẩn nội dung (Hide Content)
-  const handleHideContent = async () => {
-    if (!confirm(`Bạn có chắc chắn muốn ẨN nội dung ${report.targetType} này không?`)) return;
-    setLoading(true);
-    try {
-
-      await updateContentStatus(report.targetType as 'story' | 'chapter' | 'comment', report.targetId, 'hidden');
-      toast.success(`Đã ẩn ${report.targetType} thành công!`);
-    } catch (error: any) {
-      // ✅ VALIDATE: Check lỗi TargetOwnerNotFound (nếu API trả về khi ẩn)
-      if (error.message?.includes("TargetOwnerNotFound") || error.code === "TargetOwnerNotFound") {
-        toast.error("Không tìm thấy chủ sở hữu nội dung (Có thể tài khoản đã bị xóa).");
-      } else {
-        toast.error(error.message);
-      }
-    } finally {
-      setLoading(false);
+const calculateBanDate = (level: string): string => {
+    const l = parseInt(level);
+    if (l === 0 || l === 4) return ""; 
+    const now = new Date();
+    let daysToAdd = 0;
+    switch (l) {
+        case 1: daysToAdd = 1; break; 
+        case 2: daysToAdd = 3; break; 
+        case 3: daysToAdd = 30; break; 
+        default: daysToAdd = 0;
     }
-  };
+    if (daysToAdd > 0) {
+        now.setDate(now.getDate() + daysToAdd);
+        return now.toISOString().split('T')[0];
+    }
+    return "";
+};
+
 const reasonMapping: Record<string, string> = {
   spam: "Nội dung rác",
-  negative_content: "Nội dung tiêu cực,xúc phạm",
+  negative_content: "Nội dung tiêu cực/xúc phạm",
   misinformation: "Thông tin sai lệch",
   ip_infringement: "Vi phạm bản quyền",
 };
 
-  // 2. Xử lý: Report Đúng (Resolved) -> User bị phạt Strike
-  const handleResolve = async () => {
-    // ✅ VALIDATE: Kiểm tra các trường bắt buộc cho lỗi RestrictedUntilRequired
-    if (strikeLevel !== "0" && strikeLevel !== "1" && strikeLevel !== "2" && strikeLevel !== "3") {
-       // ✅ VALIDATE: InvalidStrike
-       toast.error("Mức phạt (Strike) không hợp lệ.");
-       return;
-    }
+// ================= MAIN COMPONENT =================
 
-    // Nếu phạt nặng (Strike > 0) thường đi kèm Ban, cần check ngày
-    // (Logic này tùy thuộc vào quy định của bạn, ví dụ Strike > 0 thì cần ngày hết hạn strike)
-    if (parseInt(strikeLevel) > 0 && !banDate) {
-        // ✅ VALIDATE: RestrictedUntilRequired
-        toast.error("Vui lòng chọn thời gian kết thúc hạn chế (Restricted Until) khi đánh gậy.");
+export function ReportActionModal({ report, isOpen, onClose, onSuccess }: ReportActionModalProps) {
+  const [loading, setLoading] = useState(false);
+  const [strikeLevel, setStrikeLevel] = useState<string>("0"); 
+  const [banDate, setBanDate] = useState<string>(""); 
+  const [hideContent, setHideContent] = useState(true); 
+
+  // State cho việc đọc nội dung chương
+  const [chapterText, setChapterText] = useState<string>("");
+  const [isLoadingChapter, setIsLoadingChapter] = useState(false);
+  const [showChapterContent, setShowChapterContent] = useState(false);
+
+  // Reset state khi mở modal mới
+  useEffect(() => {
+    if (isOpen) {
+        setChapterText("");
+        setShowChapterContent(false);
+        setStrikeLevel("0");
+        setHideContent(true);
+    }
+  }, [isOpen, report]);
+
+  useEffect(() => {
+    if (strikeLevel === "0" || strikeLevel === "4") {
+        setBanDate("");
+        return;
+    }
+    const calculatedDate = calculateBanDate(strikeLevel);
+    setBanDate(calculatedDate);
+  }, [strikeLevel]);
+
+  // --- HÀM LOAD NỘI DUNG CHƯƠNG TỪ R2 ---
+  const fetchChapterContent = async () => {
+    if (!report?.chapter?.contentPath) {
+        toast.error("Không tìm thấy đường dẫn nội dung chương.");
         return;
     }
 
-    if (!confirm("Xác nhận báo cáo ĐÚNG? User vi phạm sẽ bị tính phạt.")) return;
+    setIsLoadingChapter(true);
+    setShowChapterContent(true); 
+
+    try {
+        let fileUrl = report.chapter.contentPath;
+        if (!fileUrl.startsWith("http")) {
+            const cleanPath = fileUrl.startsWith("/") ? fileUrl.slice(1) : fileUrl;
+            fileUrl = `${R2_BASE_URL}/${cleanPath}`;
+        }
+        fileUrl += `?t=${new Date().getTime()}`;
+
+        console.log("📥 Đang tải nội dung chương từ:", fileUrl);
+        
+        const response = await fetch(fileUrl);
+        if (!response.ok) throw new Error("Lỗi tải file từ server lưu trữ.");
+        
+        const text = await response.text();
+        setChapterText(text);
+
+    } catch (error: any) {
+        console.error(error);
+        setChapterText(`Không thể tải nội dung. Lỗi: ${error.message}`);
+    } finally {
+        setIsLoadingChapter(false);
+    }
+  };
+
+  if (!report) return null;
+
+  // Logic hiển thị tên người bị report
+  const reportedTargetName = 
+      report.story?.authorUsername || 
+      report.comment?.readerUsername || 
+      "User ID: " + report.targetAccountId;
+
+  // --- RENDER CONTENT PREVIEW ---
+  const renderContentPreview = () => {
+    // 1. STORY PREVIEW
+    if (report.targetType === 'story' && report.story) {
+        return (
+            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mt-2 space-y-2">
+                <div className="flex items-start gap-3">
+                    <BookOpen className="w-5 h-5 text-blue-600 mt-1 shrink-0"/>
+                    <div>
+                        <h5 className="font-bold text-slate-800 text-base">
+                            {report.story.title}
+                        </h5>
+                        <div className="text-sm text-slate-500 flex items-center gap-1">
+                            <User className="w-3 h-3"/> Tác giả: <span className="font-medium text-slate-700">{report.story.authorUsername}</span>
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-white p-3 rounded border border-slate-100 text-sm text-slate-600 italic">
+                    "{report.story.description}"
+                </div>
+            </div>
+        );
+    }
+
+    // 2. CHAPTER PREVIEW (Đã sửa lỗi hiển thị HTML)
+    if (report.targetType === 'chapter' && report.chapter) {
+        return (
+            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mt-2">
+                <div className="flex justify-between items-start mb-3">
+                    <div>
+                        <h5 className="font-bold text-slate-800 flex items-center gap-2 text-base">
+                            <FileText className="w-5 h-5 text-purple-600"/> 
+                            {report.chapter.title}
+                        </h5>
+                        
+                    </div>
+                </div>
+
+                {!showChapterContent ? (
+                    <Button 
+                        onClick={fetchChapterContent} 
+                        variant="secondary" 
+                        size="sm" 
+                        className="w-full border border-slate-300 hover:bg-slate-100"
+                    >
+                        <Eye className="w-4 h-4 mr-2"/> Xem nội dung chương này
+                    </Button>
+                ) : (
+                    <div className="mt-2">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-semibold text-slate-500 uppercase">Nội dung văn bản</span>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-6 text-xs" 
+                                onClick={() => setShowChapterContent(false)}
+                            >
+                                Thu gọn
+                            </Button>
+                        </div>
+                        <div className="bg-white p-4 rounded-md border border-slate-300 min-h-[150px] max-h-[300px] overflow-y-auto">
+                            {isLoadingChapter ? (
+                                <div className="flex flex-col items-center justify-center h-24 text-slate-400">
+                                    <Loader2 className="w-6 h-6 animate-spin mb-2"/>
+                                    <p className="text-xs">Đang tải từ R2 Storage...</p>
+                                </div>
+                            ) : (
+                                // ✅ SỬA LỖI Ở ĐÂY: Dùng dangerouslySetInnerHTML để render HTML
+                                <article className="prose prose-sm max-w-none text-slate-800 leading-relaxed">
+                                    {chapterText ? (
+                                        <div dangerouslySetInnerHTML={{ __html: chapterText }} />
+                                    ) : (
+                                        <span className="italic text-gray-400">Không có nội dung hoặc file rỗng.</span>
+                                    )}
+                                </article>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // 3. COMMENT PREVIEW
+    if (report.targetType === 'comment' && report.comment) {
+        return (
+             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mt-2">
+                 <h5 className="font-bold text-slate-800 flex items-center gap-2 mb-2 text-sm">
+                    <MessageSquare className="w-4 h-4 text-green-600"/> 
+                    Bình luận vi phạm
+                </h5>
+                <div className="bg-white p-3 rounded border border-red-100 shadow-sm bg-red-50/30">
+                    <p className="text-slate-900 font-medium">"{report.comment.content}"</p>
+                </div>
+                <div className="flex justify-between items-center mt-2 text-xs text-slate-500">
+                    <span className="flex items-center gap-1">
+                         <User className="w-3 h-3"/> Người đăng: 
+                         <span className="font-semibold text-slate-700">{report.comment.readerUsername}</span>
+                    </span>
+                    <span>{new Date(report.comment.createdAt).toLocaleString('vi-VN')}</span>
+                </div>
+            </div>
+        );
+    }
+
+    return <p className="text-sm text-gray-500 italic mt-2">Không tải được chi tiết nội dung.</p>;
+  };
+
+  // --- ACTIONS ---
+
+  const handleContentStatusChange = async (targetType: string, targetId: string) => {
+    const apiStatus = (targetType === 'comment' ? 'hidden' : 'hidden'); 
+    await updateContentStatus(targetType as 'story' | 'chapter' | 'comment', targetId, apiStatus as any);
+  };
+  
+  const handleResolve = async () => {
+    const level = parseInt(strikeLevel);
+    if (!confirm("Xác nhận báo cáo ĐÚNG?")) return;
     
     setLoading(true);
     try {
-     
-      await updateReportStatus(report.id, 'approved', {
-        strike: parseInt(strikeLevel),
-        restrictedUntil: banDate ? new Date(banDate).toISOString() : null
-      });
-      
-      toast.success("Đã xử lý: Report Đúng (User đã bị phạt)");
-      onSuccess();
-      onClose();
+        if (hideContent) {
+            await handleContentStatusChange(report.targetType, report.targetId);
+        }
+        if (level > 0 && report.targetAccountId) {
+            await updateAccountStrikeStatus(report.targetAccountId, level as 1|2|3|4);
+        }
+        await updateReportStatus(report.reportId, "resolved", {
+            strike: level,
+            restrictedUntil: banDate ? new Date(banDate + 'T23:59:59').toISOString() : null 
+        });
+        toast.success("Đã xử lý xong.");
+        onSuccess();
+        onClose();
     } catch (error: any) {
-      // ✅ VALIDATE: Bắt lỗi cụ thể từ Backend
-      const code = error.response?.data?.code || error.code;
-      if (code === "TargetOwnerNotFound") {
-        toast.error("Không thể phạt: Người dùng này không còn tồn tại.");
-      } else if (code === "RestrictedUntilRequired") {
-        toast.error("Hệ thống yêu cầu ngày kết thúc hạn chế.");
-      } else {
         toast.error(error.message || "Lỗi xử lý báo cáo.");
-      }
     } finally {
       setLoading(false);
     }
   };
 
-  // 3. Xử lý: Report Sai (Rejected) -> Không phạt
   const handleReject = async () => {
-    if (!confirm("Xác nhận báo cáo SAI/SPAM? User sẽ không bị phạt.")) return;
+    if (!confirm("Xác nhận báo cáo SAI/SPAM?")) return;
     setLoading(true);
     try {
-      await updateReportStatus(report.id, 'rejected');
+      await updateReportStatus(report.reportId, 'rejected');
       toast.success("Đã từ chối báo cáo.");
       onSuccess();
       onClose();
@@ -132,112 +330,121 @@ const reasonMapping: Record<string, string> = {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Xử lý Báo cáo vi phạm</DialogTitle>
+          <DialogTitle>Chi tiết Báo cáo Vi phạm</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Thông tin cơ bản */}
-          <div className="grid grid-cols-2 gap-4 text-sm bg-muted/50 p-3 rounded-lg border">
-            <div>
-              <span className="font-semibold text-gray-500 block">Loại nội dung:</span>
-              <Badge variant="outline" className="uppercase mt-1">{report.targetType}</Badge>
+        <div className="space-y-6 py-2">
+          {/* 1. THÔNG TIN NGƯỜI DÙNG & LÝ DO */}
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            {/* Người báo cáo */}
+            <div className="bg-blue-50/50 p-3 rounded border border-blue-100">
+                <span className="text-xs text-blue-600 font-semibold uppercase block mb-1">Tài khoản báo cáo</span>
+                <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-blue-500"/>
+                    <span className="font-medium text-slate-800">{report.reporterUsername || report.reporterId}</span>
+                </div>
+                <div className="mt-2 text-xs text-slate-500 italic border-t border-blue-100 pt-1">
+                    "{report.details || 'Không có mô tả thêm'}"
+                </div>
             </div>
-            <div>
-              <span className="font-semibold text-gray-500 block">Lý do báo cáo:</span>
-              <span className="font-medium text-red-600">
-  {reasonMapping[report.reason] || report.reason}
-</span>
-            </div>
-            <div className="col-span-2">
-              <span className="font-semibold text-gray-500 block">Chi tiết mô tả:</span>
-              <p className="bg-white p-3 rounded mt-1 text-gray-800 italic border border-gray-200">
-                "{report.details || 'Không có mô tả chi tiết'}"
-              </p>
-            </div>
-            <div className="col-span-2">
-              <span className="font-semibold text-gray-500 block">ID Nội dung (Target ID):</span>
-              <code className="text-xs bg-gray-200 px-1 rounded">{report.targetId}</code>
+
+            {/* Người bị báo cáo */}
+            <div className="bg-red-50/50 p-3 rounded border border-red-100">
+                <span className="text-xs text-red-600 font-semibold uppercase block mb-1">Tài khoản bị báo cáo </span>
+                <div className="flex items-center gap-2">
+                    <UserX className="w-4 h-4 text-red-500"/>
+                    <span className="font-medium text-slate-800 truncate" title={reportedTargetName}>
+                        {reportedTargetName}
+                    </span>
+                </div>
+                 <div className="mt-2 text-xs text-slate-500 border-t border-red-100 pt-1">
+                   Lý do: <span className="font-semibold text-red-600">{reasonMapping[report.reason] || report.reason}</span>
+                </div>
             </div>
           </div>
 
-          {/* Khu vực hành động với Nội dung */}
+          {/* 2. CHI TIẾT NỘI DUNG (STORY / CHAPTER / COMMENT) */}
           <div className="border-t pt-4">
-            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              Hành động với nội dung:
-            </h4>
-            <div className="flex gap-3">
-              <Button variant="destructive" size="sm" onClick={handleHideContent} disabled={loading}>
-                <EyeOff className="w-4 h-4 mr-2" />
-                Ẩn nội dung này
-              </Button>
-              {/* Bạn có thể thêm nút "Hiện lại" (Publish/Visible) nếu cần */}
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              *Lưu ý: Ẩn nội dung sẽ khiến người dùng không thấy nó nữa, nhưng chưa tính điểm phạt (Strike) cho tác giả.
-            </p>
+               <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                   <EyeOff className="w-4 h-4"/> Nội dung Bị báo cáo
+               </h4>
+               {renderContentPreview()}
           </div>
 
-          {/* ✅ VALIDATE: UI Form Xử lý User (Phạt) */}
-          <div className="border-t pt-4 space-y-3">
-            <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-orange-500"/> Xử lý Người dùng (Phạt)
+          {/* 3. FORM XỬ LÝ (ACTION) */}
+          <div className="bg-slate-100 p-4 rounded-lg border border-slate-200">
+            <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-orange-600"/> Quyết định Xử phạt
             </h4>
             
+            <div className="flex items-center space-x-2 mb-4 bg-white p-2 rounded border border-slate-200">
+                <input 
+                  type="checkbox"
+                  id="hide-content"
+                  checked={hideContent}
+                  onChange={(e) => setHideContent(e.target.checked)}
+                  className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
+                  disabled={loading}
+                />
+                <Label htmlFor="hide-content" className="text-sm font-medium cursor-pointer">
+                  Ẩn/Gỡ nội dung này khỏi hệ thống
+                </Label>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label>Mức độ vi phạm (Strike)</Label>
+                <div className="space-y-1">
+                    <Label className="text-xs font-semibold uppercase text-slate-500">Mức phạt (Strike)</Label>
                     <Select value={strikeLevel} onValueChange={setStrikeLevel} disabled={loading}>
-                        <SelectTrigger>
+                        <SelectTrigger className="bg-white">
                             <SelectValue placeholder="Chọn mức phạt" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="0">Nhắc nhở (0 Strike)</SelectItem>
-                            <SelectItem value="1">Cảnh cáo (1 Strike)</SelectItem>
-                            <SelectItem value="2">Vi phạm (2 Strike)</SelectItem>
-                            <SelectItem value="3">Nghiêm trọng (3 Strike)</SelectItem>
+                            <SelectItem value="0">Không Strike (Chỉ cảnh cáo/ẩn)</SelectItem>
+                            <SelectItem value="1">Level 1 (Hạn chế 1 ngày)</SelectItem>
+                            <SelectItem value="2">Level 2 (Hạn chế 3 ngày)</SelectItem>
+                            <SelectItem value="3">Level 3 (Hạn chế 30 ngày)</SelectItem>
+                            <SelectItem value="4">Level 4 (Cấm Vĩnh viễn)</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
-                <div className="space-y-2">
-                    <Label>Hạn chế đến ngày (Restricted Until)</Label>
+                <div className="space-y-1">
+                    <Label className="text-xs font-semibold uppercase text-slate-500">Hạn chế đến ngày</Label>
                     <Input 
                         type="date" 
                         value={banDate} 
                         onChange={(e) => setBanDate(e.target.value)}
-                        disabled={loading || strikeLevel === "0"} // Strike 0 thì không cần cấm
+                        disabled={loading || strikeLevel === "0" || strikeLevel === "4"}
+                        className="bg-white"
                     />
                 </div>
             </div>
-            <p className="text-xs text-gray-500">
-              *Mức 1-3 yêu cầu chọn ngày kết thúc hạn chế để tránh lỗi <code>RestrictedUntilRequired</code>.
-            </p>
           </div>
         </div>
 
-        <DialogFooter className="sm:justify-between border-t pt-4">
+        <DialogFooter className="sm:justify-between border-t pt-4 bg-slate-50 -mx-6 -mb-6 px-6 py-4 mt-2">
           <Button variant="ghost" onClick={onClose} disabled={loading}>
             Đóng
           </Button>
           <div className="flex gap-2">
             <Button
               variant="outline"
-              className="border-red-200 text-red-600 hover:bg-red-50"
+              className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300"
               onClick={handleReject}
               disabled={loading}
             >
               <XCircle className="w-4 h-4 mr-2" />
-              Report Sai (Bỏ qua)
+              Báo cáo Sai
             </Button>
             <Button
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-green-600 hover:bg-green-700 text-white shadow-sm"
               onClick={handleResolve}
               disabled={loading}
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
-              Report Đúng (Phạt)
+              Báo cáo đúng
             </Button>
           </div>
         </DialogFooter>

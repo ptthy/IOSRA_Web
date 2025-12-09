@@ -2,18 +2,27 @@
 
 import apiClient from "@/services/apiClient"; 
 import { AxiosResponse } from 'axios';
+
 // Giao diện chung cho các API liên quan đến Report
-interface ReportItem {
-    id: string; 
-    targetType: "story" | "chapter" | "comment" | string; 
+export interface ReportItem { // Export ra để Component dùng lại
+    reportId: string; // ✅ Đổi id -> reportId
+    targetType: "story" | "chapter" | "comment" | string;
     targetId: string;
+    targetAccountId: string;
     reason: string;
     details: string;
-    status: "pending" | "resolved" | "rejected" | string; 
+    status: "pending" | "resolved" | "rejected" | string;
     reporterId: string;
-    reportedAt: string;
-    resolvedBy?: string; 
-    resolvedAt?: string;
+    createdAt: string; // ✅ Đổi reportedAt -> createdAt
+    
+    // Các trường optional
+    story?: any;
+    chapter?: any;
+    comment?: any;
+    reporterUsername?: string;
+    moderatorId?: string | null;
+    moderatorUsername?: string | null;
+    reviewedAt?: string | null;
 }
 
 interface ApiResponse<T> {
@@ -220,7 +229,7 @@ export async function approveComment(commentId: string) {
         const response = await apiClient.post(`/api/moderation/comments/${commentId}/approve`);
         return response.data;
     } catch (error: any) {
-         throw new Error(error.response?.data?.message || "Lỗi khi xử lý bình luận");
+            throw new Error(error.response?.data?.message || "Lỗi khi xử lý bình luận");
     }
 }
 
@@ -230,7 +239,7 @@ export async function removeComment(commentId: string) {
         const response = await apiClient.post(`/api/moderation/comments/${commentId}/remove`);
         return response.data;
     } catch (error: any) {
-         throw new Error(error.response?.data?.message || "Lỗi khi xử lý bình luận");
+            throw new Error(error.response?.data?.message || "Lỗi khi xử lý bình luận");
     }
 }
 
@@ -265,11 +274,11 @@ export async function postChapterDecision(
 
 // --- API 8: Lấy danh sách Report ---
 export async function getHandlingReports(
-    status: 'pending' | 'resolved' | 'rejected' | null,
-    targetType: 'story' | 'chapter' | 'comment' | null,
+    status: string | null, // ✅ Cho phép string chung chung để dễ gọi từ UI
+    targetType: string | null,
     page: number,
     pageSize: number
-): Promise<ApiResponse<ReportItem>> { 
+): Promise<ApiResponse<ReportItem>> {
     try {
         const params: any = { page, pageSize };
         if (status) params.status = status;
@@ -297,10 +306,15 @@ export async function getReportDetail(reportId: string): Promise<ReportItem> {
 // --- API 10. Chốt trạng thái Report (Resolved - Phạt / Rejected - Bỏ qua) ---
 export async function updateReportStatus(
   reportId: string,
-  status: "approved" | "rejected",
-  data?: { strike?: number; restrictedUntil?: string | null }
+  // 🔴 SỬA: Cho phép cả "resolved" để khớp với logic mới của bạn
+  status: "pending" | "rejected" | "resolved", 
+  data?: { strike?: number; restrictedUntil?: string | null } 
 ) {
   try {
+    // Nếu Backend thực sự chỉ nhận "approved" hoặc "rejected", bạn cần map lại ở đây
+    // Ví dụ: const backendStatus = status === "resolved" ? "approved" : status;
+    // Nhưng nếu Backend đã đổi sang dùng "resolved", hãy gửi thẳng "resolved"
+    
     const payload = { status, ...data };
     const response = await apiClient.put(
       `/api/ContentModHandling/reports/${reportId}/status`,
@@ -316,21 +330,52 @@ export async function updateReportStatus(
 export async function updateContentStatus(
     targetType: 'story' | 'chapter' | 'comment',
     targetId: string,
-    status: 'hidden' | 'published' | 'visible' // Comment dùng 'visible', story/chapter dùng 'published'
+    status: 'hidden' | 'published' | 'visible' | 'completed' // Bổ sung 'completed' cho Story
 ) {
     try {
         let endpoint = '';
+        // Story: hidden/published/completed
         if (targetType === 'story') endpoint = `/api/ContentModHandling/stories/${targetId}`;
+        // Chapter: hidden/published
         else if (targetType === 'chapter') endpoint = `/api/ContentModHandling/chapters/${targetId}`;
+        // Comment: visible/hidden
         else if (targetType === 'comment') endpoint = `/api/ContentModHandling/comments/${targetId}`;
         else throw new Error("Loại nội dung không hợp lệ");
 
-        const response = await apiClient.put(endpoint, { status });
+        // Comment dùng 'visible' | 'hidden'
+        // Story/Chapter dùng 'published' | 'hidden' | 'completed'
+        const apiStatus = (targetType === 'comment' && status === 'published') ? 'visible' : status;
+
+        const response = await apiClient.put(endpoint, { status: apiStatus });
         return response.data;
     } catch (error: any) {
         throw new Error(error.response?.data?.message || "Lỗi khi thay đổi trạng thái nội dung");
     }
 }
+
+// --- API 12. Cập nhật trạng thái Strike cho Account ---
+export async function updateAccountStrikeStatus(
+    accountId: string,
+    level: 1 | 2 | 3 | 4 // Chỉ cho phép các mức strike hợp lệ 1-4
+) {
+    try {
+        if (level < 1 || level > 4) {
+            throw new Error("Mức strike không hợp lệ. Phải là 1, 2, 3, hoặc 4.");
+        }
+        
+        const payload = { level };
+        const response = await apiClient.put(
+            `/api/ContentModHandling/accounts/${accountId}/strike-status`,
+            payload
+        );
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || "Lỗi khi áp dụng Strike cho tài khoản");
+    }
+}
+
+
+// --- APIs khác giữ nguyên ---
 export async function getChapterContent(reviewId: string) {
     try {
         // Gọi đúng endpoint như trong hướng dẫn trên UI của bạn
@@ -341,6 +386,7 @@ export async function getChapterContent(reviewId: string) {
         throw new Error(error.response?.data?.message || "Lỗi khi tải nội dung chương");
     }
 }
+
 export async function downloadChapterText(contentPath: string): Promise<string> {
     try {
         let fullUrl = contentPath;
