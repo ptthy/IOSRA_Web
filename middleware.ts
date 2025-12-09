@@ -21,7 +21,7 @@ export function middleware(request: NextRequest) {
           // Redirect về trang author overview
           const url = request.nextUrl.clone();
           url.pathname = "/author/overview";
-          return NextResponse.redirect(url);
+          //return NextResponse.redirect(url);
         }
       } catch (error) {
         // Nếu parse cookie lỗi, bỏ qua và cho phép truy cập

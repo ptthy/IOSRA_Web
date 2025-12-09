@@ -765,8 +765,7 @@ export default function AuthorUpgradePage() {
 
               <CardFooter className="pt-2 relative z-10">
                 <Button
-                  // ĐỔI onClick THÀNH CÁI NÀY
-                  //  onClick={() => router.push("/author/overview")}
+                  onClick={() => router.push("/author/overview")}
                   className="w-full h-11"
                 >
                   <BookOpen className="mr-2 h-4 w-4" />

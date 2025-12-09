@@ -86,35 +86,50 @@ export const storyService = {
         formData.append("CoverPrompt", data.coverPrompt);
       }
 
+      //     const response = await apiClient.post<Story>(
+      //       "/api/AuthorStory",
+      //       formData,
+      //       {
+      //         timeout: 300000, // 5 phút
+      //       }
+      //     );
+
+      //     console.log("Tạo truyện thành công:", response.data);
+      //     return response.data;
+      //   } catch (error: any) {
+      //     console.error("Error creating story:", error);
+
+      //     if (error.response?.status === 403) {
+      //       throw new Error(
+      //         error.response?.data?.message || "Bạn không có quyền tạo truyện mới"
+      //       );
+      //     }
+      //     if (error.response?.status === 400) {
+      //       throw new Error(
+      //         error.response?.data?.message || "Dữ liệu không hợp lệ."
+      //       );
+      //     }
+      //     if (error.response?.status === 401) {
+      //       throw new Error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+      //     }
+      //     throw new Error(
+      //       error.response?.data?.message || "Có lỗi xảy ra khi tạo truyện."
+      //     );
+      //   }
+      // },
       const response = await apiClient.post<Story>(
         "/api/AuthorStory",
         formData,
-        {
-          timeout: 300000, // 5 phút
-        }
+        { timeout: 300000 }
       );
 
-      console.log("Tạo truyện thành công:", response.data);
       return response.data;
     } catch (error: any) {
       console.error("Error creating story:", error);
 
-      if (error.response?.status === 403) {
-        throw new Error(
-          error.response?.data?.message || "Bạn không có quyền tạo truyện mới"
-        );
-      }
-      if (error.response?.status === 400) {
-        throw new Error(
-          error.response?.data?.message || "Dữ liệu không hợp lệ."
-        );
-      }
-      if (error.response?.status === 401) {
-        throw new Error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
-      }
-      throw new Error(
-        error.response?.data?.message || "Có lỗi xảy ra khi tạo truyện."
-      );
+      //  QUAN TRỌNG: Không throw new Error("string") nữa!
+      //ném nguyên cục error ra để component đọc được response.data
+      throw error;
     }
   },
 

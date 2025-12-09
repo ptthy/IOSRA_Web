@@ -155,8 +155,8 @@ export function ChatBotWidget() {
   };
   // --- 3. ĐIỀU KIỆN ẨN CHATBOT (AUTH PAGE + ROLE) ---
 
-  // A. Check Role (omod, cmod)
-  const hiddenRoles = ["omod", "cmod"];
+  // A. Check Role (omod, cmod, admin)
+  const hiddenRoles = ["omod", "cmod", "admin"];
   const isHiddenRole = user?.roles?.some((role: string) =>
     hiddenRoles.includes(role)
   );
