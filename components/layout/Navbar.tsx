@@ -14,6 +14,7 @@ import {
   Gem,
   Gift,
   Loader2,
+  PenLine,
 } from "lucide-react";
 import { toast } from "sonner";
 import { subscriptionService } from "@/services/subscriptionService";
@@ -31,7 +32,8 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/context/AuthContext";
 import { profileService } from "@/services/profileService";
 import { TopUpModal } from "@/components/payment/TopUpModal";
-
+import { NotificationDropdown } from "@/components/notification/NotificationDropdown";
+import { NotificationTicker } from "@/components/notification/NotificationTicker";
 export function Navbar() {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
@@ -42,7 +44,7 @@ export function Navbar() {
   // --- STATE VÍ & MODAL ---
   const [diaBalance, setDiaBalance] = useState(0);
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
-
+  const [serverAvatar, setServerAvatar] = useState<string | null>(null);
   // --- STATE NHẬN QUÀ ---
   const [claimInfo, setClaimInfo] = useState({
     canClaim: false,
@@ -51,7 +53,8 @@ export function Navbar() {
   const [isClaiming, setIsClaiming] = useState(false);
 
   const { user, isAuthenticated, logout } = useAuth();
-
+  const isAuthor =
+    user?.roles?.includes("author") || (user as any)?.isAuthorApproved;
   const isAuthPage =
     pathname === "/login" ||
     pathname === "/register" ||
@@ -88,6 +91,32 @@ export function Navbar() {
       console.error("Lỗi check daily claim navbar", error);
     }
   };
+  // --- THÊM HÀM LẤY PROFILE ĐỂ LẤY AVATAR ---
+  // const fetchProfileData = async () => {
+  //   try {
+  //     const res = await profileService.getProfile();
+  //     if (res.data) {
+  //       // Lấy đúng field "avatarUrl" từ JSON response
+  //       setServerAvatar(res.data.avatarUrl);
+  //     }
+  //   } catch (error) {
+  //     console.error("Lỗi lấy thông tin profile navbar", error);
+  //   }
+  // };
+  const fetchProfileData = async () => {
+    try {
+      const res = await profileService.getProfile();
+      if (res.data) {
+        setServerAvatar(res.data.avatarUrl);
+      }
+    } catch (error: any) {
+      // Nếu user (như mod) không có profile (Lỗi 404) -> Bỏ qua, không báo lỗi
+      if (error?.response?.status === 404) return;
+
+      console.warn("Lỗi khác:", error?.message);
+    }
+  };
+  // ------------------------------------------
 
   // --- EFFECT LẮNG NGHE SỰ KIỆN & LOAD DỮ LIỆU ---
   useEffect(() => {
@@ -95,6 +124,7 @@ export function Navbar() {
       if (isAuthenticated) {
         fetchWallet();
         checkClaimStatus();
+        fetchProfileData();
       }
     };
 
@@ -102,6 +132,7 @@ export function Navbar() {
     if (isAuthenticated) {
       fetchWallet();
       checkClaimStatus();
+      fetchProfileData();
     }
 
     // Đăng ký sự kiện cập nhật ví từ nơi khác (ví dụ: trang Profile)
@@ -139,7 +170,16 @@ export function Navbar() {
       setIsClaiming(false);
     }
   };
-
+  // --- HÀM MỚI: XỬ LÝ CHUYỂN HƯỚNG TÁC GIẢ ---
+  const handleAuthorClick = () => {
+    // Check quyền ngay lúc bấm, không render điều kiện gây lag
+    if (isAuthor) {
+      router.push("/author/overview");
+    } else {
+      router.push("/author-upgrade");
+    }
+    setOpen(false); // Đóng menu (dropdown/mobile) sau khi bấm
+  };
   // Ẩn Navbar ở các trang đọc truyện
   if (
     pathname &&
@@ -150,6 +190,9 @@ export function Navbar() {
 
   const toggleTheme = () => setTheme(theme === "light" ? "dark" : "light");
   const handleNavigate = (path: string) => router.push(path);
+
+  // -----------------------------
+
   const isActive = (path: string) => pathname === path;
 
   const getInitials = (name: string) => {
@@ -167,21 +210,42 @@ export function Navbar() {
     router.push("/");
   };
 
-  const renderAvatar = (size = 10) => (
-    <Avatar className={`h-${size} w-${size}`}>
-      {user?.avatar ? (
-        <AvatarImage
-          src={user.avatar}
-          alt={user?.displayName || user?.username || "User"}
-          className="h-full w-full object-cover"
-        />
-      ) : (
-        <AvatarFallback className="bg-secondary text-secondary-foreground">
-          {getInitials(user?.displayName || user?.username || "")}
-        </AvatarFallback>
-      )}
-    </Avatar>
-  );
+  // const renderAvatar = (size = 10) => (
+  //   <Avatar className={`h-${size} w-${size}`}>
+  //     {user?.avatar ? (
+  //       <AvatarImage
+  //         src={user.avatar}
+  //         alt={user?.displayName || user?.username || "User"}
+  //         className="h-full w-full object-cover"
+  //       />
+  //     ) : (
+  //       <AvatarFallback className="bg-secondary text-secondary-foreground">
+  //         {getInitials(user?.displayName || user?.username || "")}
+  //       </AvatarFallback>
+  //     )}
+  //   </Avatar>
+  // );
+  const renderAvatar = (size = 10) => {
+    // Ưu tiên lấy serverAvatar (từ API) -> sau đó mới tới user.avatar (từ Context)
+    const displayAvatar = serverAvatar || user?.avatar;
+    const displayName = user?.displayName || user?.username || "";
+
+    return (
+      <Avatar className={`h-${size} w-${size}`}>
+        {displayAvatar ? (
+          <AvatarImage
+            src={displayAvatar}
+            alt={displayName}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <AvatarFallback className="bg-secondary text-secondary-foreground">
+            {getInitials(displayName)}
+          </AvatarFallback>
+        )}
+      </Avatar>
+    );
+  };
 
   if (!mounted) return null;
 
@@ -199,7 +263,7 @@ export function Navbar() {
 
           {/* Desktop Navigation */}
           {!isAuthPage && (
-            <div className="hidden md:flex items-center gap-6">
+            <div className="hidden md:flex items-center gap-6 absolute left-1/2 -translate-x-1/2">
               <button
                 onClick={() => handleNavigate("/")}
                 className={`text-sm transition-colors ${
@@ -228,13 +292,29 @@ export function Navbar() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                Sáng tác
+                Đăng ký tác giả
+              </button>
+
+              <button
+                onClick={() => handleNavigate("/author/overview")}
+                className={`text-sm transition-colors ${
+                  isActive("/author/overview")
+                    ? "font-medium"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Góc sáng tác
               </button>
             </div>
           )}
 
           {/* Actions Right Side */}
           <div className="flex items-center gap-2">
+            {isAuthenticated && !isAuthPage && (
+              <div className="hidden xl:flex absolute right-[170px] top-1/2 -translate-y-1/2 w-[220px] justify-end">
+                <NotificationTicker />
+              </div>
+            )}
             {/* Desktop Top Up Button */}
             {isAuthenticated && !isAuthPage && (
               <Button
@@ -428,7 +508,18 @@ export function Navbar() {
                         onClick={() => handleNavigate("/author-upgrade")}
                         className="text-left py-2 text-lg"
                       >
-                        Sáng tác
+                        Đăng ký tác giả
+                      </button>
+
+                      {/* Luôn hiện nút Góc sáng tác */}
+                      <button
+                        onClick={() => {
+                          handleNavigate("/author/overview");
+                          // setOpen(false);
+                        }}
+                        className="text-left py-2 text-lg"
+                      >
+                        Góc sáng tác
                       </button>
                     </>
                   )}

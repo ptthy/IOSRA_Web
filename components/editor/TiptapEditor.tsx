@@ -243,7 +243,7 @@ export default function TiptapEditor({
           <div className="w-px h-8 bg-border mx-1" />
 
           {/* Link */}
-          <Button
+          {/* <Button
             type="button"
             variant={editor.isActive("link") ? "default" : "outline"}
             size="sm"
@@ -253,7 +253,7 @@ export default function TiptapEditor({
             className="h-8 w-8 p-0"
           >
             <LinkIcon className="h-4 w-4" />
-          </Button>
+          </Button> */}
 
           <div className="w-px h-8 bg-border mx-1" />
 

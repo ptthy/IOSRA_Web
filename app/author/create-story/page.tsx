@@ -52,7 +52,7 @@ import type { Tag, CreateStoryRequest } from "@/services/apiTypes";
 import { toast } from "sonner";
 import { ImageWithFallback } from "@/components/ui/ImageWithFallback";
 
-const LOCAL_STORAGE_KEY = "create-story-draft-v5";
+//const LOCAL_STORAGE_KEY = "create-story-draft-v5";
 
 const LENGTH_PLAN_OPTIONS = [
   { value: "super_short", label: "Siêu ngắn (từ 1-5 chương)" },
@@ -92,7 +92,34 @@ export default function CreateStoryPage() {
   const [promptLength, setPromptLength] = useState(0);
 
   const LIMITS = { TITLE: 100, OUTLINE: 3000, PROMPT: 500 };
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message, details } = error.response.data.error;
 
+      // Ưu tiên Validation (details)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          // Nối các lỗi lại thành 1 câu
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
+          return;
+        }
+      }
+
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+
+    // 2. Fallback
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
+  // -------------------
   // Load tags
   useEffect(() => {
     loadTags();
@@ -103,59 +130,65 @@ export default function CreateStoryPage() {
     try {
       const data = await storyService.getAllTags();
       setTags(data);
-    } catch (error) {
-      toast.error("Không thể tải danh sách thể loại");
+      // } catch (error) {
+      //   toast.error("Không thể tải danh sách thể loại");
+      // } finally {
+      //   setIsLoading(false);
+      // }
+    } catch (error: any) {
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Không thể tải danh sách thể loại");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Load draft
-  useEffect(() => {
-    const draft = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (draft) {
-      try {
-        const data = JSON.parse(draft);
-        setTitle(data.title || "");
-        setDescription(data.description || "");
-        setOutline(data.outline || "");
-        setLengthPlan(data.lengthPlan || "short");
-        setSelectedTagIds(data.selectedTagIds || []);
-        setCoverMode(data.coverMode || "upload");
-        setCoverPrompt(data.coverPrompt || "");
-        setHasUsedAICover(data.hasUsedAICover || false);
-        setCreatedStoryId(data.createdStoryId || null);
-      } catch (e) {
-        console.error("Error loading draft:", e);
-      }
-    }
-  }, []);
+  // // Load draft
+  // useEffect(() => {
+  //   const draft = localStorage.getItem(LOCAL_STORAGE_KEY);
+  //   if (draft) {
+  //     try {
+  //       const data = JSON.parse(draft);
+  //       setTitle(data.title || "");
+  //       setDescription(data.description || "");
+  //       setOutline(data.outline || "");
+  //       setLengthPlan(data.lengthPlan || "short");
+  //       setSelectedTagIds(data.selectedTagIds || []);
+  //       setCoverMode(data.coverMode || "upload");
+  //       setCoverPrompt(data.coverPrompt || "");
+  //       setHasUsedAICover(data.hasUsedAICover || false);
+  //       setCreatedStoryId(data.createdStoryId || null);
+  //     } catch (e) {
+  //       console.error("Error loading draft:", e);
+  //     }
+  //   }
+  // }, []);
 
-  // Save draft
-  useEffect(() => {
-    const draft = {
-      title,
-      description,
-      outline,
-      lengthPlan,
-      selectedTagIds,
-      coverMode,
-      coverPrompt,
-      hasUsedAICover,
-      createdStoryId,
-    };
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(draft));
-  }, [
-    title,
-    description,
-    outline,
-    lengthPlan,
-    selectedTagIds,
-    coverMode,
-    coverPrompt,
-    hasUsedAICover,
-    createdStoryId,
-  ]);
+  // // Save draft
+  // useEffect(() => {
+  //   const draft = {
+  //     title,
+  //     description,
+  //     outline,
+  //     lengthPlan,
+  //     selectedTagIds,
+  //     coverMode,
+  //     coverPrompt,
+  //     hasUsedAICover,
+  //     createdStoryId,
+  //   };
+  //   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(draft));
+  // }, [
+  //   title,
+  //   description,
+  //   outline,
+  //   lengthPlan,
+  //   selectedTagIds,
+  //   coverMode,
+  //   coverPrompt,
+  //   hasUsedAICover,
+  //   createdStoryId,
+  // ]);
 
   const toggleTag = (tagId: string) => {
     setSelectedTagIds((prev) =>
@@ -177,7 +210,7 @@ export default function CreateStoryPage() {
   const handleAcceptAICover = () => {
     setShowAIPreview(false);
     setHasUsedAICover(true);
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    // localStorage.removeItem(LOCAL_STORAGE_KEY);
     toast.success("Đã dùng ảnh bìa AI");
     router.push(`/author/story/${createdStoryId}/submit-ai`);
   };
@@ -201,7 +234,7 @@ export default function CreateStoryPage() {
       hasUsedAICover: true,
       createdStoryId, // giữ lại cái quan trọng nhất
     };
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newDraft));
+    // localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newDraft));
 
     toast.info("Đã từ chối ảnh AI → Vui lòng upload ảnh mới");
   };
@@ -289,7 +322,7 @@ export default function CreateStoryPage() {
         const res = await storyService.createStory(requestData);
 
         setCreatedStoryId(res.storyId);
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        //  localStorage.removeItem(LOCAL_STORAGE_KEY);
 
         if (coverMode === "generate" && res.coverUrl) {
           setGeneratedAICover(res.coverUrl);
@@ -304,34 +337,62 @@ export default function CreateStoryPage() {
       else if (createdStoryId && coverMode === "upload" && coverFile) {
         await storyService.replaceDraftCover(createdStoryId, coverFile);
 
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        //  localStorage.removeItem(LOCAL_STORAGE_KEY);
         toast.success("Cập nhật ảnh bìa thành công!");
         router.push(`/author/story/${createdStoryId}/submit-ai`);
       }
-    } catch (err: any) {
-      console.error(err);
+      // } catch (err: any) {
+      //   console.error(err);
 
-      // === XỬ LÝ LOGIC NẾU ID BỊ LỖI (NOT FOUND) ===
+      //   // === XỬ LÝ LOGIC NẾU ID BỊ LỖI (NOT FOUND) ===
+      //   if (
+      //     err.code === "STORY_NOT_FOUND" ||
+      //     err.message === "Truyện không tồn tại"
+      //   ) {
+      //     toast.error(
+      //       "Truyện cũ không tìm thấy. Hệ thống sẽ tạo truyện mới khi bạn lưu lại."
+      //     );
+
+      //     // Reset ID để lần sau bấm nút sẽ nhảy vào TRƯỜNG HỢP 1 (Tạo mới)
+      //     setCreatedStoryId(null);
+
+      //     // Cập nhật lại localStorage để xóa ID lỗi đi
+      //     const currentDraft = JSON.parse(
+      //       localStorage.getItem(LOCAL_STORAGE_KEY) || "{}"
+      //     );
+      //     delete currentDraft.createdStoryId;
+      //     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentDraft));
+      //   } else {
+      //     // Các lỗi khác thì hiển thị bình thường
+      //     toast.error(err.message || "Có lỗi xảy ra");
+      //   }
+      // } finally {
+      //   setIsSubmitting(false);
+      // }
+    } catch (error: any) {
+      // Đổi tên biến thành error cho đồng bộ
+      console.error(error);
+
+      // === GIỮ NGUYÊN LOGIC NẾU ID BỊ LỖI (NOT FOUND) ===
       if (
-        err.code === "STORY_NOT_FOUND" ||
-        err.message === "Truyện không tồn tại"
+        error.code === "STORY_NOT_FOUND" ||
+        error.message === "Truyện không tồn tại"
       ) {
         toast.error(
           "Truyện cũ không tìm thấy. Hệ thống sẽ tạo truyện mới khi bạn lưu lại."
         );
-
-        // Reset ID để lần sau bấm nút sẽ nhảy vào TRƯỜNG HỢP 1 (Tạo mới)
+        // Reset ID để lần sau bấm nút sẽ nhảy vào TRƯỜNG HỢP 1
         setCreatedStoryId(null);
 
-        // Cập nhật lại localStorage để xóa ID lỗi đi
-        const currentDraft = JSON.parse(
-          localStorage.getItem(LOCAL_STORAGE_KEY) || "{}"
-        );
-        delete currentDraft.createdStoryId;
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentDraft));
+        // // Cập nhật lại localStorage
+        // const currentDraft = JSON.parse(
+        //   localStorage.getItem(LOCAL_STORAGE_KEY) || "{}"
+        // );
+        // delete currentDraft.createdStoryId;
+        // localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentDraft));
       } else {
-        // Các lỗi khác thì hiển thị bình thường
-        toast.error(err.message || "Có lỗi xảy ra");
+        // --- DÙNG HELPER CHO CÁC LỖI KHÁC ---
+        handleApiError(error, "Có lỗi xảy ra khi tạo truyện");
       }
     } finally {
       setIsSubmitting(false);

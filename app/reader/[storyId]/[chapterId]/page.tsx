@@ -49,7 +49,7 @@ export default function ReaderPage() {
   const [content, setContent] = useState<string>("");
   const [originalContentUrl, setOriginalContentUrl] = useState<string>("");
   const [allChapters, setAllChapters] = useState<ChapterSummary[]>([]);
-  const [balance, setBalance] = useState(0); // 🔥 THÊM STATE BALANCE
+  const [balance, setBalance] = useState(0); // THÊM STATE BALANCE
 
   // --- STATE UI & SETTINGS ---
   const [loading, setLoading] = useState(true);
@@ -73,7 +73,33 @@ export default function ReaderPage() {
   const [autoPlayAfterUnlock, setAutoPlayAfterUnlock] = useState(false);
   //  THÊM STATE: Trạng thái gói cước
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+  // --- FIX LỖI SCROLL: Luôn cuộn lên đầu khi đổi chương hoặc có nội dung mới ---
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [chapterId, content]);
 
+  // --- HELPER: Xử lý lỗi API (Dùng chung) ---
+  const handleApiError = (err: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation (Details)
+    if (err.response && err.response.data && err.response.data.error) {
+      const { message, details } = err.response.data.error;
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          toast.error(details[firstKey].join(" "));
+          return;
+        }
+      }
+      // 2. Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+    // 3. Fallback
+    const fallbackMsg = err.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
   // --- 1. LOAD DATA ---
   useEffect(() => {
     const fetchData = async () => {
@@ -178,13 +204,34 @@ export default function ReaderPage() {
     }
   }, [chapterId, storyId, refreshKey]);
 
-  // 🔥 2. LOAD BALANCE KHI USER ĐÃ ĐĂNG NHẬP
+  //  2. LOAD BALANCE KHI USER ĐÃ ĐĂNG NHẬP
   useEffect(() => {
     const loadWallet = async () => {
+      //     if (user?.id) {
+      //       try {
+      //         const res = await profileService.getWallet();
+      //         if (res.data) {
+      //           setBalance(res.data.diaBalance || 0);
+      //         }
+      //       } catch (error) {
+      //         console.error("Không thể tải thông tin ví:", error);
+      //         setBalance(0);
+      //       }
+      //     } else {
+      //       setBalance(0); // Reset về 0 nếu chưa đăng nhập
+      //     }
+      //   };
+
+      //   loadWallet();
+      // }, [user?.id]); // Chạy lại khi user thay đổi
       if (user?.id) {
         try {
-          const res = await profileService.getWallet();
-          if (res.data) {
+          // SỬA: Thay res bằng data, bỏ .data
+
+          const res: any = await profileService.getWallet(); // Đổi tên thành res cho đỡ lộn
+
+          if (res && res.data) {
+            // Lấy diaBalance từ trong res.data
             setBalance(res.data.diaBalance || 0);
           }
         } catch (error) {
@@ -192,12 +239,12 @@ export default function ReaderPage() {
           setBalance(0);
         }
       } else {
-        setBalance(0); // Reset về 0 nếu chưa đăng nhập
+        setBalance(0);
       }
     };
 
     loadWallet();
-  }, [user?.id]); // Chạy lại khi user thay đổi
+  }, [user?.id]);
 
   // --- 3. AUTO PLAY SAU KHI MỞ KHÓA ---
   useEffect(() => {
@@ -285,8 +332,13 @@ export default function ReaderPage() {
         setComments((prev) => addReplyRecursive(prev));
       }
       return newComment;
-    } catch (error) {
-      console.error(error);
+      // } catch (error) {
+      //   console.error(error);
+      //   throw error;
+      // }
+    } catch (error: any) {
+      //  Gọi hàm xử lý lỗi
+      handleApiError(error, "Gửi bình luận thất bại.");
       throw error;
     }
   };
@@ -295,8 +347,14 @@ export default function ReaderPage() {
     if (!chapterId) return;
     try {
       await chapterCommentService.updateComment(chapterId, id, { content });
-    } catch (e) {
-      console.error(e);
+      // } catch (e) {
+      //   console.error(e);
+      // }
+      toast.success("Đã chỉnh sửa bình luận.");
+    } catch (e: any) {
+      //  Gọi hàm xử lý lỗi
+      handleApiError(e, "Chỉnh sửa thất bại.");
+      throw e;
     }
   };
 
@@ -304,20 +362,42 @@ export default function ReaderPage() {
     if (!chapterId) return;
     try {
       await chapterCommentService.deleteComment(chapterId, id);
-    } catch (e) {}
+      // } catch (e) {}
+      toast.success("Đã xóa bình luận.");
+    } catch (e: any) {
+      //  Gọi hàm xử lý lỗi
+      handleApiError(e, "Xóa bình luận thất bại.");
+    }
   };
 
   const handleLikeComment = async (id: string) => {
-    await chapterCommentService.likeComment(chapterId, id);
-    loadComments(1);
+    try {
+      await chapterCommentService.likeComment(chapterId, id);
+      //loadComments(1);
+      loadComments(commentsPage); // Reload lại trang hiện tại để cập nhật số like
+    } catch (e: any) {
+      handleApiError(e, "Không thể Like bình luận.");
+    }
   };
   const handleDislikeComment = async (id: string) => {
-    await chapterCommentService.dislikeComment(chapterId, id);
-    loadComments(1);
+    // await chapterCommentService.dislikeComment(chapterId, id);
+    // loadComments(1);
+    try {
+      await chapterCommentService.dislikeComment(chapterId, id);
+      loadComments(commentsPage);
+    } catch (e: any) {
+      handleApiError(e, "Không thể Dislike bình luận.");
+    }
   };
   const handleRemoveReaction = async (id: string) => {
-    await chapterCommentService.removeCommentReaction(chapterId, id);
-    loadComments(1);
+    // await chapterCommentService.removeCommentReaction(chapterId, id);
+    // loadComments(1);
+    try {
+      await chapterCommentService.removeCommentReaction(chapterId, id);
+      loadComments(commentsPage);
+    } catch (e: any) {
+      handleApiError(e, "Lỗi khi gỡ cảm xúc.");
+    }
   };
   const handleLoadMoreComments = () => loadComments(commentsPage + 1);
 
@@ -343,7 +423,7 @@ export default function ReaderPage() {
     else router.push("/");
   };
 
-  // 🔥 CALLBACK KHI MỞ KHÓA CHAPTER THÀNH CÔNG
+  //  CALLBACK KHI MỞ KHÓA CHAPTER THÀNH CÔNG
   const handleChapterUnlockSuccess = () => {
     console.log("🎯 Chapter unlocked, refreshing data...");
     setRefreshKey((prev) => prev + 1);
@@ -360,7 +440,7 @@ export default function ReaderPage() {
       ? "rgba(0, 65, 106, 0.1)"
       : "rgba(0, 65, 106, 0.08)";
 
-  // 🔥🔥🔥 LOGIC HIỂN THỊ CHÍNH THEO isOwned
+  //  LOGIC HIỂN THỊ CHÍNH THEO isOwned
   const shouldShowLockedOverlay = () => {
     if (!chapter) return false;
 
@@ -502,7 +582,7 @@ export default function ReaderPage() {
 
         <div className="w-full px-4 py-8 md:py-12">
           <TabsContent value="content" className="m-0 p-0 focus-visible:ring-0">
-            {/* 🔥🔥🔥 LOGIC HIỂN THỊ CHÍNH */}
+            {/* LOGIC HIỂN THỊ CHÍNH */}
             {shouldShowLockedOverlay() ? (
               <LockedOverlay
                 chapterId={chapterId}

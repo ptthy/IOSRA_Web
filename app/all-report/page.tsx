@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Flag, AlertCircle, Clock } from "lucide-react";
 import { ReportDetailModal } from "@/components/report/ReportDetailModal";
 import { cn } from "@/lib/utils";
-
+import { toast } from "sonner";
 // Map tiếng Việt cho giao diện list
 const REASON_MAP_SHORT: Record<string, string> = {
   spam: "Spam",
@@ -50,7 +50,34 @@ export default function AllReportPage() {
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message, details } = error.response.data.error;
 
+      // Ưu tiên Validation (details)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          // Nối các lỗi lại thành 1 câu
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
+          return;
+        }
+      }
+
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+
+    // 2. Fallback
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
+  // -------------------
   useEffect(() => {
     loadReports();
   }, []);
@@ -60,8 +87,15 @@ export default function AllReportPage() {
     try {
       const data = await reportService.getMyReports(1, 50); // Lấy 50 cái mới nhất
       setReports(data.items);
-    } catch (error) {
+      // } catch (error) {
+      //   console.error(error);
+      // } finally {
+      //   setLoading(false);
+      // }
+    } catch (error: any) {
       console.error(error);
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Không thể tải lịch sử báo cáo.");
     } finally {
       setLoading(false);
     }

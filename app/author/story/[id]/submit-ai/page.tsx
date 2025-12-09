@@ -15,7 +15,7 @@ import { Loader2, ArrowLeft, Sparkles, Info } from "lucide-react";
 import { storyService } from "@/services/storyService"; // Chỉ import service
 import type { Story } from "@/services/apiTypes"; // Import Story từ apiTypes
 import { Badge } from "@/components/ui/badge";
-
+import { toast } from "sonner";
 export default function SubmitAIPage() {
   const params = useParams();
   const router = useRouter();
@@ -24,7 +24,34 @@ export default function SubmitAIPage() {
   const [story, setStory] = useState<Story | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message, details } = error.response.data.error;
 
+      // Ưu tiên Validation (details)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          // Nối các lỗi lại thành 1 câu
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
+          return;
+        }
+      }
+
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+
+    // 2. Fallback
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
+  // -------------------
   useEffect(() => {
     loadStory();
   }, [storyId]);
@@ -35,8 +62,14 @@ export default function SubmitAIPage() {
       // Sửa: dùng getStoryDetails thay vì getStoryById
       const data = await storyService.getStoryDetails(storyId);
       setStory(data);
-    } catch (error) {
-      console.error("Error loading story:", error);
+      // } catch (error) {
+      //   console.error("Error loading story:", error);
+      // } finally {
+      //   setIsLoading(false);
+      // }
+    } catch (error: any) {
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Không thể tải thông tin truyện.");
     } finally {
       setIsLoading(false);
     }
@@ -49,9 +82,14 @@ export default function SubmitAIPage() {
       await storyService.submitStoryForReview(storyId);
       // Navigate to result page
       router.push(`/author/story/${storyId}/ai-result`);
-    } catch (error) {
-      console.error("Error submitting to AI:", error);
-      setIsSubmitting(false);
+      // } catch (error) {
+      //   console.error("Error submitting to AI:", error);
+      //   setIsSubmitting(false);
+      // }
+    } catch (error: any) {
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Gửi phân tích thất bại. Vui lòng thử lại.");
+      setIsSubmitting(false); // Tắt loading khi lỗi
     }
   };
 

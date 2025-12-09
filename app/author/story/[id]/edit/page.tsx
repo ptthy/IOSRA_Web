@@ -14,7 +14,34 @@ export default function EditStoryPage() {
 
   const [initialData, setInitialData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message, details } = error.response.data.error;
 
+      // Ưu tiên Validation (details)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          // Nối các lỗi lại thành 1 câu
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
+          return;
+        }
+      }
+
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+
+    // 2. Fallback
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
+  // -------------------
   useEffect(() => {
     const loadStory = async () => {
       try {
@@ -38,9 +65,17 @@ export default function EditStoryPage() {
           createdStoryId: storyId,
           currentCoverUrl: story.coverUrl, //  QUAN TRỌNG: Lấy URL ảnh từ API
         });
-      } catch (error) {
-        console.error("Error loading story:", error);
-        toast.error("Không tải được thông tin truyện");
+        // } catch (error) {
+        //   console.error("Error loading story:", error);
+        //   toast.error("Không tải được thông tin truyện");
+        //   router.replace(`/author/story/${storyId}`);
+        // } finally {
+        //   setIsLoading(false);
+        // }
+      } catch (error: any) {
+        // --- DÙNG HELPER ---
+        handleApiError(error, "Không tải được thông tin truyện");
+        // Giữ lại logic chuyển trang nếu lỗi
         router.replace(`/author/story/${storyId}`);
       } finally {
         setIsLoading(false);

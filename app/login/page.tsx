@@ -50,34 +50,35 @@ export default function LoginRoute() {
     } catch (err: any) {
       setIsLoading(false);
 
-      // --- XỬ LÝ LỖI DỰA TRÊN SWAGGER RESPONSE ---
       if (err.response && err.response.data && err.response.data.error) {
         const { code, message, details } = err.response.data.error;
 
-        // Case 1: Sai mật khẩu hoặc Tài khoản không tồn tại
-        if (code === "InvalidCredentials") {
-          toast.error("Mật khẩu không chính xác.");
-          return;
+        // 1. Ưu tiên xử lý Validation (details) -> Lấy lỗi đầu tiên tìm thấy
+        if (details) {
+          const firstKey = Object.keys(details)[0];
+          if (firstKey && details[firstKey].length > 0) {
+            toast.error(details[firstKey].join(" ")); // VD: "Email không đúng định dạng"
+            return;
+          }
         }
 
-        if (code === "AccountNotFound") {
-          toast.error("Tài khoản không tồn tại.");
-          return;
-        }
+        // 2. Xử lý các mã lỗi nghiệp vụ đặc thù (Giữ lại để hiển thị tiếng Việt)
+        // if (code === "InvalidCredentials") {
+        //   toast.error("Thông tin đăng nhập không chính xác.");
+        //   return;
+        // }
 
-        // Case 2: Lỗi Validation (400) - Loop qua object details
-        if (code === "VALIDATION_FAILED" && details) {
-          // details dạng: { Identifier: ["msg1"], Password: ["msg2"] }
-          Object.keys(details).forEach((key) => {
-            const messages = details[key];
-            if (Array.isArray(messages)) {
-              messages.forEach((msg) => toast.error(`${key}: ${msg}`));
-            }
-          });
-          return;
-        }
+        // if (code === "AccountNotFound") {
+        //   toast.error("Tài khoản không tồn tại.");
+        //   return;
+        // }
 
-        // Case 3: Các lỗi khác có message từ Backend
+        // if (code === "UserLocked") {
+        //   toast.error("Tài khoản đã bị khóa. Vui lòng liên hệ admin.");
+        //   return;
+        // }
+
+        // 3. Fallback: Hiển thị message từ Backend nếu không rơi vào các case trên
         if (message) {
           toast.error(message);
           return;
@@ -85,7 +86,10 @@ export default function LoginRoute() {
       }
 
       // Case 4: Lỗi không xác định (mạng, server down...)
-      toast.error("Đăng nhập thất bại. Vui lòng thử lại sau.");
+      const fallbackMsg =
+        err.response?.data?.message ||
+        "Đăng nhập thất bại. Vui lòng thử lại sau.";
+      toast.error(fallbackMsg);
       console.error("Login Error:", err);
     }
   };

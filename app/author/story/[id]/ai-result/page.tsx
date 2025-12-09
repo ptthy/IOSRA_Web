@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { storyService } from "@/services/storyService";
 import type { Story } from "@/services/apiTypes";
-
+import { toast } from "sonner";
 // --- HELPER FUNCTION ---
 const extractVietnameseFeedback = (
   feedback: string | null | undefined
@@ -41,7 +41,34 @@ export default function AIResultPage() {
 
   const [story, setStory] = useState<Story | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message, details } = error.response.data.error;
 
+      // Ưu tiên Validation (details)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          // Nối các lỗi lại thành 1 câu
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
+          return;
+        }
+      }
+
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+
+    // 2. Fallback
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
+  // -------------------
   useEffect(() => {
     loadStory();
   }, [storyId]);
@@ -51,8 +78,15 @@ export default function AIResultPage() {
     try {
       const data = await storyService.getStoryDetails(storyId);
       setStory(data);
-    } catch (error) {
+      // } catch (error) {
+      //   console.error("Error loading story:", error);
+      // } finally {
+      //   setIsLoading(false);
+      // }
+    } catch (error: any) {
       console.error("Error loading story:", error);
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Không thể tải kết quả đánh giá.");
     } finally {
       setIsLoading(false);
     }

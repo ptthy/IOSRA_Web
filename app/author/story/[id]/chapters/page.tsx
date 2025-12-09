@@ -48,7 +48,11 @@ import { chapterService } from "@/services/chapterService";
 import type { Story, Chapter } from "@/services/apiTypes";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-
+const LENGTH_PLAN_MAP: Record<string, string> = {
+  super_short: "Siêu ngắn (từ 1-5 chương)",
+  short: "Ngắn (từ 5-20 chương)",
+  novel: "Dài (trên 20 chương)",
+};
 export default function ManageChaptersPage() {
   const params = useParams();
   const router = useRouter();
@@ -58,7 +62,51 @@ export default function ManageChaptersPage() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCompleting, setIsCompleting] = useState(false);
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Log ra console để kiểm tra cấu trúc thực tế (nhấn F12 để xem)
+    console.log("🔥 handleApiError Debug:", {
+      responseData: error.response?.data,
+      status: error.response?.status,
+    });
 
+    const responseData = error.response?.data;
+
+    // 2. Check trường hợp JSON trả về có dạng: { "error": { "message": "..." } }
+    // Đây là trường hợp JSON bạn cung cấp
+    if (responseData?.error) {
+      const { message, details } = responseData.error;
+
+      // Ưu tiên hiển thị lỗi chi tiết (Validation) nếu có
+      if (details) {
+        // Lấy key đầu tiên trong object details
+        const firstKey = Object.keys(details)[0];
+        if (
+          firstKey &&
+          Array.isArray(details[firstKey]) &&
+          details[firstKey].length > 0
+        ) {
+          toast.error(details[firstKey][0]); // Lấy lỗi đầu tiên
+          return;
+        }
+      }
+
+      // Hiển thị message từ object error
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+
+    // 3. Check trường hợp JSON trả về có dạng phẳng: { "message": "..." }
+    if (responseData?.message) {
+      toast.error(responseData.message);
+      return;
+    }
+
+    // 4. Nếu không bắt được định dạng nào ở trên thì dùng Fallback
+    toast.error(defaultMessage);
+  };
+  // -------------------
   useEffect(() => {
     loadData();
   }, [storyId]);
@@ -72,9 +120,15 @@ export default function ManageChaptersPage() {
       ]);
       setStory(storyData);
       setChapters(chaptersData);
-    } catch (error) {
-      console.error("Error loading data:", error);
-      toast.error("Không thể tải thông tin");
+      // } catch (error) {
+      //   console.error("Error loading data:", error);
+      //   toast.error("Không thể tải thông tin");
+      // } finally {
+      //   setIsLoading(false);
+      // }
+    } catch (error: any) {
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Không thể tải thông tin");
     } finally {
       setIsLoading(false);
     }
@@ -127,22 +181,28 @@ export default function ManageChaptersPage() {
           router.push("/author/overview");
         }, 1000);
       }, 500);
+      // } catch (error: any) {
+      //   console.error("💥 Error in handleCompleteStory:", error);
+
+      //   // Hiển thị thông báo lỗi chi tiết
+      //   const errorMessage =
+      //     error.message || "Có lỗi xảy ra khi hoàn thành truyện";
+
+      //   // Kiểm tra nếu là lỗi thời gian chờ
+      //   if (errorMessage.includes("bạn có thể hoàn thành truyện sau")) {
+      //     toast.error(`⏳ ${errorMessage}`, {
+      //       duration: 8000, // Hiển thị lâu hơn
+      //     });
+      //   } else {
+      //     toast.error(`❌ ${errorMessage}`);
+      //   }
+
+      //   setIsCompleting(false);
+      // }
     } catch (error: any) {
-      console.error("💥 Error in handleCompleteStory:", error);
-
-      // Hiển thị thông báo lỗi chi tiết
-      const errorMessage =
-        error.message || "Có lỗi xảy ra khi hoàn thành truyện";
-
-      // Kiểm tra nếu là lỗi thời gian chờ
-      if (errorMessage.includes("bạn có thể hoàn thành truyện sau")) {
-        toast.error(`⏳ ${errorMessage}`, {
-          duration: 8000, // Hiển thị lâu hơn
-        });
-      } else {
-        toast.error(`❌ ${errorMessage}`);
-      }
-
+      console.error("Error in handleCompleteStory:", error);
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Có lỗi xảy ra khi hoàn thành truyện");
       setIsCompleting(false);
     }
   };
@@ -460,39 +520,65 @@ export default function ManageChaptersPage() {
           </div>
         </CardHeader>
 
+        {/* --- SỬA NỘI DUNG CARD CONTENT TẠI ĐÂY --- */}
         <CardContent className="space-y-4">
+          {/* 1. Cảnh báo quan trọng (Đã sửa nội dung quy định) */}
           <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-lg">
             <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm text-amber-800 dark:text-amber-300">
                 <strong>Lưu ý quan trọng:</strong> Sau khi đánh dấu hoàn thành,
-                bạn sẽ không thể cập nhật thêm nội dung cho truyện này. Hãy chắc
-                chắn rằng bạn đã hoàn tất toàn bộ tác phẩm.
+                bạn sẽ không thể cập nhật thêm nội dung cho truyện này.
               </p>
               <p className="text-sm text-amber-700 dark:text-amber-400 mt-2">
-                <strong>Quy định:</strong> Truyện phải được xuất bản ít nhất 30
-                ngày trước khi có thể đánh dấu hoàn thành.
+                <strong>Quy định:</strong> Bạn cần đảm bảo truyện đã đạt{" "}
+                <strong>đủ số lượng chương</strong> tương ứng với kế hoạch độ
+                dài đã đăng ký bên dưới.
               </p>
             </div>
           </div>
 
-          {/* Thêm thông tin về thời gian chờ nếu có */}
-          {story?.publishedAt && (
-            <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg">
-              <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm text-blue-800 dark:text-blue-300">
-                  <strong>Thời gian xuất bản:</strong> Truyện đã được xuất bản
-                  vào {new Date(story.publishedAt).toLocaleDateString("vi-VN")}
-                </p>
-                <p className="text-sm text-blue-700 dark:text-blue-400 mt-1">
-                  Bạn có thể hoàn thành truyện sau khi đủ 30 ngày kể từ ngày
-                  xuất bản.
-                </p>
-              </div>
-            </div>
-          )}
+          {/* 2. Hiển thị độ dài dự kiến & So sánh số chương hiện tại */}
+          {/* Dùng (story as any) để tránh lỗi nếu typescript chưa cập nhật type */}
+          {(story as any)?.length_plan &&
+            LENGTH_PLAN_MAP[(story as any).length_plan] && (
+              <div className="flex items-start gap-3 p-4 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900 rounded-lg">
+                <BookOpen className="h-5 w-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-purple-800 dark:text-purple-300 font-medium">
+                    Kế hoạch độ dài:{" "}
+                    {LENGTH_PLAN_MAP[(story as any).length_plan]}
+                  </p>
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-purple-700 dark:text-purple-400">
+                      Hiện có: <strong>{publishedChapters.length}</strong>{" "}
+                      chương
+                    </span>
+                    {/* Logic hiển thị đơn giản để nhắc user */}
+                    {(() => {
+                      const plan = (story as any).length_plan;
+                      const count = publishedChapters.length;
+                      let min = 0;
+                      if (plan === "super_short") min = 1;
+                      if (plan === "short") min = 5;
+                      if (plan === "novel") min = 20;
 
+                      return count >= min ? (
+                        <span className="text-green-600 font-bold flex items-center gap-1">
+                          <CheckCircle className="h-3 w-3" /> Đủ điều kiện
+                        </span>
+                      ) : (
+                        <span className="text-red-500 font-bold">
+                          Chưa đủ (Cần &ge; {min})
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
+
+          {/* Dialog xác nhận (Giữ nguyên) */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
@@ -535,10 +621,7 @@ export default function ManageChaptersPage() {
                       <li>
                         Truyện sẽ được đánh dấu là "Hoàn thành" với độc giả
                       </li>
-                      <li>
-                        Bạn sẽ được phép tạo truyện mới theo quy định của
-                        ToraNovel
-                      </li>
+                      <li>Bạn sẽ được phép tạo truyện mới</li>
                     </ul>
                   </div>
                 </AlertDialogDescription>

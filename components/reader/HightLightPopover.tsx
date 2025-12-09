@@ -27,7 +27,7 @@ export function HighlightPopover({
   position,
   onClose,
 }: HighlightPopoverProps) {
-  // 🔥 Lưu selectedText vào state để tránh bị mất khi selection clear
+  //  Lưu selectedText vào state để tránh bị mất khi selection clear
   const [savedText, setSavedText] = useState(selectedText);
   const [selectedColor, setSelectedColor] = useState(HIGHLIGHT_COLORS[0]);
   const [note, setNote] = useState("");
@@ -88,7 +88,7 @@ export function HighlightPopover({
 
     console.log("🔵 handleSave được gọi!");
 
-    // 🔥 Sử dụng savedText thay vì selectedText
+    // Sử dụng savedText thay vì selectedText
     if (!savedText || !savedText.trim()) {
       console.warn("⚠️ Không có text được chọn");
       return;
@@ -127,7 +127,7 @@ export function HighlightPopover({
     }
   };
 
-  // 🔥 Kiểm tra savedText thay vì selectedText
+  //  Kiểm tra savedText thay vì selectedText
   if (!open || !savedText) return null;
 
   // Tính toán vị trí cho popover - đảm bảo không bị overflow

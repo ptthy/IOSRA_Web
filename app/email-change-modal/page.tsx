@@ -26,7 +26,33 @@ export default function EmailChangePage() {
     null
   );
   const [imageError, setImageError] = useState(false);
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message, details } = error.response.data.error;
 
+      // Ưu tiên Validation (details)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          // Nối các lỗi lại thành 1 câu
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
+          return;
+        }
+      }
+
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+
+    // 2. Fallback
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
   const ERROR_IMG_SRC =
     "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==";
 
@@ -67,9 +93,16 @@ export default function EmailChangePage() {
         });
       }, 1000);
       setTimerInterval(timer);
-    } catch (err: any) {
-      console.error("Error sending OTP:", err);
-      toast.error(err.response?.data?.message || "Không thể gửi mã OTP.");
+      // } catch (err: any) {
+      //   console.error("Error sending OTP:", err);
+      //   toast.error(err.response?.data?.message || "Không thể gửi mã OTP.");
+      // } finally {
+      //   setIsLoading(false);
+      // }
+    } catch (error: any) {
+      console.error("Error sending OTP:", error);
+      // --- SỬ DỤNG HELPER ---
+      handleApiError(error, "Không thể gửi mã OTP.");
     } finally {
       setIsLoading(false);
     }
@@ -88,9 +121,16 @@ export default function EmailChangePage() {
       toast.success("Email đã được cập nhật thành công");
       updateUser({ email: newEmail });
       router.push("/profile");
-    } catch (err: any) {
-      console.error("Error verifying OTP:", err);
-      toast.error(err.response?.data?.message || "Mã OTP không đúng.");
+      // } catch (err: any) {
+      //   console.error("Error verifying OTP:", err);
+      //   toast.error(err.response?.data?.message || "Mã OTP không đúng.");
+      // } finally {
+      //   setIsLoading(false);
+      // }
+    } catch (error: any) {
+      console.error("Error verifying OTP:", error);
+      // --- SỬ DỤNG HELPER ---
+      handleApiError(error, "Mã OTP không đúng hoặc đã hết hạn.");
     } finally {
       setIsLoading(false);
     }

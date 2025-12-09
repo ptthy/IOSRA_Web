@@ -5,17 +5,17 @@ import apiClient from "./apiClient";
 
 // 1. Summary Types
 export interface RevenueSummary {
-  revenueBalanceVnd: number; // Số dư khả dụng
-  revenuePendingVnd: number; // Đang chờ
-  revenueWithdrawnVnd: number; // Đã rút
-  totalRevenueVnd: number; // Tổng doanh thu
+  revenueBalance: number; // Số dư khả dụng
+  revenuePending: number; // Đang chờ
+  revenueWithdrawn: number; // Đã rút
+  totalRevenue: number; // Tổng doanh thu
   rankName?: "Casual" | "Bronze" | "Gold" | "Diamond";
   rankRewardRate: number; // Tỷ lệ chia sẻ (VD: 60)
 }
 
 // 2. Transaction Types
 export interface TransactionMetadata {
-  grossVnd: number;
+  grossAmount: number;
   voiceIds?: string[];
   voiceNames?: string[];
   chapterTitle?: string;
@@ -28,7 +28,7 @@ export interface TransactionMetadata {
 export interface TransactionItem {
   transactionId: string;
   type: "purchase" | string;
-  amountVnd: number;
+  amount: number;
   purchaseLogId?: string | null;
   requestId?: string | null;
   chapterTitle?: string | null;

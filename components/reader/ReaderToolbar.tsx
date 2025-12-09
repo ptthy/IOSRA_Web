@@ -265,7 +265,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
       const errorCode = error.response?.data?.error?.code;
       const errorMessage = error.response?.data?.error?.message;
 
-      // 🔥 XỬ LÝ CÁC LOẠI LỖI
+      //  XỬ LÝ CÁC LOẠI LỖI
       switch (true) {
         case error.response?.status === 409:
           toast.success("Bạn đã sở hữu giọng đọc này!", {
@@ -346,6 +346,12 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
 
   // 3. Hàm chọn nhạc (Check VIP)
   const handleMusicSelect = (path: string) => {
+    if (path === "turn_off") {
+      setActiveMusicPath(null);
+      setIsMusicPlaying(false);
+      toast.info("Đã tắt nhạc nền");
+      return;
+    }
     if (!hasActiveSubscription) {
       toast.error("Tính năng giới hạn", {
         description: "Bạn phải mua gói Hội viên để nghe nhạc nền.",
@@ -466,7 +472,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                     const isReading = ch.chapterId === chapterId;
                     const isLocked = ch.isLocked;
                     const showOwnedBadge = ch.isOwned === true;
-                    // 🔥 FIX LOGIC: Đã mua = Không bị khóa VÀ accessType là 'dias'
+                    //  FIX LOGIC: Đã mua = Không bị khóa VÀ accessType là 'dias'
                     const isPurchased = !isLocked && ch.accessType === "dias";
                     const isOwnedState = ch.isOwned === true || isPurchased;
                     const isFree = ch.accessType === "free";
@@ -710,6 +716,13 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                   <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/30">
                     Mood: {mood?.name || "Tâm trạng"}
                   </div>
+                  <SelectItem value="turn_off">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <VolumeX className="w-3 h-3" />
+                      <span>Tắt nhạc</span>
+                    </div>
+                  </SelectItem>
+                  {/* --------------------- */}
                   {moodMusicPaths.map((path, index) => (
                     <SelectItem key={path} value={path}>
                       <div className="flex items-center justify-between w-full min-w-[140px] gap-2">

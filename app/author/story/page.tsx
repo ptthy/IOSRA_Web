@@ -17,12 +17,39 @@ import { storyService } from "@/services/storyService";
 import type { Story } from "@/services/apiTypes";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-
+import { toast } from "sonner";
 export default function ManageStoriesPage() {
   const router = useRouter();
   const [stories, setStories] = useState<Story[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message, details } = error.response.data.error;
 
+      // Ưu tiên Validation (details)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          // Nối các lỗi lại thành 1 câu
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
+          return;
+        }
+      }
+
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+
+    // 2. Fallback
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
+  // -------------------
   useEffect(() => {
     loadStories();
   }, []);
@@ -32,8 +59,14 @@ export default function ManageStoriesPage() {
     try {
       const data = await storyService.getAllStories();
       setStories(data);
-    } catch (error) {
-      console.error("Error loading stories:", error);
+      // } catch (error) {
+      //   console.error("Error loading stories:", error);
+      // } finally {
+      //   setIsLoading(false);
+      // }
+    } catch (error: any) {
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Không thể tải danh sách truyện.");
     } finally {
       setIsLoading(false);
     }

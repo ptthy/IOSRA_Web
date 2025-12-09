@@ -126,7 +126,7 @@ export const saveVoiceSettings = (settings: VoiceSettings) => {
   }
 };
 
-// 🔥 QUAN TRỌNG: Sửa lỗi hàm saveHighlight
+// QUAN TRỌNG: Sửa lỗi hàm saveHighlight
 export const saveHighlight = (highlight: Highlight) => {
   if (typeof window === "undefined") return;
 
@@ -143,7 +143,7 @@ export const saveHighlight = (highlight: Highlight) => {
   }
 };
 
-// 🔥 QUAN TRỌNG: Sửa lỗi hàm getHighlights
+//  QUAN TRỌNG: Sửa lỗi hàm getHighlights
 export const getHighlights = (chapterId: string): Highlight[] => {
   if (typeof window === "undefined") return [];
 
@@ -230,7 +230,7 @@ export const applyHighlightsToText = (
 
   return result;
 };
-// 🔥 QUAN TRỌNG: Sửa lỗi hàm deleteHighlight
+//  QUAN TRỌNG: Sửa lỗi hàm deleteHighlight
 export const deleteHighlight = (chapterId: string, highlightId: string) => {
   if (typeof window === "undefined") return;
 

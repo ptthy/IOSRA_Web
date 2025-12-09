@@ -52,7 +52,7 @@ import type { Tag, CreateStoryRequest } from "@/services/apiTypes";
 import { toast } from "sonner";
 import { ImageWithFallback } from "@/components/ui/ImageWithFallback";
 
-const LOCAL_STORAGE_KEY = "create-story-draft-v5";
+//const LOCAL_STORAGE_KEY = "create-story-draft-v5";
 
 const LENGTH_PLAN_OPTIONS = [
   { value: "super_short", label: "Siêu ngắn (từ 1-5 chương)" },
@@ -170,56 +170,57 @@ export default function CreateStoryForm({
 
       setCoverPrompt(initialData.coverPrompt || "");
       setCreatedStoryId(initialData.createdStoryId || null);
-    } else {
-      // Chỉ load draft khi không phải edit mode
-      const draft = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (draft) {
-        try {
-          const data = JSON.parse(draft);
-          setTitle(data.title || "");
-          setDescription(data.description || "");
-          setOutline(data.outline || "");
-          setLengthPlan(data.lengthPlan || "short");
-          setSelectedTagIds(data.selectedTagIds || []);
-          setCoverMode(data.coverMode || "upload");
-          setCoverPrompt(data.coverPrompt || "");
-          setHasUsedAICover(data.hasUsedAICover || false);
-          setCreatedStoryId(data.createdStoryId || null);
-        } catch (e) {
-          console.error("Error loading draft:", e);
-        }
-      }
     }
+    // else {
+    //   // Chỉ load draft khi không phải edit mode
+    //   const draft = localStorage.getItem(LOCAL_STORAGE_KEY);
+    //   if (draft) {
+    //     try {
+    //       const data = JSON.parse(draft);
+    //       setTitle(data.title || "");
+    //       setDescription(data.description || "");
+    //       setOutline(data.outline || "");
+    //       setLengthPlan(data.lengthPlan || "short");
+    //       setSelectedTagIds(data.selectedTagIds || []);
+    //       setCoverMode(data.coverMode || "upload");
+    //       setCoverPrompt(data.coverPrompt || "");
+    //       setHasUsedAICover(data.hasUsedAICover || false);
+    //       setCreatedStoryId(data.createdStoryId || null);
+    //     } catch (e) {
+    //       console.error("Error loading draft:", e);
+    //     }
+    //   }
+    // }
   }, [initialData, isEditMode]);
 
-  // Save draft (chỉ khi không phải edit mode)
-  useEffect(() => {
-    if (!isEditMode) {
-      const draft = {
-        title,
-        description,
-        outline,
-        lengthPlan,
-        selectedTagIds,
-        coverMode,
-        coverPrompt,
-        hasUsedAICover,
-        createdStoryId,
-      };
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(draft));
-    }
-  }, [
-    title,
-    description,
-    outline,
-    lengthPlan,
-    selectedTagIds,
-    coverMode,
-    coverPrompt,
-    hasUsedAICover,
-    createdStoryId,
-    isEditMode,
-  ]);
+  // // Save draft (chỉ khi không phải edit mode)
+  // useEffect(() => {
+  //   if (!isEditMode) {
+  //     const draft = {
+  //       title,
+  //       description,
+  //       outline,
+  //       lengthPlan,
+  //       selectedTagIds,
+  //       coverMode,
+  //       coverPrompt,
+  //       hasUsedAICover,
+  //       createdStoryId,
+  //     };
+  //     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(draft));
+  //   }
+  // }, [
+  //   title,
+  //   description,
+  //   outline,
+  //   lengthPlan,
+  //   selectedTagIds,
+  //   coverMode,
+  //   coverPrompt,
+  //   hasUsedAICover,
+  //   createdStoryId,
+  //   isEditMode,
+  // ]);
 
   useEffect(() => {
     setTitleLength(title.length);
@@ -280,7 +281,7 @@ export default function CreateStoryForm({
       return;
     }
 
-    // 🔥 FIX QUAN TRỌNG: Trong edit mode, không bắt buộc phải có coverFile mới
+    //  FIX QUAN TRỌNG: Trong edit mode, không bắt buộc phải có coverFile mới
     if (
       coverMode === "upload" &&
       !coverFile &&
@@ -295,7 +296,7 @@ export default function CreateStoryForm({
       return;
     }
 
-    // 🔥 KIỂM TRA THAY ĐỔI: Nếu là edit mode và không có thay đổi gì, không gọi API
+    //  KIỂM TRA THAY ĐỔI: Nếu là edit mode và không có thay đổi gì, không gọi API
     if (isEditMode && initialDataRef.current) {
       const initial = initialDataRef.current;
 
@@ -336,7 +337,7 @@ export default function CreateStoryForm({
     setIsSubmitting(true);
 
     try {
-      // 🔥 FIX LỖI 400 & LỖI TYPESCRIPT:
+      //  FIX LỖI 400 & LỖI TYPESCRIPT:
       // Trong edit mode, nếu không có coverFile mới, gửi coverFile là undefined
       // Đảm bảo kiểu dữ liệu phù hợp với CreateStoryRequest
       const finalCoverFile =
@@ -395,7 +396,7 @@ export default function CreateStoryForm({
       if (isEditMode && storyId) {
         // EDIT MODE: Update draft (chỉ gửi những field đã thay đổi)
         await storyService.updateDraft(storyId, requestData);
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        // localStorage.removeItem(LOCAL_STORAGE_KEY);
         toast.success("Cập nhật truyện thành công!");
         onSuccess?.();
       } else {
@@ -410,7 +411,7 @@ export default function CreateStoryForm({
           setHasUsedAICover(true);
           setShowAIPreview(true);
         } else {
-          localStorage.removeItem(LOCAL_STORAGE_KEY);
+          // localStorage.removeItem(LOCAL_STORAGE_KEY);
           toast.success("Tạo truyện thành công!");
           router.push(`/author/story/${result.storyId}`);
         }
@@ -426,7 +427,7 @@ export default function CreateStoryForm({
   const handleAcceptAICover = () => {
     setShowAIPreview(false);
     setHasUsedAICover(true);
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    //localStorage.removeItem(LOCAL_STORAGE_KEY);
     toast.success("Đã dùng ảnh bìa AI");
     if (createdStoryId) {
       router.push(`/author/story/${createdStoryId}`);
@@ -450,7 +451,7 @@ export default function CreateStoryForm({
       hasUsedAICover: true,
       createdStoryId,
     };
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newDraft));
+    //   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newDraft));
     toast.info("Đã từ chối ảnh AI → Vui lòng upload ảnh mới");
   };
 

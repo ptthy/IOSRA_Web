@@ -130,20 +130,54 @@ export default function SearchPage() {
       console.log("🎯 Using ADVANCE filter with params:", params);
       const result = await storyCatalogApi.getAdvancedFilter(params);
       setData(result);
+      // } catch (error: any) {
+      //   console.error("Error loading stories:", error);
+
+      //   if (error.response?.data?.error?.details) {
+      //     const errorDetails = error.response.data.error.details;
+      //     const errorMessages = Object.values(errorDetails).flat().join(", ");
+      //     setError(`Lỗi từ server: ${errorMessages}`);
+      //   } else if (error.response?.data?.error?.message) {
+      //     setError(`Lỗi từ server: ${error.response.data.error.message}`);
+      //   } else if (error.response?.status === 400) {
+      //     setError("Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại.");
+      //   } else {
+      //     setError("Không thể tải danh sách truyện. Vui lòng thử lại sau.");
+      //   }
+      // } finally {
+      //   setLoading(false);
+      // }
     } catch (error: any) {
       console.error("Error loading stories:", error);
 
-      if (error.response?.data?.error?.details) {
-        const errorDetails = error.response.data.error.details;
-        const errorMessages = Object.values(errorDetails).flat().join(", ");
-        setError(`Lỗi từ server: ${errorMessages}`);
-      } else if (error.response?.data?.error?.message) {
-        setError(`Lỗi từ server: ${error.response.data.error.message}`);
-      } else if (error.response?.status === 400) {
-        setError("Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại.");
-      } else {
-        setError("Không thể tải danh sách truyện. Vui lòng thử lại sau.");
+      // Mặc định là lỗi chung
+      let finalErrorMessage =
+        "Không thể tải danh sách truyện. Vui lòng thử lại sau.";
+
+      // --- LOGIC BÓC TÁCH LỖI ---
+      if (error.response && error.response.data && error.response.data.error) {
+        const { message, details } = error.response.data.error;
+
+        // 1. Ưu tiên Validation (Details) -> Lấy lỗi đầu tiên tìm thấy
+        if (details) {
+          const firstKey = Object.keys(details)[0];
+          if (firstKey && details[firstKey].length > 0) {
+            // Gán lỗi chi tiết vào biến để hiển thị
+            finalErrorMessage = details[firstKey].join(" ");
+          }
+        }
+        // 2. Nếu không có details thì lấy message từ Backend
+        else if (message) {
+          finalErrorMessage = message;
+        }
       }
+      // 3. Xử lý trường hợp lỗi 400 mà không có body chuẩn
+      else if (error.response?.status === 400) {
+        finalErrorMessage = "Dữ liệu tìm kiếm không hợp lệ.";
+      }
+
+      // Cập nhật vào State để hiển thị ra UI (Khung đỏ giữa màn hình)
+      setError(finalErrorMessage);
     } finally {
       setLoading(false);
     }

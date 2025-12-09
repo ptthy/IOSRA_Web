@@ -263,7 +263,34 @@ export default function AuthorChapterDetailPage() {
 
   // State theo dõi thay đổi chưa lưu
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const handleApiError = (error: any, defaultMessage: string) => {
+    // 1. Check lỗi Validation/Logic từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message, details } = error.response.data.error;
 
+      // Ưu tiên Validation (details)
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        if (firstKey && details[firstKey].length > 0) {
+          // Nối các lỗi lại thành 1 câu
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
+          return;
+        }
+      }
+
+      // Message từ Backend
+      if (message) {
+        toast.error(message);
+        return;
+      }
+    }
+
+    // 2. Fallback
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
+    toast.error(fallbackMsg);
+  };
+  // -------------------
   // Hàm xử lý thay đổi từ Tiptap Editor
   const handleEditorChange = (html: string) => {
     setEditFormData((prev) => ({ ...prev, content: html }));
@@ -303,9 +330,14 @@ export default function AuthorChapterDetailPage() {
       if (chapterData.moderatorNote) {
         setShowModeratorAlert(true);
       }
+      // } catch (error: any) {
+      //   console.error("Error reloading chapter:", error);
+      //   toast.error(error.message || "Không thể tải thông tin chương");
+      // }
     } catch (error: any) {
       console.error("Error reloading chapter:", error);
-      toast.error(error.message || "Không thể tải thông tin chương");
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Không thể tải thông tin chương");
     }
   };
   useEffect(() => {
@@ -356,9 +388,16 @@ export default function AuthorChapterDetailPage() {
         setChapterContent("");
         setIsContentReady(true);
       }
+      // } catch (error: any) {
+      //   console.error("Error loading chapter:", error);
+      //   toast.error(error.message || "Không thể tải thông tin chương");
+      // } finally {
+      //   setIsLoading(false);
+      // }
     } catch (error: any) {
       console.error("Error loading chapter:", error);
-      toast.error(error.message || "Không thể tải thông tin chương");
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Không thể tải thông tin chương");
     } finally {
       setIsLoading(false);
     }
@@ -430,24 +469,35 @@ export default function AuthorChapterDetailPage() {
 
       // RELOAD LẠI CHAPTER SAU KHI SUBMIT THÀNH CÔNG
       await reloadChapter();
+      // } catch (error: any) {
+      //   console.error("Error submitting chapter:", error);
+
+      //   // QUAN TRỌNG: RELOAD LẠI CHAPTER KHI CÓ LỖI
+      //   await reloadChapter();
+
+      //   // Hiển thị thông báo lỗi cụ thể
+      //   if (error.response?.data?.error?.code === "InvalidChapterState") {
+      //     toast.error(
+      //       "Chương không ở trạng thái có thể gửi. Chỉ chương ở trạng thái bản nháp mới được gửi."
+      //     );
+      //   } else if (error.response?.data?.error?.code === "ChapterRejectedByAi") {
+      //     toast.error(
+      //       "Chương bị từ chối bởi hệ thống kiểm duyệt tự động của ToraNovel"
+      //     );
+      //   } else {
+      //     toast.error(error.message || "Có lỗi xảy ra khi gửi chương");
+      //   }
+      // } finally {
+      //   setIsSubmitting(false);
+      // }
     } catch (error: any) {
       console.error("Error submitting chapter:", error);
 
       // QUAN TRỌNG: RELOAD LẠI CHAPTER KHI CÓ LỖI
       await reloadChapter();
 
-      // Hiển thị thông báo lỗi cụ thể
-      if (error.response?.data?.error?.code === "InvalidChapterState") {
-        toast.error(
-          "Chương không ở trạng thái có thể gửi. Chỉ chương ở trạng thái bản nháp mới được gửi."
-        );
-      } else if (error.response?.data?.error?.code === "ChapterRejectedByAi") {
-        toast.error(
-          "Chương bị từ chối bởi hệ thống kiểm duyệt tự động của ToraNovel"
-        );
-      } else {
-        toast.error(error.message || "Có lỗi xảy ra khi gửi chương");
-      }
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Có lỗi xảy ra khi gửi chương");
     } finally {
       setIsSubmitting(false);
     }
@@ -548,16 +598,26 @@ export default function AuthorChapterDetailPage() {
       setIsEditing(true);
 
       toast.success("Đã rút chương về bản nháp thành công!");
+      // } catch (err: any) {
+      //   console.error("Error withdrawing chapter:", err);
+      //   // Nếu lỗi thì mới dùng reloadChapter để cứu vớt UI
+      //   await reloadChapter();
+
+      //   if (err.response?.data?.error?.code === "WithdrawNotAllowed") {
+      //     toast.error("Chỉ có thể rút chương khi bị từ chối");
+      //   } else {
+      //     toast.error(err.message || "Không thể rút chương");
+      //   }
+      // } finally {
+      //   setIsWithdrawing(false);
+      // }
     } catch (err: any) {
       console.error("Error withdrawing chapter:", err);
       // Nếu lỗi thì mới dùng reloadChapter để cứu vớt UI
       await reloadChapter();
 
-      if (err.response?.data?.error?.code === "WithdrawNotAllowed") {
-        toast.error("Chỉ có thể rút chương khi bị từ chối");
-      } else {
-        toast.error(err.message || "Không thể rút chương");
-      }
+      // --- DÙNG HELPER ---
+      handleApiError(err, "Không thể rút chương");
     } finally {
       setIsWithdrawing(false);
     }
@@ -597,9 +657,16 @@ export default function AuthorChapterDetailPage() {
       toast.success("Cập nhật chương thành công!");
       setIsEditing(false);
       setHasUnsavedChanges(false);
+      // } catch (error: any) {
+      //   console.error("Error updating chapter:", error);
+      //   toast.error(error.message || "Có lỗi xảy ra khi cập nhật chương");
+      // } finally {
+      //   setIsSaving(false);
+      // }
     } catch (error: any) {
       console.error("Error updating chapter:", error);
-      toast.error(error.message || "Có lỗi xảy ra khi cập nhật chương");
+      // --- DÙNG HELPER ---
+      handleApiError(error, "Có lỗi xảy ra khi cập nhật chương");
     } finally {
       setIsSaving(false);
     }
@@ -915,7 +982,9 @@ export default function AuthorChapterDetailPage() {
           <div className="space-y-6">
             {/* Giá */}
             <div>
-              <p className="text-sm text-slate-400 mb-1">Giá (Dias)</p>
+              <p className="text-sm text-slate-400 mb-1">
+                Giá cho 1 chương nếu mất phí (Dias)
+              </p>
               {/* Luôn hiển thị giá trị Dias gốc từ hệ thống */}
               <p className="font-medium">{chapter.priceDias} Dias</p>
             </div>

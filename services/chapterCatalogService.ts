@@ -80,7 +80,7 @@ export const chapterCatalogApi = {
       );
       return response.data;
     } catch (error: any) {
-      // 🔥 XỬ LÝ LỖI 403 - CHAPTER BỊ KHÓA
+      //  XỬ LÝ LỖI 403 - CHAPTER BỊ KHÓA
       if (
         error.response?.status === 403 &&
         error.response?.data?.error?.code === "ChapterLocked"

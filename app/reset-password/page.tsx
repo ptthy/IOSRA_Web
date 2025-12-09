@@ -92,13 +92,47 @@ function ResetPasswordForm() {
 
       toast.success("Đặt lại mật khẩu thành công! Vui lòng đăng nhập.");
       router.push("/login");
+      // } catch (err: any) {
+      //   const errMsg =
+      //     err.response?.data?.message ||
+      //     "Đặt lại mật khẩu thất bại. Mã OTP có thể sai hoặc hết hạn.";
+      //   setError(errMsg);
+      //   toast.error(errMsg);
+      //   setIsLoading(false);
+      // }
     } catch (err: any) {
-      const errMsg =
+      setIsLoading(false);
+
+      // --- XỬ LÝ LỖI CHI TIẾT ---
+      if (err.response && err.response.data && err.response.data.error) {
+        const { message, details } = err.response.data.error;
+
+        // 1. Ưu tiên Validation (Lỗi từ details) -> Lấy lỗi đầu tiên
+        if (details) {
+          const firstKey = Object.keys(details)[0];
+          if (firstKey && details[firstKey].length > 0) {
+            const specificMsg = details[firstKey].join(" ");
+            setError(specificMsg);
+            toast.error(specificMsg);
+            return;
+          }
+        }
+
+        // 2. Message từ Backend (Nếu không có details)
+        if (message) {
+          setError(message);
+          toast.error(message);
+          return;
+        }
+      }
+
+      // 3. Fallback: Lỗi chung hoặc lỗi mạng
+      const fallbackMsg =
         err.response?.data?.message ||
         "Đặt lại mật khẩu thất bại. Mã OTP có thể sai hoặc hết hạn.";
-      setError(errMsg);
-      toast.error(errMsg);
-      setIsLoading(false);
+
+      setError(fallbackMsg);
+      toast.error(fallbackMsg);
     }
   };
 

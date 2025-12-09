@@ -18,7 +18,7 @@ export interface TranslationResponse {
 export interface CreateTranslationRequest {
   targetLanguageCode: string; // Mã ngôn ngữ muốn dịch sang (en-US, etc.)
 }
-
+const TRANSLATION_TIMEOUT = 180000;
 export const chapterTranslationApi = {
   // 1. Lấy bản dịch có sẵn
   // GET /api/ChapterTranslation/{chapterId}?languageCode=...
@@ -29,6 +29,7 @@ export const chapterTranslationApi = {
     return apiClient
       .get(`/api/ChapterTranslation/${chapterId}`, {
         params: { languageCode },
+        timeout: TRANSLATION_TIMEOUT,
       })
       .then((response) => response.data);
   },
@@ -43,7 +44,9 @@ export const chapterTranslationApi = {
       targetLanguageCode: languageCode,
     };
     return apiClient
-      .post(`/api/ChapterTranslation/${chapterId}`, body)
+      .post(`/api/ChapterTranslation/${chapterId}`, body, {
+        timeout: TRANSLATION_TIMEOUT, // <--- THÊM DÒNG NÀY
+      })
       .then((response) => response.data);
   },
 };

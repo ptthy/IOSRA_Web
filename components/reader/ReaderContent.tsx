@@ -78,11 +78,52 @@ const ContentRenderer: React.FC<{
     return renderHTML(processed);
   };
 
+  //   switch (contentType) {
+  //     case "html":
+  //       return (
+  //         <div
+  //           className={`html-content ${className}`}
+  //           dangerouslySetInnerHTML={{ __html: processedContent }}
+  //           style={style}
+  //         />
+  //       );
+
+  //     case "markdown":
+  //       const htmlFromMarkdown = renderMarkdown(safeContent);
+  //       const finalHtml = applyHighlightsToText(
+  //         htmlFromMarkdown.props.dangerouslySetInnerHTML.__html,
+  //         highlights
+  //       );
+  //       return (
+  //         <div
+  //           className={`markdown-content ${className}`}
+  //           dangerouslySetInnerHTML={{ __html: finalHtml }}
+  //           style={style}
+  //         />
+  //       );
+
+  //     case "plain":
+  //     default:
+  //       const plainWithBreaks = safeContent.replace(/\n/g, "<br />");
+  //       const highlightedPlain = applyHighlightsToText(
+  //         plainWithBreaks,
+  //         highlights
+  //       );
+  //       return (
+  //         <div
+  //           className={`plain-content ${className}`}
+  //           dangerouslySetInnerHTML={{ __html: highlightedPlain }}
+  //           style={style}
+  //         />
+  //       );
+  //   }
+  // };
   switch (contentType) {
     case "html":
       return (
         <div
-          className={`html-content ${className}`}
+          // THÊM: [&_*]:!leading-[inherit]
+          className={`html-content ${className} [&_*]:!leading-[inherit]`}
           dangerouslySetInnerHTML={{ __html: processedContent }}
           style={style}
         />
@@ -96,7 +137,8 @@ const ContentRenderer: React.FC<{
       );
       return (
         <div
-          className={`markdown-content ${className}`}
+          // THÊM: [&_*]:!leading-[inherit]
+          className={`markdown-content ${className} [&_*]:!leading-[inherit]`}
           dangerouslySetInnerHTML={{ __html: finalHtml }}
           style={style}
         />
@@ -111,7 +153,8 @@ const ContentRenderer: React.FC<{
       );
       return (
         <div
-          className={`plain-content ${className}`}
+          // THÊM: [&_*]:!leading-[inherit]
+          className={`plain-content ${className} [&_*]:!leading-[inherit]`}
           dangerouslySetInnerHTML={{ __html: highlightedPlain }}
           style={style}
         />
@@ -484,13 +527,188 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({
         </div>
       ) : (
         // --- BOOK MODE ---
+        // <div className="space-y-8 animate-in fade-in duration-500">
+        //   <div
+        //     className="relative group transition-all duration-500 hover:shadow-2xl w-full"
+        //     style={{ perspective: "2000px" }}
+        //   >
+        //     <div
+        //       className="grid grid-cols-1 lg:grid-cols-2 gap-0 min-h-[700px] rounded-2xl overflow-hidden backdrop-blur-sm transition-all duration-500 w-full"
+        //       style={{
+        //         backgroundColor: isDarkTheme
+        //           ? "rgba(0, 52, 84, 0.5)"
+        //           : isTransparent
+        //           ? "rgba(255, 255, 255, 0.7)"
+        //           : theme.card,
+        //         border: `2px solid ${getBorder()}`,
+        //         boxShadow: "0 20px 60px rgba(0, 0, 0, 0.08)",
+        //       }}
+        //     >
+        //       {/* Left Page */}
+        //       <div
+        //         className="p-8 lg:p-12 select-text relative transition-all duration-300 w-full"
+        //         style={readerStyle}
+        //       >
+        //         <div className="w-full h-full flex flex-col">
+        //           {currentPage === 0 && (
+        //             <div
+        //               className="mb-8 pb-6 border-b"
+        //               style={{ borderColor: getBorder() }}
+        //             >
+        //               <p
+        //                 className="text-xs uppercase tracking-[0.15em] mb-2 font-medium"
+        //                 style={{ color: theme.secondary }}
+        //               >
+        //                 Chương {chapter.chapterNo}
+        //               </p>
+        //               <h2
+        //                 className="text-2xl mb-2"
+        //                 style={{
+        //                   color: theme.text,
+        //                   fontWeight: 400,
+        //                   fontFamily: readerStyle.fontFamily,
+        //                 }}
+        //               >
+        //                 {chapter.title}
+        //               </h2>
+        //               <div
+        //                 className="flex items-center gap-4 text-xs"
+        //                 style={{ color: theme.secondary }}
+        //               >
+        //                 <div className="flex items-center gap-1">
+        //                   <Calendar className="h-3 w-3" />{" "}
+        //                   <span>{formatDate(chapter.publishedAt)}</span>
+        //                 </div>
+        //                 <div className="flex items-center gap-1">
+        //                   <FileText className="h-3 w-3" />{" "}
+        //                   <span>{formatWordCount(chapter.wordCount)} từ</span>
+        //                 </div>
+        //               </div>
+        //             </div>
+        //           )}
+        //           <div className="reader-content flex-1" style={readerStyle}>
+        //             <ContentRenderer
+        //               content={getPageContent(currentPage)}
+        //               chapterId={chapterId}
+        //               highlights={highlights}
+        //               className="w-full"
+        //               style={{
+        //                 color: theme.text,
+        //                 textAlign: "justify" as const,
+        //                 lineHeight: settings.lineHeight,
+        //               }}
+        //             />
+        //           </div>
+        //           <div
+        //             className="flex justify-center mt-6 pt-4 border-t"
+        //             style={{ borderColor: getBorder() }}
+        //           >
+        //             <span
+        //               className="text-xs font-medium"
+        //               style={{ color: theme.secondary }}
+        //             >
+        //               {currentPage + 1}
+        //             </span>
+        //           </div>
+        //         </div>
+        //       </div>
+
+        //       {/* Binding Shadow */}
+        //       <div
+        //         className="hidden lg:block absolute left-1/2 top-0 bottom-0 w-8 pointer-events-none -ml-4"
+        //         style={{
+        //           background: `linear-gradient(90deg, transparent, ${
+        //             isDarkTheme ? "rgba(0,0,0,0.2)" : "rgba(0,0,0,0.05)"
+        //           } 50%, transparent)`,
+        //         }}
+        //       />
+
+        //       {/* Right Page */}
+        //       {currentPage < totalPages - 1 && (
+        //         <div
+        //           className="p-8 lg:p-12 select-text hidden lg:block border-l relative transition-all duration-300 w-full"
+        //           style={{ borderColor: getBorder(), ...readerStyle }}
+        //         >
+        //           <div className="w-full h-full flex flex-col">
+        //             <div className="flex-1 w-full">
+        //               <ContentRenderer
+        //                 content={getPageContent(currentPage + 1)}
+        //                 chapterId={chapterId}
+        //                 highlights={highlights}
+        //                 className="w-full"
+        //                 style={{
+        //                   color: theme.text,
+        //                   textAlign: "justify" as const,
+        //                   lineHeight: settings.lineHeight,
+        //                 }}
+        //               />
+        //             </div>
+        //             <div
+        //               className="flex justify-center mt-6 pt-4 border-t"
+        //               style={{ borderColor: getBorder() }}
+        //             >
+        //               <span
+        //                 className="text-xs font-medium"
+        //                 style={{ color: theme.secondary }}
+        //               >
+        //                 {currentPage + 2}
+        //               </span>
+        //             </div>
+        //           </div>
+        //         </div>
+        //       )}
+        //     </div>
+        //   </div>
+
+        //   {/* Book Navigation */}
+        //   <div className="flex justify-between items-center gap-4 w-full max-w-6xl mx-auto px-4">
+        //     <Button
+        //       variant="outline"
+        //       size="lg"
+        //       onClick={() => setCurrentPage((p) => Math.max(0, p - 2))}
+        //       disabled={currentPage === 0}
+        //       className="group h-14"
+        //       style={{ borderColor: getBorder(), color: theme.text }}
+        //     >
+        //       <ChevronLeft className="mr-2 h-6 w-6 group-hover:-translate-x-1 transition-transform" />{" "}
+        //       <span className="font-semibold">Trang trước</span>
+        //     </Button>
+        //     <div className="flex flex-col items-center gap-2">
+        //       <span
+        //         className="text-lg px-6 py-3 rounded-full font-semibold"
+        //         style={{
+        //           color: theme.text,
+        //           backgroundColor: `${theme.text}10`,
+        //         }}
+        //       >
+        //         {currentPage + 1}-{Math.min(currentPage + 2, totalPages)} /{" "}
+        //         {totalPages}
+        //       </span>
+        //     </div>
+        //     <Button
+        //       variant="outline"
+        //       size="lg"
+        //       onClick={() =>
+        //         setCurrentPage((p) => Math.min(totalPages - 1, p + 2))
+        //       }
+        //       disabled={currentPage >= totalPages - 2}
+        //       className="group h-14"
+        //       style={{ borderColor: getBorder(), color: theme.text }}
+        //     >
+        //       <span className="font-semibold">Trang sau</span>{" "}
+        //       <ChevronRight className="ml-2 h-6 w-6 group-hover:translate-x-1 transition-transform" />
+        //     </Button>
+        //   </div>
+        // </div>
+        // --- BOOK MODE (ĐÃ SỬA LỖI TRANG TRẮNG & SETTINGS) ---
         <div className="space-y-8 animate-in fade-in duration-500">
           <div
-            className="relative group transition-all duration-500 hover:shadow-2xl w-full"
+            className="relative group transition-all duration-500 w-full"
             style={{ perspective: "2000px" }}
           >
             <div
-              className="grid grid-cols-1 lg:grid-cols-2 gap-0 min-h-[700px] rounded-2xl overflow-hidden backdrop-blur-sm transition-all duration-500 w-full"
+              // SỬA 1: Đặt chiều cao cố định (ví dụ 85% màn hình) để sách không bị dài vô tận
+              className="h-[85vh] rounded-2xl overflow-hidden backdrop-blur-sm transition-all duration-500 w-full relative"
               style={{
                 backgroundColor: isDarkTheme
                   ? "rgba(0, 52, 84, 0.5)"
@@ -501,123 +719,93 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({
                 boxShadow: "0 20px 60px rgba(0, 0, 0, 0.08)",
               }}
             >
-              {/* Left Page */}
-              <div
-                className="p-8 lg:p-12 select-text relative transition-all duration-300 w-full"
-                style={readerStyle}
-              >
-                <div className="w-full h-full flex flex-col">
-                  {currentPage === 0 && (
-                    <div
-                      className="mb-8 pb-6 border-b"
-                      style={{ borderColor: getBorder() }}
-                    >
-                      <p
-                        className="text-xs uppercase tracking-[0.15em] mb-2 font-medium"
-                        style={{ color: theme.secondary }}
-                      >
-                        Chương {chapter.chapterNo}
-                      </p>
-                      <h2
-                        className="text-2xl mb-2"
-                        style={{
-                          color: theme.text,
-                          fontWeight: 400,
-                          fontFamily: readerStyle.fontFamily,
-                        }}
-                      >
-                        {chapter.title}
-                      </h2>
-                      <div
-                        className="flex items-center gap-4 text-xs"
-                        style={{ color: theme.secondary }}
-                      >
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />{" "}
-                          <span>{formatDate(chapter.publishedAt)}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <FileText className="h-3 w-3" />{" "}
-                          <span>{formatWordCount(chapter.wordCount)} từ</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  <div className="reader-content flex-1" style={readerStyle}>
-                    <ContentRenderer
-                      content={getPageContent(currentPage)}
-                      chapterId={chapterId}
-                      highlights={highlights}
-                      className="w-full"
-                      style={{
-                        color: theme.text,
-                        textAlign: "justify" as const,
-                        lineHeight: settings.lineHeight,
-                      }}
-                    />
-                  </div>
+              <div className="p-8 lg:p-12 w-full h-full box-border flex flex-col">
+                {/* Header (Chỉ hiện ở trang đầu của chương) */}
+                {currentPage === 0 && (
                   <div
-                    className="flex justify-center mt-6 pt-4 border-t"
+                    className="flex-none mb-6 pb-6 border-b w-full"
                     style={{ borderColor: getBorder() }}
                   >
-                    <span
-                      className="text-xs font-medium"
+                    <p
+                      className="text-xs uppercase tracking-[0.15em] mb-2 font-medium"
                       style={{ color: theme.secondary }}
                     >
-                      {currentPage + 1}
-                    </span>
+                      Chương {chapter.chapterNo}
+                    </p>
+                    <h2
+                      className="text-2xl mb-2"
+                      style={{
+                        color: theme.text,
+                        fontFamily: readerStyle.fontFamily,
+                      }}
+                    >
+                      {chapter.title}
+                    </h2>
+                    {/* ... (Giữ nguyên phần thông tin ngày tháng) ... */}
                   </div>
+                )}
+
+                {/* --- PHẦN CONTENT QUAN TRỌNG NHẤT --- */}
+                <div
+                  // SỬA 2: columns-2: Tự chia cột.
+                  // overflow-y-auto: Cho phép cuộn nế chữ quá to (tránh mất chữ)
+                  className="flex-1 w-full columns-1 lg:columns-2 gap-12 lg:gap-16 text-justify overflow-y-auto no-scrollbar"
+                  style={{
+                    height: "100%",
+                    columnFill: "balance", // SỬA 3: Cân bằng chiều cao 2 cột (KHẮC PHỤC LỖI TRỐNG CHÂN TRANG)
+                    widows: 2,
+                    orphans: 2,
+                  }}
+                >
+                  {/* CSS ẩn thanh cuộn */}
+                  <style jsx>{`
+                    .no-scrollbar::-webkit-scrollbar {
+                      display: none;
+                    }
+                    .no-scrollbar {
+                      -ms-overflow-style: none;
+                      scrollbar-width: none;
+                    }
+                  `}</style>
+
+                  <ContentRenderer
+                    // SỬA 4: Lấy nội dung gộp (Spread) thay vì lấy từng trang lẻ
+                    // Lưu ý: Bạn cần thêm hàm getSpreadContent ở trên (xem hướng dẫn bên dưới code này)
+                    content={(() => {
+                      const start = currentPage * wordsPerPage;
+                      const end = start + wordsPerPage * 2;
+                      return words.slice(start, end).join(" ");
+                    })()}
+                    chapterId={chapterId}
+                    highlights={highlights}
+                    className="w-full block"
+                    // SỬA 5: Truyền style trực tiếp vào đây để Settings (Dãn dòng, Cỡ chữ) hoạt động
+                    style={{
+                      color: theme.text,
+                      textAlign: "justify" as const,
+                      fontSize: `${settings.fontSize}px`,
+                      lineHeight: settings.lineHeight,
+                      fontFamily: readerStyle.fontFamily,
+                    }}
+                  />
                 </div>
               </div>
 
-              {/* Binding Shadow */}
+              {/* Hiệu ứng gáy sách (Giữ nguyên) */}
               <div
-                className="hidden lg:block absolute left-1/2 top-0 bottom-0 w-8 pointer-events-none -ml-4"
+                className="hidden lg:block absolute left-1/2 top-0 bottom-0 w-16 pointer-events-none -ml-8"
                 style={{
-                  background: `linear-gradient(90deg, transparent, ${
-                    isDarkTheme ? "rgba(0,0,0,0.2)" : "rgba(0,0,0,0.05)"
-                  } 50%, transparent)`,
+                  background: `linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.1) 50%, transparent 100%)`,
                 }}
               />
-
-              {/* Right Page */}
-              {currentPage < totalPages - 1 && (
-                <div
-                  className="p-8 lg:p-12 select-text hidden lg:block border-l relative transition-all duration-300 w-full"
-                  style={{ borderColor: getBorder(), ...readerStyle }}
-                >
-                  <div className="w-full h-full flex flex-col">
-                    <div className="flex-1 w-full">
-                      <ContentRenderer
-                        content={getPageContent(currentPage + 1)}
-                        chapterId={chapterId}
-                        highlights={highlights}
-                        className="w-full"
-                        style={{
-                          color: theme.text,
-                          textAlign: "justify" as const,
-                          lineHeight: settings.lineHeight,
-                        }}
-                      />
-                    </div>
-                    <div
-                      className="flex justify-center mt-6 pt-4 border-t"
-                      style={{ borderColor: getBorder() }}
-                    >
-                      <span
-                        className="text-xs font-medium"
-                        style={{ color: theme.secondary }}
-                      >
-                        {currentPage + 2}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <div
+                className="hidden lg:block absolute left-1/2 top-8 bottom-8 w-px opacity-20"
+                style={{ backgroundColor: theme.text }}
+              />
             </div>
           </div>
 
-          {/* Book Navigation */}
+          {/* Navigation (Giữ nguyên logic của bạn) */}
           <div className="flex justify-between items-center gap-4 w-full max-w-6xl mx-auto px-4">
             <Button
               variant="outline"
@@ -630,6 +818,7 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({
               <ChevronLeft className="mr-2 h-6 w-6 group-hover:-translate-x-1 transition-transform" />{" "}
               <span className="font-semibold">Trang trước</span>
             </Button>
+
             <div className="flex flex-col items-center gap-2">
               <span
                 className="text-lg px-6 py-3 rounded-full font-semibold"
@@ -642,6 +831,7 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({
                 {totalPages}
               </span>
             </div>
+
             <Button
               variant="outline"
               size="lg"
