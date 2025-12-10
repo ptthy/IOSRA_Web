@@ -34,7 +34,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { Navbar } from "@/components/layout/Navbar";
 import { Textarea } from "@/components/ui/textarea";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 // Định nghĩa các trạng thái của GIAO DIỆN
 type UpgradeStatus = "default" | "pending" | "rejected" | "approved";
 
@@ -114,6 +114,17 @@ const STATUS_DISPLAY_CONFIG: {
 };
 
 export default function AuthorUpgradePage() {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const message = searchParams.get("message");
+    if (message) {
+      toast.error(message);
+      // Xóa message khỏi URL sau khi hiển thị
+      window.history.replaceState({}, "", "/author-upgrade");
+    }
+  }, [searchParams]);
+
   //  KHAI BÁO STATE
   // ---------------------------------
   const { user, isLoading: isAuthLoading } = useAuth(); // Lấy trạng thái auth
@@ -127,6 +138,9 @@ export default function AuthorUpgradePage() {
 
   // State loading cho lần tải trang ĐẦU TIÊN
   const [isLoadingPage, setIsLoadingPage] = useState(false);
+
+  // Thêm flag để tránh fetch lại khi đã fetch xong
+  const [hasFetched, setHasFetched] = useState(false);
 
   const [typedCommitment, setTypedCommitment] = useState("");
 
@@ -220,70 +234,59 @@ export default function AuthorUpgradePage() {
 
   /**
    * Hàm fetch trạng thái từ API, được bọc trong useCallback
+   * @param force - Nếu true, sẽ fetch lại ngay cả khi đã fetch rồi
    */
-  const fetchUpgradeStatus = useCallback(async () => {
-    setIsLoadingPage(true);
-    try {
-      const response = await authorUpgradeService.getMyRequests();
+  const fetchUpgradeStatus = useCallback(
+    async (force: boolean = false) => {
+      // Nếu đã fetch rồi và không force, không fetch lại
+      if (hasFetched && !force) return;
 
-      // API trả về mảng, chúng ta lấy request mới nhất (giả sử là vị trí 0)
-      const latestRequest = response.data[0];
+      setIsLoadingPage(true);
+      try {
+        const response = await authorUpgradeService.getMyRequests();
 
-      if (!latestRequest) {
-        // ---- TRƯỜNG HỢP 1: CHƯA GỬI ----
-        // API trả về mảng rỗng, nghĩa là chưa gửi bao giờ
-        setUpgradeRequest({ status: "default" });
-      } else {
-        // ---- TRƯỜNG HỢP 2: ĐÃ GỬI (có 1 trong 3 trạng thái) ----
-        // 1. Bóc tách lý do từ 'content' bằng hàm helper
-        const reason = parseRejectionReason(latestRequest.content);
+        // API trả về mảng, chúng ta lấy request mới nhất (giả sử là vị trí 0)
+        const latestRequest = response.data[0];
 
-        setUpgradeRequest({
-          status: mapApiStatusToLocal(latestRequest.status),
-          // 2. Dùng 'createdAt' thay vì 'updatedAt'
-          submittedDate: formatDate(latestRequest.createdAt),
-          // 3. Sử dụng lý do vừa bóc tách
-          rejectionReason: reason || undefined,
-        });
-        if (mapApiStatusToLocal(latestRequest.status) === "approved") {
-          updateUser({ role: "author" });
+        if (!latestRequest) {
+          setUpgradeRequest({ status: "default" });
+        } else {
+          const reason = parseRejectionReason(latestRequest.content);
+          const mappedStatus = mapApiStatusToLocal(latestRequest.status);
+
+          setUpgradeRequest({
+            status: mappedStatus,
+            submittedDate: formatDate(latestRequest.createdAt),
+            rejectionReason: reason || undefined,
+          });
         }
+
+        setHasFetched(true); // Đánh dấu đã fetch
+      } catch (error) {
+        const axiosError = error as AxiosError;
+        if (axiosError.response?.status === 404) {
+          setUpgradeRequest({ status: "default" });
+          setHasFetched(true); // Vẫn đánh dấu đã fetch
+        } else {
+          handleApiError(error, "Không thể tải trạng thái yêu cầu.");
+        }
+      } finally {
+        setIsLoadingPage(false);
       }
-    } catch (error) {
-      const axiosError = error as AxiosError;
-      // Nếu lỗi là 404 (Not Found) cũng có nghĩa là chưa gửi
-      if (axiosError.response?.status === 404) {
-        setUpgradeRequest({ status: "default" });
-        // } else {
-        //   // Lỗi mạng hoặc lỗi server khác
-        //   console.error("Lỗi fetch trạng thái:", error);
-        //   toast.error("Không thể tải trạng thái yêu cầu. Vui lòng thử lại.");
-        // }
-      } else {
-        // --- DÙNG HELPER ---
-        handleApiError(error, "Không thể tải trạng thái yêu cầu.");
-      }
-    } finally {
-      setIsLoadingPage(false);
-    }
-  }, []); // Không có dependency, hàm này ổn định
+    },
+    [hasFetched, handleApiError]
+  ); // Thêm hasFetched vào dependency
 
   /**
    * useEffect: Chạy khi component mount VÀ khi auth đã sẵn sàng
    */
   useEffect(() => {
-    // Chỉ fetch khi auth đã load xong (không còn loading)
-    if (!isAuthLoading) {
-      if (user) {
-        // Nếu user đã login, fetch trạng thái của họ
-        fetchUpgradeStatus();
-      } else {
-        // Nếu không có user, không cần fetch, nhưng vẫn phải dừng loading
-        // (Trang này có thể cho người chưa login xem form)
-        setIsLoadingPage(false);
-      }
+    if (!isAuthLoading && user && !hasFetched) {
+      fetchUpgradeStatus();
+    } else if (!isAuthLoading && !user) {
+      setIsLoadingPage(false);
     }
-  }, [isAuthLoading, user, fetchUpgradeStatus]); // Chạy lại khi auth thay đổi
+  }, [isAuthLoading, user?.id, hasFetched, fetchUpgradeStatus]); // Chỉ phụ thuộc vào user.id
 
   /**
    * Xử lý gửi yêu cầu (khi bấm nút ở form 'default')
@@ -302,7 +305,8 @@ export default function AuthorUpgradePage() {
       });
 
       toast.success("Yêu cầu của bạn đã được gửi thành công!");
-      await fetchUpgradeStatus();
+      // Force fetch lại để lấy trạng thái mới (pending)
+      await fetchUpgradeStatus(true);
     } catch (error) {
       const axiosError = error as AxiosError;
 

@@ -10,6 +10,7 @@ const apiClient = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true, // THÊM DÒNG NÀY để gửi/nhận cookies
 });
 
 // Flag để tránh infinite loop khi refresh token
@@ -28,6 +29,27 @@ const processQueue = (error: any, token: string | null = null) => {
     }
   });
   failedQueue = [];
+};
+
+// Hàm chung để refresh token
+export const refreshToken = async (): Promise<string> => {
+  const refreshResponse = await axios.post(
+    `${API_BASE_URL}/api/Auth/refresh`,
+    {},
+    {
+      withCredentials: true, //send cookie
+    }
+  );
+
+  const newToken =
+    refreshResponse.data?.token || refreshResponse.data?.data?.token;
+
+  if (!newToken) {
+    throw new Error("Không nhận được token mới từ refresh API");
+  }
+
+  localStorage.setItem("authToken", newToken);
+  return newToken;
 };
 
 // Request interceptor
@@ -144,37 +166,18 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // Gọi API refresh token
-        const refreshResponse = await axios.post(
-          `${API_BASE_URL}/api/Auth/refresh`,
-          {},
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-            },
-          }
-        );
+        const newToken = await refreshToken();
 
-        const newToken =
-          refreshResponse.data?.token || refreshResponse.data?.data?.token;
-
-        if (newToken) {
-          // Lưu token mới
-          localStorage.setItem("authToken", newToken);
-
-          // Cập nhật header cho request ban đầu
-          if (originalRequest.headers) {
-            originalRequest.headers.Authorization = `Bearer ${newToken}`;
-          }
-
-          // Xử lý queue và retry request ban đầu
-          processQueue(null, newToken);
-          isRefreshing = false;
-
-          return apiClient(originalRequest);
-        } else {
-          throw new Error("Không nhận được token mới từ refresh API");
+        // Cập nhật header cho request ban đầu
+        if (originalRequest.headers) {
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
         }
+
+        // Xử lý queue và retry request ban đầu
+        processQueue(null, newToken);
+        isRefreshing = false;
+
+        return apiClient(originalRequest);
       } catch (refreshError: any) {
         // Refresh token cũng hết hạn hoặc lỗi -> gọi logout
         isRefreshing = false;
@@ -206,55 +209,174 @@ apiClient.interceptors.response.use(
       }
     }
 
-    // Xử lý lỗi 403
-    if (error.response?.status === 403) {
-      const responseData = error.response?.data as any;
-      const errorCode = responseData?.error?.code;
-      const errorMessage = responseData?.error?.message?.toLowerCase();
-
-      //  PHÂN BIỆT CÁC LOẠI 403:
-
-      // 1. 403 ChapterLocked -> KHÔNG đá ra login, để component xử lý
-      if (errorCode === "ChapterLocked") {
-        console.log("🎯 Chapter bị khóa - giữ nguyên trên trang reader");
-        return Promise.reject(error); // Giữ nguyên lỗi để component xử lý
-      }
-      //  2. 403 SubscriptionRequired -> KHÔNG đá ra login
-      else if (errorCode === "SubscriptionRequired") {
-        console.log("🎯 Cần gói Premium - giữ nguyên trên trang");
+    // Xử lý lỗi 403 - THỬ REFRESH TOKEN TRƯỚC
+    if (
+      error.response?.status === 403 &&
+      originalRequest &&
+      !originalRequest._retry
+    ) {
+      // Chỉ refresh ở client-side
+      if (typeof window === "undefined") {
         return Promise.reject(error);
       }
-      // 3.  403 AccountRestricted (Bị cấm đăng/tương tác) -> KHÔNG đá ra login
-      else if (errorCode === "AccountRestricted") {
-        console.log("🎯 Tài khoản bị hạn chế - giữ nguyên để hiện thông báo");
-        return Promise.reject(error); // Trả lỗi về để component hiện thông báo thời gian bị ban
+
+      // Kiểm tra có token trong localStorage không
+      const currentToken = localStorage.getItem("authToken");
+      if (!currentToken) {
+        // Không có token -> xử lý 403 như bình thường
+        return handle403Error(error);
       }
-      // 2. 403 do không có quyền author
-      else if (
-        errorMessage?.includes("author") ||
-        errorMessage?.includes("tác giả") ||
-        errorCode?.includes("Author")
+
+      // Kiểm tra các error code đặc biệt - KHÔNG refresh cho các case này
+      const responseData = error.response?.data as any;
+      const errorCode = responseData?.error?.code;
+
+      // Các error code đặc biệt không cần refresh (do không phải lỗi token)
+      if (
+        errorCode === "ChapterLocked" ||
+        errorCode === "SubscriptionRequired" ||
+        errorCode === "AccountRestricted"
       ) {
-        if (
-          typeof window !== "undefined" &&
-          !window.location.pathname.includes("author-upgrade")
-        ) {
-          window.location.href = "/author-upgrade";
-        }
+        return Promise.reject(error);
       }
-      // 3. 403 khác (token invalid, etc.) -> đá ra trang home
-      else {
-        if (typeof window !== "undefined") {
-          // Xóa token và thông tin người dùng khỏi localStorage
-          localStorage.removeItem("authToken");
-          localStorage.removeItem("authUser");
-          window.location.href = "/";
-        }
+
+      // Tránh refresh nhiều lần đồng thời
+      if (isRefreshing) {
+        // Nếu đang refresh, đợi và retry request sau khi refresh xong
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            if (originalRequest.headers) {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+            }
+            return apiClient(originalRequest);
+          })
+          .catch((err) => {
+            // Nếu retry vẫn 403, xử lý như 403 bình thường
+            if (err.response?.status === 403) {
+              return handle403Error(err);
+            }
+            return Promise.reject(err);
+          });
       }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        // Thử refresh token
+        const newToken = await refreshToken();
+
+        // Cập nhật header cho request ban đầu
+        if (originalRequest.headers) {
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        }
+
+        // Xử lý queue
+        processQueue(null, newToken);
+        isRefreshing = false;
+
+        // Retry request ban đầu
+        const retryResponse = await apiClient(originalRequest);
+
+        // Nếu retry thành công, trả về response
+        return retryResponse;
+      } catch (refreshError: any) {
+        // Refresh thất bại hoặc retry vẫn 403 -> xử lý 403 như bình thường
+        isRefreshing = false;
+        processQueue(refreshError, null);
+
+        // Nếu retry vẫn 403, xử lý như 403 bình thường
+        if (refreshError.response?.status === 403) {
+          return handle403Error(refreshError);
+        }
+
+        // Nếu refresh token hết hạn -> logout
+        if (refreshError.response?.status === 401) {
+          try {
+            await axios.post(
+              `${API_BASE_URL}/api/Auth/logout`,
+              {},
+              {
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+                },
+              }
+            );
+          } catch (logoutError) {
+            console.error("Lỗi khi gọi logout:", logoutError);
+          }
+
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("authToken");
+            localStorage.removeItem("authUser");
+            window.location.href = "/login";
+          }
+        }
+
+        return Promise.reject(refreshError);
+      }
+    }
+
+    // Nếu đã retry rồi mà vẫn 403, xử lý như 403 bình thường
+    if (error.response?.status === 403) {
+      return handle403Error(error);
     }
 
     return Promise.reject(error);
   }
 );
+
+// Hàm xử lý 403 sau khi đã thử refresh
+const handle403Error = (error: AxiosError) => {
+  const responseData = error.response?.data as any;
+  const errorCode = responseData?.error?.code;
+  const errorMessage = responseData?.error?.message?.toLowerCase();
+
+  // PHÂN BIỆT CÁC LOẠI 403:
+
+  // 1. 403 ChapterLocked -> KHÔNG đá ra login, để component xử lý
+  if (errorCode === "ChapterLocked") {
+    console.log("🎯 Chapter bị khóa - giữ nguyên trên trang reader");
+    return Promise.reject(error);
+  }
+  // 2. 403 SubscriptionRequired -> KHÔNG đá ra login
+  else if (errorCode === "SubscriptionRequired") {
+    console.log("🎯 Cần gói Premium - giữ nguyên trên trang");
+    return Promise.reject(error);
+  }
+  // 3. 403 AccountRestricted (Bị cấm đăng/tương tác) -> KHÔNG đá ra login
+  else if (errorCode === "AccountRestricted") {
+    console.log("🎯 Tài khoản bị hạn chế - giữ nguyên để hiện thông báo");
+    return Promise.reject(error);
+  }
+  // 4. 403 do không có quyền author (kiểm tra error message/code HOẶC đang ở trang author)
+  else if (
+    errorMessage?.includes("author") ||
+    errorMessage?.includes("tác giả") ||
+    errorCode?.includes("Author") ||
+    (typeof window !== "undefined" &&
+      window.location.pathname.startsWith("/author"))
+  ) {
+    if (
+      typeof window !== "undefined" &&
+      !window.location.pathname.includes("author-upgrade")
+    ) {
+      window.location.href = "/author-upgrade";
+    }
+    return Promise.reject(error);
+  }
+  // 5. 403 khác (token invalid, etc.) -> đá ra trang home
+  else {
+    if (typeof window !== "undefined") {
+      // Xóa token và thông tin người dùng khỏi localStorage
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("authUser");
+      window.location.href = "/";
+    }
+    return Promise.reject(error);
+  }
+};
 
 export default apiClient;

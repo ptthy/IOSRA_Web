@@ -14,6 +14,7 @@ import { jwtDecode } from "jwt-decode";
 import { toast } from "sonner";
 import { authService } from "@/services/authService";
 import { authorUpgradeService } from "@/services/authorUpgradeService";
+import { refreshToken } from "@/services/apiClient";
 
 export interface User {
   id: string;
@@ -41,6 +42,7 @@ interface AuthContextType {
   logout: () => void;
   setAuthData: (user: User, token: string) => void;
   updateUser: (updates: Partial<User>) => void;
+  refreshAndUpdateUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -268,6 +270,92 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
+  // Hàm refresh token và cập nhật user từ token mới
+  const refreshAndUpdateUser = useCallback(async () => {
+    try {
+      // Gọi refresh token
+      const newToken = await refreshToken();
+
+      if (!newToken) {
+        throw new Error("Không nhận được token mới");
+      }
+
+      // Decode token để lấy thông tin user
+      const decodedPayload: any = jwtDecode(newToken);
+
+      // Lấy roles từ token
+      const rawRoles = decodedPayload.roles || [];
+      const userRoles = (Array.isArray(rawRoles) ? rawRoles : [rawRoles]).map(
+        (r: string) => r.toLowerCase().trim()
+      );
+
+      const primaryRole = getPrimaryRole(userRoles);
+
+      // Check author approved
+      let isApproved = userRoles.includes("author");
+      if (!isApproved && primaryRole === "reader") {
+        try {
+          const reqRes = await authorUpgradeService.getMyRequests();
+          isApproved = reqRes.data.some(
+            (req: any) => req.status === "approved"
+          );
+        } catch (e) {
+          // Ignore error
+        }
+      }
+
+      // Lấy thông tin user hiện tại để giữ avatar, displayName
+      const currentUser =
+        user || JSON.parse(localStorage.getItem("authUser") || "null");
+
+      // Tạo user object mới từ token
+      const updatedUser: User = {
+        id: decodedPayload.sub || currentUser?.id || "",
+        username: decodedPayload.username || currentUser?.username || "",
+        email: decodedPayload.email || currentUser?.email || "",
+        role: primaryRole as any,
+        roles: userRoles,
+        isPremium: decodedPayload.isPremium || currentUser?.isPremium || false,
+        isAuthorApproved: isApproved,
+        displayName: currentUser?.displayName || decodedPayload.username || "",
+        avatar: currentUser?.avatar || null,
+        bio: currentUser?.bio,
+        birthday: currentUser?.birthday,
+      };
+
+      // Cập nhật state và storage
+      setToken(newToken);
+      setUser(updatedUser);
+      localStorage.setItem("authToken", newToken);
+      localStorage.setItem("authUser", JSON.stringify(updatedUser));
+      setUserCookie(updatedUser);
+
+      // Lấy thông tin profile nếu cần
+      try {
+        const profileRes = await authService.getMyProfile();
+        if (profileRes.data) {
+          const finalUser: User = {
+            ...updatedUser,
+            avatar: profileRes.data.avatarUrl || updatedUser.avatar,
+            displayName: profileRes.data.displayName || updatedUser.displayName,
+            bio: profileRes.data.bio || updatedUser.bio,
+            birthday: profileRes.data.birthday || updatedUser.birthday,
+          };
+          setUser(finalUser);
+          localStorage.setItem("authUser", JSON.stringify(finalUser));
+          setUserCookie(finalUser);
+        }
+      } catch (err) {
+        // Ignore profile error, use token data
+        console.warn("Không lấy được profile sau refresh:", err);
+      }
+    } catch (error: any) {
+      console.error("Lỗi refresh token:", error);
+      // Nếu refresh thất bại, có thể token đã hết hạn
+      // Không throw error để tránh break flow
+    }
+  }, [user]);
+
   // ✅ LOGIC NAVBAR
   const isAuthor =
     user?.roles?.includes("author") ?? user?.isAuthorApproved ?? false;
@@ -283,6 +371,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logout,
     setAuthData,
     updateUser,
+    refreshAndUpdateUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
