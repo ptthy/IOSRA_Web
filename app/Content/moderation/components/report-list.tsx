@@ -18,36 +18,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { motion, Variants } from "framer-motion";
 
-import { getHandlingReports } from "@/services/moderationApi";
+// ✅ QUAN TRỌNG: Import ReportItem từ API Service để đồng bộ Type
+import { getHandlingReports, ReportItem } from "@/services/moderationApi";
 import { ReportActionModal } from "./report-action-modal";
 import { cn } from "@/lib/utils";
-
-// ========================= TYPES =========================
-
-type ReportStatus = "pending" | "approved" | "rejected" | null;
-
-interface ReportItem {
-  id: string;
-  targetType: "story" | "chapter" | "comment" | string;
-  targetId: string;
-  reason: string;
-  details: string;
-  status: "pending" | "approved" | "rejected" | string;
-  reporterId: string;
-  reportedAt: string;
-
-  approvedBy?: string;
-  approvedAt?: string;
-  rejectedBy?: string;
-  rejectedAt?: string;
-}
-
-interface ApiResponse {
-  items: ReportItem[];
-  total?: number;
-  page?: number;
-  pageSize?: number;
-}
 
 // ========================= MOTION VARIANTS =========================
 
@@ -67,7 +41,8 @@ export function ReportsList() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<ReportStatus>("pending");
+  // Tab mặc định
+  const [activeTab, setActiveTab] = useState<string>("pending");
 
   // Modal
   const [selectedReport, setSelectedReport] = useState<ReportItem | null>(null);
@@ -80,14 +55,19 @@ export function ReportsList() {
     setError(null);
 
     try {
-     const apiStatus =
-  activeTab === "approved" ? "resolved" : activeTab;
+      // ✅ Logic: Tab UI là "approved" nhưng API cần gọi "resolved"
+      const apiStatus = activeTab === "approved" ? "resolved" : activeTab;
 
-const response = await getHandlingReports(apiStatus, null, 1, 50);
+      // Gọi API (getHandlingReports giờ đã chấp nhận string | null)
+      const response = await getHandlingReports(apiStatus, null, 1, 50);
 
-      setReports(Array.isArray(response) ? response : response.items || []);
+      // ✅ Fix lỗi setReports: Lấy mảng items từ response object
+      const dataItems = response.items || [];
+      setReports(dataItems);
+      
     } catch (err: any) {
-      setError(err.message);
+      console.error("Fetch error:", err);
+      setError(err.message || "Có lỗi xảy ra");
     } finally {
       setIsLoading(false);
     }
@@ -105,7 +85,7 @@ const response = await getHandlingReports(apiStatus, null, 1, 50);
   // ================= REUSABLE TABLE =================
 
   const ReportsTable = ({ data }: { data: ReportItem[] }) => {
-    if (data.length === 0) {
+    if (!data || data.length === 0) {
       return (
         <div className="flex justify-center items-center min-h-[300px]">
           <p className="text-lg text-gray-500">Không có báo cáo nào trong mục này.</p>
@@ -129,7 +109,8 @@ const response = await getHandlingReports(apiStatus, null, 1, 50);
           <TableBody>
             {data.map((report) => (
               <TableRow
-                key={report.id}
+                // ✅ Sử dụng reportId làm key (khớp với API)
+                key={report.reportId}
                 className="border-b hover:bg-[var(--muted)]/20 transition-colors"
               >
                 <TableCell className="py-4 px-6">
@@ -154,13 +135,19 @@ const response = await getHandlingReports(apiStatus, null, 1, 50);
                     className={cn(
                       report.status === "pending" &&
                         "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
-                      report.status === "approved" &&
+                      // ✅ Check cả approved (UI) và resolved (API)
+                      (report.status === "approved" || report.status === "resolved") &&
                         "bg-green-100 text-green-800 hover:bg-green-200",
                       report.status === "rejected" &&
                         "bg-gray-100 text-gray-800 hover:bg-gray-200"
                     )}
                   >
-                    {report.status}
+                    {/* ✅ Hiển thị text tiếng Việt phù hợp */}
+                    {report.status === "resolved" || report.status === "approved" 
+                      ? "Đã xử phạt" 
+                      : report.status === "rejected" 
+                        ? "Đã từ chối" 
+                        : "Chờ xử lý"}
                   </Badge>
                 </TableCell>
 
@@ -226,7 +213,7 @@ const response = await getHandlingReports(apiStatus, null, 1, 50);
         </p>
       </motion.div>
 
-      <Tabs value={activeTab ?? "pending"} onValueChange={(v) => setActiveTab(v as ReportStatus)}>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <TabsList className="bg-[var(--card)] border border-[var(--border)] h-12 p-1 flex items-center gap-1 rounded-lg">
 
@@ -241,7 +228,7 @@ const response = await getHandlingReports(apiStatus, null, 1, 50);
               Chờ xử lý
             </TabsTrigger>
 
-            {/* Approved */}
+            {/* Approved (UI) -> Resolved (API) */}
             <TabsTrigger
               value="approved"
               className={cn(
@@ -275,15 +262,8 @@ const response = await getHandlingReports(apiStatus, null, 1, 50);
         </div>
 
         <motion.div key={activeTab} variants={tabContentVariants} initial="hidden" animate="visible">
-          <TabsContent value="pending">
-            <ReportsTable data={reports} />
-          </TabsContent>
-
-          <TabsContent value="approved">
-            <ReportsTable data={reports} />
-          </TabsContent>
-
-          <TabsContent value="rejected">
+          {/* Vì logic fetch đã theo activeTab, ta render trực tiếp table */}
+          <TabsContent value={activeTab} forceMount>
             <ReportsTable data={reports} />
           </TabsContent>
         </motion.div>
