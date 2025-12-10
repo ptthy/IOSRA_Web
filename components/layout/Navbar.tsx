@@ -182,8 +182,9 @@ export function Navbar() {
   };
   // Ẩn Navbar ở các trang đọc truyện
   if (
-    pathname &&
-    (pathname.startsWith("/Op") || pathname.startsWith("/Content")) || pathname.startsWith("/Admin")
+    (pathname &&
+      (pathname.startsWith("/Op") || pathname.startsWith("/Content"))) ||
+    pathname.startsWith("/Admin")
   ) {
     return null;
   }
@@ -292,10 +293,10 @@ export function Navbar() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                Đăng ký tác giả
+                Góc tác giả
               </button>
 
-              <button
+              {/* <button
                 onClick={() => handleNavigate("/author/overview")}
                 className={`text-sm transition-colors ${
                   isActive("/author/overview")
@@ -304,7 +305,7 @@ export function Navbar() {
                 }`}
               >
                 Góc sáng tác
-              </button>
+              </button> */}
             </div>
           )}
 
@@ -508,11 +509,11 @@ export function Navbar() {
                         onClick={() => handleNavigate("/author-upgrade")}
                         className="text-left py-2 text-lg"
                       >
-                        Đăng ký tác giả
+                        Góc tác giả
                       </button>
 
                       {/* Luôn hiện nút Góc sáng tác */}
-                      <button
+                      {/* <button
                         onClick={() => {
                           handleNavigate("/author/overview");
                           // setOpen(false);
@@ -520,7 +521,7 @@ export function Navbar() {
                         className="text-left py-2 text-lg"
                       >
                         Góc sáng tác
-                      </button>
+                      </button> */}
                     </>
                   )}
 
