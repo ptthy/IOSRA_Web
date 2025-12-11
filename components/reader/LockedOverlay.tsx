@@ -11,18 +11,29 @@ import {
   Check,
   Gem,
   Zap,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { chapterPurchaseApi } from "@/services/chapterPurchaseService";
 import { toast } from "sonner";
 import { TopUpModal } from "@/components/payment/TopUpModal";
-
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 interface LockedOverlayProps {
   chapterId: string;
   priceDias: number;
   onUnlockSuccess: () => void;
   currentBalance?: number;
   setShowTopUpModal: (show: boolean) => void;
+  storyTitle?: string;
+  chapterTitle?: string;
+  chapterNo?: number;
 }
 
 export const LockedOverlay: React.FC<LockedOverlayProps> = ({
@@ -31,50 +42,96 @@ export const LockedOverlay: React.FC<LockedOverlayProps> = ({
   onUnlockSuccess,
   currentBalance = 0,
   setShowTopUpModal,
+  storyTitle = "Truyện",
+  chapterTitle = "",
+  chapterNo = 0,
 }) => {
   const [buying, setBuying] = useState(false);
 
   const [insufficientBalance, setInsufficientBalance] = useState(false);
-
-  const handleBuy = async () => {
-    // Kiểm tra số dư trước khi mua
+  const [showConfirm, setShowConfirm] = useState(false); // State bật tắt popup xác nhận
+  const handlePreCheck = () => {
     if (currentBalance < priceDias) {
       setInsufficientBalance(true);
+      toast.error("Số dư không đủ", {
+        description: `Bạn cần ${priceDias} Dias nhưng chỉ có ${currentBalance} Dias.`,
+      });
       return;
     }
-
+    setInsufficientBalance(false);
+    setShowConfirm(true); // Mở Modal xác nhận
+  };
+  const handleConfirmBuy = async () => {
     setBuying(true);
     try {
-      await chapterPurchaseApi.buyChapter(chapterId);
+      // Gọi API
+      const result = await chapterPurchaseApi.buyChapter(chapterId);
+
+      setShowConfirm(false); // Đóng modal
       toast.success("Mở khóa thành công!", {
-        description: "Chúc bạn đọc truyện vui vẻ.",
+        description: `Số dư còn lại: ${result.walletBalanceAfter} Dias`,
       });
       onUnlockSuccess();
     } catch (error: any) {
-      //  LOGIC MỚI: BẮT LỖI 409 (ChapterPurchased)
+      // Logic xử lý lỗi cũ của bạn
       if (error.response && error.response.status === 409) {
         toast.success("Bạn đã sở hữu chương này!", {
           description: "Đang tải nội dung...",
-          icon: <Check className="w-4 h-4 text-green-500" />,
         });
         onUnlockSuccess();
+        setShowConfirm(false);
       } else if (error.response?.status === 400) {
-        // Lỗi số dư không đủ
         setInsufficientBalance(true);
-        toast.error("Số dư không đủ", {
-          description: `Bạn cần ${priceDias} Dias nhưng chỉ có ${currentBalance} Dias.`,
-        });
+        setShowConfirm(false);
+        toast.error("Số dư không đủ");
       } else {
         const msg =
           error.response?.data?.error?.message || "Lỗi không xác định.";
-        toast.error("Không thể mở khóa", {
-          description: msg,
-        });
+        toast.error("Không thể mở khóa", { description: msg });
       }
     } finally {
       setBuying(false);
     }
   };
+  // const handleBuy = async () => {
+  //   // Kiểm tra số dư trước khi mua
+  //   if (currentBalance < priceDias) {
+  //     setInsufficientBalance(true);
+  //     return;
+  //   }
+
+  //   setBuying(true);
+  //   try {
+  //     await chapterPurchaseApi.buyChapter(chapterId);
+  //     toast.success("Mở khóa thành công!", {
+  //       description: "Chúc bạn đọc truyện vui vẻ.",
+  //     });
+  //     onUnlockSuccess();
+  //   } catch (error: any) {
+  //     //  LOGIC MỚI: BẮT LỖI 409 (ChapterPurchased)
+  //     if (error.response && error.response.status === 409) {
+  //       toast.success("Bạn đã sở hữu chương này!", {
+  //         description: "Đang tải nội dung...",
+  //         icon: <Check className="w-4 h-4 text-green-500" />,
+  //       });
+  //       onUnlockSuccess();
+  //     } else if (error.response?.status === 400) {
+  //       // Lỗi số dư không đủ
+  //       setInsufficientBalance(true);
+  //       toast.error("Số dư không đủ", {
+  //         description: `Bạn cần ${priceDias} Dias nhưng chỉ có ${currentBalance} Dias.`,
+  //       });
+  //     } else {
+  //       const msg =
+  //         error.response?.data?.error?.message || "Lỗi không xác định.";
+  //       toast.error("Không thể mở khóa", {
+  //         description: msg,
+  //       });
+  //     }
+  //   } finally {
+  //     setBuying(false);
+  //   }
+  // };
 
   return (
     <>
@@ -128,7 +185,8 @@ export const LockedOverlay: React.FC<LockedOverlayProps> = ({
         <div className="w-full max-w-xs space-y-3">
           {/* Nút Mở khóa chính */}
           <Button
-            onClick={handleBuy}
+            // onClick={handleBuy}
+            onClick={handlePreCheck}
             disabled={buying}
             size="lg"
             className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white shadow-orange-200 shadow-xl transition-all hover:scale-[1.02]"
@@ -162,8 +220,85 @@ export const LockedOverlay: React.FC<LockedOverlayProps> = ({
           </div>
         </div>
       </div>
+      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <DialogContent className="sm:max-w-md bg-white dark:bg-gray-900 border-orange-200">
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl text-orange-600 flex flex-col items-center gap-2">
+              <div className="p-3 bg-orange-100 rounded-full">
+                <Lock className="w-6 h-6 text-orange-600" />
+              </div>
+              Xác nhận mở khóa
+            </DialogTitle>
+            <DialogDescription className="text-center pt-2">
+              Bạn có chắc chắn muốn sử dụng <strong>{priceDias} Dias</strong> để
+              mở khóa chương này?
+            </DialogDescription>
+          </DialogHeader>
 
-      {/* Modal nạp Dias */}
+          {/* Box thông tin chi tiết */}
+          <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg space-y-3 border border-gray-100 dark:border-gray-800 my-2">
+            <div className="flex items-start gap-3">
+              <Unlock className="w-4 h-4 text-gray-500 mt-1" />
+              <div>
+                <p className="text-xs text-gray-500 uppercase font-semibold">
+                  Chương
+                </p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-1">
+                  {storyTitle}
+                </p>
+              </div>
+            </div>
+            {/* <div className="flex items-start gap-3">
+              <Unlock className="w-4 h-4 text-gray-500 mt-1" />
+              <div>
+                <p className="text-xs text-gray-500 uppercase font-semibold">
+                  Chương {chapterNo}
+                </p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-1">
+                  {chapterTitle}
+                </p>
+              </div>
+            </div> */}
+
+            <div className="flex justify-between items-center pt-2 border-t border-dashed border-gray-200 mt-2">
+              <span className="text-sm text-gray-500">Giá mở khóa</span>
+              <span className="text-base font-bold text-orange-600">
+                {priceDias} Dias
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">Số dư sau khi mua</span>
+              <span className="text-sm font-semibold text-blue-600">
+                {(currentBalance - priceDias).toLocaleString()} Dias
+              </span>
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-row gap-2 justify-end sm:justify-center w-full">
+            <Button
+              variant="outline"
+              onClick={() => setShowConfirm(false)}
+              className="flex-1"
+              disabled={buying}
+            >
+              Hủy bỏ
+            </Button>
+            <Button
+              onClick={handleConfirmBuy}
+              disabled={buying}
+              className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white"
+            >
+              {buying ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Xử lý...
+                </>
+              ) : (
+                "Đồng ý"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

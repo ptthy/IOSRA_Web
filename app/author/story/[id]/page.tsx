@@ -376,7 +376,7 @@ export default function StoryDetailPage() {
                         variant="secondary"
                         className="bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
                       >
-                        Ngắn (từ 5-20 chương)
+                        Ngắn (từ 6-20 chương)
                       </Badge>
                     )}
                     {story.lengthPlan === "novel" && (

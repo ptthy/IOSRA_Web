@@ -49,6 +49,7 @@ export function NotificationDropdown() {
 
   const fetchLatest = async () => {
     try {
+      // Lấy 5 tin mới nhất để hiện trong dropdown
       const res = await notificationService.getNotifications(1, 5);
       if (res.data) {
         setItems(res.data.items);
@@ -61,6 +62,20 @@ export function NotificationDropdown() {
 
   useEffect(() => {
     fetchLatest();
+    // --- THÊM ĐOẠN NÀY ---
+    // Lắng nghe sự kiện từ Ticker
+    const handleRealtimeUpdate = () => {
+      console.log("🔄 Dropdown: Phát hiện tin mới -> Tải lại data...");
+      fetchLatest();
+    };
+
+    window.addEventListener("notification-updated", handleRealtimeUpdate);
+
+    // Dọn dẹp khi component bị hủy
+    return () => {
+      window.removeEventListener("notification-updated", handleRealtimeUpdate);
+    };
+    // ---------------------
   }, []);
 
   return (

@@ -168,6 +168,22 @@ export default function NotificationPage() {
   // useEffect bắt sự kiện thay đổi trang (Giữ nguyên)
   useEffect(() => {
     fetchNotifications();
+    // --- THÊM ĐOẠN NÀY ---
+    const handleRealtimeUpdate = () => {
+      // Chỉ tự động load lại nếu đang ở trang 1
+      // (Để tránh người dùng đang xem trang 5 tự nhiên bị giật về trang 1 hoặc bị trôi nội dung)
+      if (page === 1) {
+        console.log("🔄 Page: Có tin mới -> Refresh list...");
+        fetchNotifications();
+      }
+    };
+
+    window.addEventListener("notification-updated", handleRealtimeUpdate);
+
+    return () => {
+      window.removeEventListener("notification-updated", handleRealtimeUpdate);
+    };
+    // ---------------------
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 

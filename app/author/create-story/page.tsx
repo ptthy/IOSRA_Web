@@ -56,7 +56,7 @@ import { ImageWithFallback } from "@/components/ui/ImageWithFallback";
 
 const LENGTH_PLAN_OPTIONS = [
   { value: "super_short", label: "Siêu ngắn (từ 1-5 chương)" },
-  { value: "short", label: "Ngắn (từ 5-20 chương)" },
+  { value: "short", label: "Ngắn (từ 6-20 chương)" },
   { value: "novel", label: "Dài (trên 20 chương)" },
 ] as const;
 
