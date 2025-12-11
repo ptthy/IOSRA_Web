@@ -50,7 +50,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 const LENGTH_PLAN_MAP: Record<string, string> = {
   super_short: "Siêu ngắn (từ 1-5 chương)",
-  short: "Ngắn (từ 5-20 chương)",
+  short: "Ngắn (từ 6-20 chương)",
   novel: "Dài (trên 20 chương)",
 };
 export default function ManageChaptersPage() {

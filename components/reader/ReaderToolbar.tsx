@@ -20,6 +20,7 @@ import {
   Music, // Thêm icon nhạc
   Music2,
   Crown,
+  Unlock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -457,7 +458,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                 </Button>
               </PopoverTrigger>
               <PopoverContent
-                className="w-[360px] sm:w-[400px] p-0"
+                className="w-[360px] sm:w-[500px] p-0"
                 align="start"
               >
                 <div className="p-3 border-b bg-muted/20">
@@ -470,11 +471,15 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                 <ScrollArea className="h-[300px] overflow-y-auto">
                   {sortedChapters.map((ch) => {
                     const isReading = ch.chapterId === chapterId;
-                    const isLocked = ch.isLocked;
-                    const showOwnedBadge = ch.isOwned === true;
-                    //  FIX LOGIC: Đã mua = Không bị khóa VÀ accessType là 'dias'
-                    const isPurchased = !isLocked && ch.accessType === "dias";
-                    const isOwnedState = ch.isOwned === true || isPurchased;
+                    // const isLocked = ch.isLocked;
+                    // const showOwnedBadge = ch.isOwned === true;
+                    // //  FIX LOGIC: Đã mua = Không bị khóa VÀ accessType là 'dias'
+                    // const isPurchased = !isLocked && ch.accessType === "dias";
+                    // const isOwnedState = ch.isOwned === true || isPurchased;
+                    // const isFree = ch.accessType === "free";
+                    // Dựa vào JSON: isLocked vẫn là true dù đã mua, nên phải check isOwned trước
+                    const isOwned = ch.isOwned === true;
+                    const isLocked = ch.isLocked && !isOwned; // Chỉ coi là locked nếu chưa owned
                     const isFree = ch.accessType === "free";
 
                     return (
@@ -501,10 +506,11 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                                   : ""
                               )}
                             >
+                              {/* Logic icon bên cạnh tên chương */}
                               {isLocked && (
                                 <Lock className="w-3 h-3 text-orange-500" />
                               )}
-                              {isOwnedState && (
+                              {isOwned && (
                                 <Check className="w-3 h-3 text-green-500" />
                               )}
                               Chương {ch.chapterNo}
@@ -522,19 +528,24 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                               >
                                 Đang đọc
                               </Badge>
+                            ) : isOwned ? (
+                              // Case 1: Đã sở hữu -> Hiện badge Crown "Đã mở"
+                              <Badge
+                                variant="secondary"
+                                className="bg-green-100 text-green-700 hover:bg-green-200 gap-1"
+                              >
+                                <Unlock className="w-3 h-3" /> Đã mở
+                              </Badge>
                             ) : isLocked ? (
+                              // Case 2: Bị khóa (chưa mua) -> Hiện giá
                               <Badge
                                 variant="outline"
                                 className="border-orange-500 text-orange-600 bg-orange-50 font-bold"
                               >
                                 {ch.priceDias} Dias
                               </Badge>
-                            ) : isOwnedState ? (
-                              <div className="flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full border border-green-100">
-                                <Check className="w-3 h-3" />{" "}
-                                <span>Sở hữu</span>
-                              </div>
                             ) : (
+                              // Case 3: Free
                               <span className="text-xs text-muted-foreground/70">
                                 Free
                               </span>

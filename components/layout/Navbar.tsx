@@ -312,7 +312,7 @@ export function Navbar() {
           {/* Actions Right Side */}
           <div className="flex items-center gap-2">
             {isAuthenticated && !isAuthPage && (
-              <div className="hidden xl:flex absolute right-[170px] top-1/2 -translate-y-1/2 w-[220px] justify-end">
+              <div className="hidden xl:flex absolute right-[180px] top-1/2 -translate-y-1/2 w-auto justify-end">
                 <NotificationTicker />
               </div>
             )}

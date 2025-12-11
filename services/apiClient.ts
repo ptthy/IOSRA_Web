@@ -1,7 +1,7 @@
 //services/apiClient.ts
 
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
-
+import { toast } from "sonner";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 const apiClient = axios.create({
@@ -12,6 +12,42 @@ const apiClient = axios.create({
   },
   withCredentials: true, // THÊM DÒNG NÀY để gửi/nhận cookies
 });
+// --- HELPER-New: LOGIC HIỂN THỊ TOAST TỪ USER ---
+const showErrorToast = (err: any) => {
+  // Chỉ hiện toast ở client-side
+  if (typeof window === "undefined") return;
+
+  // Kiểm tra cấu trúc lỗi { error: { code, message, details } }
+  if (err.response && err.response.data && err.response.data.error) {
+    const { message, details } = err.response.data.error;
+
+    // 1. Ưu tiên tìm trong 'details' để lấy message cụ thể
+    if (details) {
+      const firstKey = Object.keys(details)[0];
+      if (firstKey && details[firstKey].length > 0) {
+        const specificMsg = details[firstKey].join(" ");
+        toast.error(specificMsg);
+        return;
+      }
+    }
+
+    // 2. Nếu không có details, lấy message chung của error
+    if (message) {
+      toast.error(message);
+      return;
+    }
+  }
+
+  // --- FALLBACK (Cho các lỗi mạng hoặc lỗi không đúng chuẩn trên) ---
+  const fallbackMsg =
+    err.response?.data?.message || "Có lỗi xảy ra. Vui lòng thử lại.";
+
+  // Không hiện toast fallback nếu lỗi là 401 (vì sẽ xử lý refresh token)
+  // hoặc các mã lỗi đặc biệt đã được xử lý riêng (như ChapterLocked log bên dưới)
+  if (err.response?.status !== 401) {
+    toast.error(fallbackMsg);
+  }
+};
 
 // Flag để tránh infinite loop khi refresh token
 let isRefreshing = false;
@@ -103,6 +139,7 @@ apiClient.interceptors.response.use(
       const currentToken = localStorage.getItem("authToken");
       if (!currentToken) {
         // Không có token -> không phải lỗi hết hạn, reject ngay
+        showErrorToast(error); // <--- THÊM DÒNG NÀY
         return Promise.reject(error);
       }
 
@@ -126,6 +163,7 @@ apiClient.interceptors.response.use(
         errorMessage.includes("unauthorized");
 
       if (isNotExpiredError) {
+        showErrorToast(error); // <--- THÊM DÒNG NÀY
         return Promise.reject(error);
       }
 
@@ -239,6 +277,18 @@ apiClient.interceptors.response.use(
       ) {
         return Promise.reject(error);
       }
+      const errorMsgLower = (responseData?.error?.message || "").toLowerCase();
+      const isAuthorPermissionError =
+        errorMsgLower.includes("author") ||
+        errorMsgLower.includes("tác giả") ||
+        (typeof window !== "undefined" &&
+          window.location.pathname.startsWith("/author"));
+
+      if (isAuthorPermissionError) {
+        console.log("Phát hiện lỗi thiếu quyền Author -> Thử refresh token...");
+        // Code phía dưới sẽ tự động chạy logic refresh vì chúng ta không return Promise.reject()
+      }
+      // --------------------
 
       // Tránh refresh nhiều lần đồng thời
       if (isRefreshing) {
@@ -323,7 +373,8 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 403) {
       return handle403Error(error);
     }
-
+    // --- THÊM DÒNG NÀY ĐỂ HIỆN LỖI CHUNG ---
+    showErrorToast(error);
     return Promise.reject(error);
   }
 );
@@ -344,11 +395,13 @@ const handle403Error = (error: AxiosError) => {
   // 2. 403 SubscriptionRequired -> KHÔNG đá ra login
   else if (errorCode === "SubscriptionRequired") {
     console.log("🎯 Cần gói Premium - giữ nguyên trên trang");
+    toast.error("Bạn cần gói Premium để thực hiện thao tác này."); // <--- THÊM
     return Promise.reject(error);
   }
   // 3. 403 AccountRestricted (Bị cấm đăng/tương tác) -> KHÔNG đá ra login
   else if (errorCode === "AccountRestricted") {
     console.log("🎯 Tài khoản bị hạn chế - giữ nguyên để hiện thông báo");
+    showErrorToast(error); // <--- THÊM (Hiện lý do bị cấm từ backend)
     return Promise.reject(error);
   }
   // 4. 403 do không có quyền author (kiểm tra error message/code HOẶC đang ở trang author)
@@ -369,6 +422,7 @@ const handle403Error = (error: AxiosError) => {
   }
   // 5. 403 khác (token invalid, etc.) -> đá ra trang home
   else {
+    showErrorToast(error);
     if (typeof window !== "undefined") {
       // Xóa token và thông tin người dùng khỏi localStorage
       localStorage.removeItem("authToken");

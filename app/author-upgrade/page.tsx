@@ -127,7 +127,9 @@ export default function AuthorUpgradePage() {
 
   //  KHAI BÁO STATE
   // ---------------------------------
-  const { user, isLoading: isAuthLoading } = useAuth(); // Lấy trạng thái auth
+  //const { user, isLoading: isAuthLoading } = useAuth(); // Lấy trạng thái auth
+  // Thêm refreshAndUpdateUser vào đây
+  const { user, isLoading: isAuthLoading, refreshAndUpdateUser } = useAuth();
   const router = useRouter();
 
   // ---------------------
@@ -177,12 +179,29 @@ export default function AuthorUpgradePage() {
   // BIẾN SO SÁNH CAM KẾT
   const isCommitmentMatched = typedCommitment === COMMITMENT_TEXT;
   const { updateUser } = useAuth();
+  // useEffect(() => {
+  //   if (upgradeRequest.status === "approved") {
+  //     updateUser({ role: "author" });
+  //     // toast.success("Tài khoản của bạn đã được nâng cấp lên tác giả!");
+  //   }
+  // }, [upgradeRequest.status, updateUser]);
   useEffect(() => {
     if (upgradeRequest.status === "approved") {
-      updateUser({ role: "author" });
-      // toast.success("Tài khoản của bạn đã được nâng cấp lên tác giả!");
+      // Kiểm tra xem token hiện tại đã có role author chưa
+      const hasAuthorRole =
+        user?.roles?.includes("author") || user?.isAuthorApproved;
+
+      // Nếu chưa có, gọi API lấy token mới ngay lập tức
+      if (!hasAuthorRole) {
+        console.log("Đã duyệt -> Refresh token để lấy quyền Tác giả...");
+        refreshAndUpdateUser().then(() => {
+          toast.success("Chúc mừng! Bạn đã là Tác giả.");
+          // Chuyển hướng ngay sau khi có token mới
+          router.push("/author/overview");
+        });
+      }
     }
-  }, [upgradeRequest.status, updateUser]);
+  }, [upgradeRequest.status, user, refreshAndUpdateUser, router]);
 
   // CÁC HÀM XỬ LÝ LOGIC
   // ---------------------------------
