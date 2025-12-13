@@ -230,8 +230,12 @@ export const LockedOverlay: React.FC<LockedOverlayProps> = ({
               Xác nhận mở khóa
             </DialogTitle>
             <DialogDescription className="text-center pt-2">
-              Bạn có chắc chắn muốn sử dụng <strong>{priceDias} Dias</strong> để
-              mở khóa chương này?
+              Bạn có chắc chắn muốn sử dụng{" "}
+              <strong className="inline-flex items-center gap-1">
+                {priceDias}{" "}
+                <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+              </strong>{" "}
+              để mở khóa chương này?
             </DialogDescription>
           </DialogHeader>
 
@@ -262,14 +266,16 @@ export const LockedOverlay: React.FC<LockedOverlayProps> = ({
 
             <div className="flex justify-between items-center pt-2 border-t border-dashed border-gray-200 mt-2">
               <span className="text-sm text-gray-500">Giá mở khóa</span>
-              <span className="text-base font-bold text-orange-600">
-                {priceDias} Dias
+              <span className="text-base font-bold text-orange-600 flex items-center gap-1">
+                {priceDias}{" "}
+                <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-500">Số dư sau khi mua</span>
-              <span className="text-sm font-semibold text-blue-600">
-                {(currentBalance - priceDias).toLocaleString()} Dias
+              <span className="text-sm font-semibold text-blue-600 flex items-center gap-1">
+                {(currentBalance - priceDias).toLocaleString()}{" "}
+                <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
               </span>
             </div>
           </div>

@@ -12,9 +12,12 @@ export interface Message {
 export function ChatMessage({ message }: { message: Message }) {
   const isBot = message.sender === "bot";
 
-  const timeString = new Date(message.timestamp).toLocaleTimeString("vi-VN", {
+  const timeString = new Date(message.timestamp).toLocaleString("vi-VN", {
     hour: "2-digit",
     minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   });
 
   return (

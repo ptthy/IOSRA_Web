@@ -8,10 +8,24 @@ import {
   VoiceCharCountResponse,
 } from "./apiTypes";
 
+export interface PricingRule {
+  minCharCount: number;
+  maxCharCount: number | null;
+  generationCostDias: number; // Giá gốc (Dias)
+  sellingPriceDias: number; // Giá bán (Dias)
+}
+
 export const voiceChapterService = {
   // 1. Lấy thông tin Voice của chương (để xem đã tạo chưa, nghe thử)
+  // getVoiceChapter: async (chapterId: string): Promise<VoiceChapterResponse> => {
+  //   const response = await apiClient.get(`/api/VoiceChapter/${chapterId}`);
+  //   return response.data;
+  // },
   getVoiceChapter: async (chapterId: string): Promise<VoiceChapterResponse> => {
-    const response = await apiClient.get(`/api/VoiceChapter/${chapterId}`);
+    // Thêm timestamp để chống cache, giúp Polling cập nhật trạng thái mới nhất
+    const response = await apiClient.get(
+      `/api/VoiceChapter/${chapterId}?_t=${new Date().getTime()}`
+    );
     return response.data;
   },
 
@@ -46,6 +60,13 @@ export const voiceChapterService = {
     const response = await apiClient.post(
       `/api/VoiceChapter/${chapterId}/order`,
       requestBody
+    );
+    return response.data;
+  },
+  // 5. Lấy bảng giá quy đổi
+  getPricingRules: async (): Promise<PricingRule[]> => {
+    const response = await apiClient.get<PricingRule[]>(
+      "/api/VoiceChapter/pricing-rules"
     );
     return response.data;
   },

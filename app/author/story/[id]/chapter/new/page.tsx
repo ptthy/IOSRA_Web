@@ -371,7 +371,7 @@ export default function CreateChapterPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="free">Miễn phí</SelectItem>
-                  <SelectItem value="dias">Trả phí (Kim cương)</SelectItem>
+                  <SelectItem value="dias">Trả phí</SelectItem>
                 </SelectContent>
               </Select>
             </CardContent>

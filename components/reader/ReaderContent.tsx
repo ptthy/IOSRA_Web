@@ -1,4 +1,4 @@
-//components/reader/VoiceControl.tsx
+//components/reader/ReaderContent.tsx
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";

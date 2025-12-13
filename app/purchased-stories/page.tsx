@@ -12,6 +12,7 @@ import {
   Copy,
   Receipt,
   CheckCircle2,
+  Gem,
 } from "lucide-react";
 import {
   chapterPurchaseApi,
@@ -335,9 +336,16 @@ export default function PurchasedStoriesPage() {
                               <td className="px-4 py-4 align-middle">
                                 <Badge
                                   variant="outline"
-                                  className="bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400"
+                                  className="
+      bg-yellow-50 text-yellow-700 border-yellow-200 
+      dark:bg-yellow-900/20 dark:text-yellow-400 
+      flex items-center gap-2 w-fit 
+      px-3 py-1 text-base
+    "
                                 >
-                                  {item.priceDias} Dias
+                                  {item.priceDias}
+                                  {/* Tăng size icon lên h-5 w-5 (20px) */}
+                                  <Gem className="h-7 w-7 fill-blue-500 text-blue-600" />
                                 </Badge>
                               </td>
 

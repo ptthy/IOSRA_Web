@@ -129,24 +129,58 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
     return `${AUDIO_BASE_URL}${cleanPath}`;
   };
 
+  // const fetchVoices = async () => {
+  //   setIsLoadingVoice(true);
+  //   try {
+  //     const data = await chapterCatalogApi.getChapterVoices(chapterId);
+  //     console.log("🎯 VOICES DATA:", data);
+  //     setVoices(data);
+
+  //     //  QUAN TRỌNG: Nếu có autoPlayAfterUnlock, chọn giọng đầu tiên và phát ngay
+  //     if (autoPlayAfterUnlock && data.length > 0) {
+  //       const firstOwnedVoice = data.find((v) => v.owned);
+  //       if (firstOwnedVoice) {
+  //         console.log("🎯 AUTO PLAYING VOICE AFTER UNLOCK:", firstOwnedVoice);
+  //         setCurrentVoice(firstOwnedVoice);
+  //         setVoiceSettings((prev) => ({ ...prev, isPlaying: true }));
+  //       }
+  //     } else if (!currentVoice) {
+  //       // Bình thường: chọn giọng đầu tiên đã sở hữu
+  //       const owned = data.find((v) => v.owned);
+  //       if (owned) setCurrentVoice(owned);
+  //     }
+  //   } catch (error) {
+  //     console.error("Lỗi tải giọng:", error);
+  //   } finally {
+  //     setIsLoadingVoice(false);
+  //   }
+  // };
   const fetchVoices = async () => {
     setIsLoadingVoice(true);
     try {
       const data = await chapterCatalogApi.getChapterVoices(chapterId);
       console.log("🎯 VOICES DATA:", data);
-      setVoices(data);
 
-      //  QUAN TRỌNG: Nếu có autoPlayAfterUnlock, chọn giọng đầu tiên và phát ngay
-      if (autoPlayAfterUnlock && data.length > 0) {
-        const firstOwnedVoice = data.find((v) => v.owned);
+      // --- [SỬA] LỌC VOICE: Chỉ lấy chưa mua HOẶC đã mua + ready ---
+      const visibleVoices = data.filter((v) => {
+        if (!v.owned) return true; // Chưa mua -> Hiện để bán
+        return v.status === "ready"; // Đã mua -> Phải xong mới hiện
+      });
+
+      // Cập nhật state bằng danh sách đã lọc
+      setVoices(visibleVoices);
+
+      // --- [SỬA] LOGIC AUTOPLAY: Dùng visibleVoices thay vì data ---
+      if (autoPlayAfterUnlock && visibleVoices.length > 0) {
+        const firstOwnedVoice = visibleVoices.find((v) => v.owned);
         if (firstOwnedVoice) {
           console.log("🎯 AUTO PLAYING VOICE AFTER UNLOCK:", firstOwnedVoice);
           setCurrentVoice(firstOwnedVoice);
           setVoiceSettings((prev) => ({ ...prev, isPlaying: true }));
         }
       } else if (!currentVoice) {
-        // Bình thường: chọn giọng đầu tiên đã sở hữu
-        const owned = data.find((v) => v.owned);
+        // Bình thường: chọn giọng đầu tiên đã sở hữu trong danh sách CÓ THỂ NGHE
+        const owned = visibleVoices.find((v) => v.owned);
         if (owned) setCurrentVoice(owned);
       }
     } catch (error) {
@@ -306,11 +340,35 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
     }
   };
 
+  // const refreshAndPlay = async (targetVoiceId: string) => {
+  //   try {
+  //     const data = await chapterCatalogApi.getChapterVoices(chapterId);
+  //     setVoices(data);
+  //     const newOwned = data.find((v) => v.voiceId === targetVoiceId);
+  //     if (newOwned && newOwned.owned) {
+  //       setCurrentVoice(newOwned);
+  //       setVoiceSettings((prev) => ({ ...prev, isPlaying: true }));
+  //     }
+  //   } catch (e) {
+  //     console.error("Reload error", e);
+  //   }
+  // };
   const refreshAndPlay = async (targetVoiceId: string) => {
     try {
       const data = await chapterCatalogApi.getChapterVoices(chapterId);
-      setVoices(data);
-      const newOwned = data.find((v) => v.voiceId === targetVoiceId);
+
+      // --- [SỬA] LỌC VOICE TƯƠNG TỰ ---
+      const visibleVoices = data.filter((v) => {
+        if (!v.owned) return true;
+        return v.status === "ready";
+      });
+
+      setVoices(visibleVoices);
+
+      // --- [SỬA] Tìm voice trong danh sách ĐÃ LỌC ---
+      // Nếu voice vừa mua bị lỗi/đang xử lý, nó sẽ không tìm thấy ở đây -> không lỗi player
+      const newOwned = visibleVoices.find((v) => v.voiceId === targetVoiceId);
+
       if (newOwned && newOwned.owned) {
         setCurrentVoice(newOwned);
         setVoiceSettings((prev) => ({ ...prev, isPlaying: true }));

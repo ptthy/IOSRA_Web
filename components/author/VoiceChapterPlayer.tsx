@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import { voiceChapterService } from "@/services/voiceChapterService";
 import { profileService } from "@/services/profileService";
+import { authorRevenueService } from "@/services/authorRevenueService"; // <--- Thêm dòng này thay thế luồng cũ
 import { VoiceAudio, VoiceItem } from "@/services/apiTypes";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,10 +34,14 @@ import {
   PlusCircle,
   ArrowLeft,
   Check,
+  AlertCircle,
+  RefreshCw,
+  Gem,
 } from "lucide-react";
 import { toast } from "sonner";
 import { VoiceTopupModal } from "@/components/payment/VoiceTopupModal";
-
+import { Badge } from "@/components/ui/badge";
+import { PricingRule } from "@/services/voiceChapterService";
 // --- CẤU HÌNH DOMAIN AUDIO R2 ---
 const AUDIO_BASE_URL = "https://pub-15618311c0ec468282718f80c66bcc13.r2.dev/";
 
@@ -52,6 +57,7 @@ export default function VoiceChapterPlayer({
   const [availableVoices, setAvailableVoices] = useState<VoiceItem[]>([]);
   const [charCount, setCharCount] = useState<number>(0);
   const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [pricingRules, setPricingRules] = useState<PricingRule[]>([]); // <--- State mới
 
   // --- UI States ---
   const [isLoading, setIsLoading] = useState(true);
@@ -70,7 +76,61 @@ export default function VoiceChapterPlayer({
   const [playbackSpeed, setPlaybackSpeed] = useState("1.0");
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // --- THÊM: Ref cho Polling ---
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // --- THÊM: Logic Polling (Tự động cập nhật) ---
+  useEffect(() => {
+    // Nếu có voice nào đang "processing" thì bắt đầu polling
+    const hasProcessing = createdVoices.some(
+      (v) => v.status === "processing" || v.status === "pending"
+    );
+    if (hasProcessing) {
+      startPolling();
+    } else {
+      stopPolling();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createdVoices]);
+
+  // Cleanup khi thoát trang
+  useEffect(() => {
+    return () => stopPolling();
+  }, []);
+
+  const startPolling = () => {
+    if (pollingIntervalRef.current) return;
+
+    pollingIntervalRef.current = setInterval(async () => {
+      try {
+        const chapterData = await voiceChapterService.getVoiceChapter(
+          chapterId
+        );
+        if (chapterData && chapterData.voices) {
+          setCreatedVoices(chapterData.voices);
+
+          // Kiểm tra nếu xong hết thì dừng
+          const stillProcessing = chapterData.voices.some(
+            (v: VoiceAudio) =>
+              v.status === "processing" || v.status === "pending"
+          );
+          if (!stillProcessing) {
+            toast.success("Đã cập nhật trạng thái giọng đọc!");
+            stopPolling();
+          }
+        }
+      } catch (error) {
+        console.error("Polling error:", error);
+      }
+    }, 4000); // 4 giây gọi 1 lần
+  };
+
+  const stopPolling = () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  };
   // --- Helper: Ghép Link Audio Full ---
   const getFullAudioUrl = (path: string | undefined | null) => {
     if (!path) return "";
@@ -95,9 +155,13 @@ export default function VoiceChapterPlayer({
 
   const fetchWallet = async () => {
     try {
-      const res = await profileService.getWallet();
+      // const res = await profileService.getWallet();
+      // SỬA: Dùng service doanh thu thay vì profile
+      const res = await authorRevenueService.getSummary();
       if (res.data) {
-        setWalletBalance(res.data.voiceCharBalance || 0);
+        // setWalletBalance(res.data.voiceCharBalance || 0);
+        // SỬA: Lấy revenueBalance theo đúng cấu trúc  mới
+        setWalletBalance(res.data.revenueBalance || 0);
       }
     } catch (error) {
       console.error("Lỗi lấy ví:", error);
@@ -108,16 +172,21 @@ export default function VoiceChapterPlayer({
     setIsLoading(true);
     try {
       // Load song song tất cả dữ liệu cần thiết
-      const [walletRes, chapterData, voiceList, count] = await Promise.all([
-        profileService.getWallet(),
-        voiceChapterService.getVoiceChapter(chapterId),
-        voiceChapterService.getVoiceList(),
-        voiceChapterService.getCharCount(chapterId),
-      ]);
-
+      const [walletRes, chapterData, voiceList, count, rules] =
+        await Promise.all([
+          // profileService.getWallet(),
+          authorRevenueService.getSummary(), // <--- SỬA: Gọi API Summary
+          voiceChapterService.getVoiceChapter(chapterId),
+          voiceChapterService.getVoiceList(),
+          voiceChapterService.getCharCount(chapterId),
+          voiceChapterService.getPricingRules(), // <--- Gọi thêm cái này
+        ]);
+      setPricingRules(rules || []); // <--- Lưu vào state
       // Set Wallet
       if (walletRes.data) {
-        setWalletBalance(walletRes.data.voiceCharBalance || 0);
+        //  setWalletBalance(walletRes.data.voiceCharBalance || 0);
+        // SỬA: Map vào revenueBalance
+        setWalletBalance(walletRes.data.revenueBalance || 0);
       }
 
       // Set Voices & Chapter info
@@ -203,8 +272,19 @@ export default function VoiceChapterPlayer({
         : [...prev, voiceId]
     );
   };
+  // Tìm rule phù hợp với số ký tự hiện tại
+  const currentRule = pricingRules.find(
+    (r) =>
+      charCount >= r.minCharCount &&
+      (r.maxCharCount === null || charCount <= r.maxCharCount)
+  );
 
-  const totalCost = charCount * selectedVoiceIds.length;
+  // Giá per voice (nếu không tìm thấy rule thì mặc định 0)
+  const costPerVoice = currentRule ? currentRule.generationCostDias : 0;
+
+  // Tổng chi phí = Giá 1 voice * số lượng voice đã chọn
+  const totalCost = costPerVoice * selectedVoiceIds.length;
+  // const totalCost = charCount * selectedVoiceIds.length;
   const isEnoughBalance = walletBalance >= totalCost;
 
   const handleCreateVoices = async () => {
@@ -221,33 +301,79 @@ export default function VoiceChapterPlayer({
 
     setIsProcessing(true);
     try {
-      const result = await voiceChapterService.orderVoice(
+      //const result = await voiceChapterService.orderVoice(
+      // Vì TS chưa cập nhật type nên ta dùng "as any" hoặc truy cập trực tiếp để tránh lỗi IDE tạm thời
+      const result: any = await voiceChapterService.orderVoice(
         chapterId,
         selectedVoiceIds
       );
+      //     // SỬA: Thêm || 0 để phòng trường hợp backend trả về null/undefined
+      //     const charged = result.charactersCharged || 0;
+      //     toast.success(
+      //       `Tạo thành công! Đã trừ ${result.charactersCharged.toLocaleString()} ký tự.`
+      //     );
 
-      toast.success(
-        `Tạo thành công! Đã trừ ${result.charactersCharged.toLocaleString()} ký tự.`
-      );
+      //     if (result.walletBalance !== undefined) {
+      //       setWalletBalance(result.walletBalance);
+      //     } else {
+      //       fetchWallet();
+      //     }
 
-      if (result.walletBalance !== undefined) {
+      //     // Cập nhật lại danh sách voices (kết hợp cái cũ và mới nếu API trả về full,
+      //     // nhưng thường API trả về full list voices của chapter đó, nên set thẳng)
+      //     setCreatedVoices(result.voices);
+
+      //     // Chọn voice mới nhất vừa tạo làm mặc định phát
+      //     if (result.voices.length > 0) {
+      //       // Tìm voice đầu tiên trong danh sách vừa chọn mua để play
+      //       const newVoice = result.voices.find((v) =>
+      //         selectedVoiceIds.includes(v.voiceId)
+      //       );
+      //       if (newVoice) setCurrentVoiceId(newVoice.voiceId);
+      //       else setCurrentVoiceId(result.voices[0].voiceId);
+      //     }
+
+      //     // Quay về màn hình Player
+      //     setIsAddingVoice(false);
+      //     // Reset selection cho lần sau
+      //     setSelectedVoiceIds([]);
+      //   } catch (error: any) {
+      //     console.error("Lỗi tạo voice:", error);
+      //     toast.error(
+      //       error.response?.data?.message ||
+      //         "Không thể tạo giọng đọc. Vui lòng thử lại."
+      //     );
+      //   } finally {
+      //     setIsProcessing(false);
+      //   }
+      // };
+      // 1. Lấy cost từ "totalGenerationCostDias" thay vì "charactersCharged"
+      const charged =
+        result.totalGenerationCostDias || result.charactersCharged || 0;
+
+      toast.success(`Tạo thành công! Đã trừ ${charged.toLocaleString()} Dias.`);
+
+      // 2. Lấy số dư mới từ "authorRevenueBalanceAfter" thay vì "walletBalance"
+      if (result.authorRevenueBalanceAfter !== undefined) {
+        setWalletBalance(result.authorRevenueBalanceAfter);
+      } else if (result.walletBalance !== undefined) {
         setWalletBalance(result.walletBalance);
       } else {
         fetchWallet();
       }
 
-      // Cập nhật lại danh sách voices (kết hợp cái cũ và mới nếu API trả về full,
-      // nhưng thường API trả về full list voices của chapter đó, nên set thẳng)
-      setCreatedVoices(result.voices);
+      // 3. Cập nhật danh sách voices
+      if (result.voices) {
+        setCreatedVoices(result.voices);
 
-      // Chọn voice mới nhất vừa tạo làm mặc định phát
-      if (result.voices.length > 0) {
-        // Tìm voice đầu tiên trong danh sách vừa chọn mua để play
-        const newVoice = result.voices.find((v) =>
-          selectedVoiceIds.includes(v.voiceId)
-        );
-        if (newVoice) setCurrentVoiceId(newVoice.voiceId);
-        else setCurrentVoiceId(result.voices[0].voiceId);
+        // Chọn voice mới nhất vừa tạo làm mặc định phát
+        if (result.voices.length > 0) {
+          const newVoice = result.voices.find((v: VoiceAudio) =>
+            selectedVoiceIds.includes(v.voiceId)
+          );
+          if (newVoice) setCurrentVoiceId(newVoice.voiceId);
+          else setCurrentVoiceId(result.voices[0].voiceId);
+        }
       }
 
       // Quay về màn hình Player
@@ -264,7 +390,6 @@ export default function VoiceChapterPlayer({
       setIsProcessing(false);
     }
   };
-
   const formatTime = (seconds: number) => {
     if (!seconds || isNaN(seconds)) return "0:00";
     const mins = Math.floor(seconds / 60);
@@ -294,7 +419,17 @@ export default function VoiceChapterPlayer({
     const currentVoiceData = createdVoices.find(
       (v) => v.voiceId === currentVoiceId
     );
-    const fullAudioUrl = getFullAudioUrl(currentVoiceData?.audioUrl);
+
+    // 1. Xác định trạng thái
+    const status = currentVoiceData?.status || "processing";
+    const isReady = status === "ready";
+    const isFailed = status === "failed";
+    const isProcessingVoice = status === "processing" || status === "pending";
+
+    // 2. Chỉ lấy link audio khi Ready để tránh lỗi src=""
+    const fullAudioUrl = isReady
+      ? getFullAudioUrl(currentVoiceData?.audioUrl)
+      : undefined;
 
     return (
       <Card className="border-blue-100 dark:border-blue-900 overflow-hidden">
@@ -304,16 +439,34 @@ export default function VoiceChapterPlayer({
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Volume2 className="h-5 w-5 text-blue-600" />
                 Audio AI (Tác giả)
+                {/* Badge trạng thái cạnh tiêu đề */}
+                {isProcessingVoice && (
+                  <Badge
+                    variant="secondary"
+                    className="bg-yellow-100 text-yellow-800 animate-pulse ml-2"
+                  >
+                    Xử lý
+                  </Badge>
+                )}
+                {isFailed && (
+                  <Badge variant="destructive" className="ml-2">
+                    Lỗi
+                  </Badge>
+                )}
               </CardTitle>
-              <CardDescription>Nghe lại bản Audio đã tạo.</CardDescription>
+              <CardDescription>
+                {isProcessingVoice
+                  ? "Đang tạo giọng đọc..."
+                  : isFailed
+                  ? "Tạo thất bại"
+                  : "Nghe lại audio đã tạo"}
+              </CardDescription>
             </div>
 
-            {/* Nút Mở Mode Mua Thêm */}
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
-                // Reset selection, chỉ chọn những cái chưa mua (optional)
                 setSelectedVoiceIds([]);
                 setIsAddingVoice(true);
               }}
@@ -328,100 +481,135 @@ export default function VoiceChapterPlayer({
         <CardContent className="pt-6">
           <audio
             ref={audioRef}
-            src={fullAudioUrl}
+            src={fullAudioUrl} // React tự hiểu undefined là không render src
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={handleLoadedMetadata}
             onEnded={handleEnded}
             onError={(e) => console.error("Audio Load Error:", e)}
           />
 
-          <div className="flex flex-col gap-4">
-            {/* Control Bar */}
-            <div className="flex items-center gap-4 select-none">
-              <button
-                onClick={() => skipTime(-10)}
-                className="text-slate-500 hover:text-blue-600 font-bold text-xs w-8"
-              >
-                -10s
-              </button>
+          {/* --- KHU VỰC HIỂN THỊ CHÍNH (Thay đổi theo Status) --- */}
 
-              <button
-                onClick={togglePlay}
-                className="flex items-center justify-center h-12 w-12 rounded-full bg-[#1e3a5f] hover:bg-[#2a4d7a] text-white shadow-lg transition-all hover:scale-105 active:scale-95"
-              >
-                {isPlaying ? (
-                  <Pause className="h-5 w-5 fill-current" />
-                ) : (
-                  <Play className="h-5 w-5 fill-current ml-1" />
-                )}
-              </button>
-
-              <button
-                onClick={() => skipTime(10)}
-                className="text-slate-500 hover:text-blue-600 font-bold text-xs w-8"
-              >
-                +10s
-              </button>
-
-              <span className="text-xs text-slate-500 font-mono w-10 text-right">
-                {formatTime(currentTime)}
-              </span>
-
-              <div className="flex-1 mx-2">
-                <Slider
-                  value={[currentTime]}
-                  max={duration || 100}
-                  step={0.1}
-                  onValueChange={handleSeek}
-                  className="cursor-pointer"
-                />
-              </div>
-
-              <span className="text-xs text-slate-500 font-mono w-10">
-                {formatTime(duration)}
-              </span>
+          {/* TRƯỜNG HỢP 1: ĐANG XỬ LÝ -> Hiện vòng xoay */}
+          {isProcessingVoice && (
+            <div className="py-10 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-dashed border-slate-200">
+              <Loader2 className="h-10 w-10 text-blue-600 animate-spin mb-3" />
+              <p className="font-medium text-slate-700 dark:text-slate-300">
+                Đang khởi tạo Audio...
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Vui lòng đợi giây lát.
+              </p>
             </div>
+          )}
 
-            {/* Bottom Bar */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-4 border-[#00416a]/20 dark:border-[#f0ead6]/20">
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <Select value={playbackSpeed} onValueChange={handleSpeedChange}>
-                  <SelectTrigger
-                    className="h-9 w-[80px] text-xs focus:ring-0 font-medium
-                    bg-[#f0ead6] text-[#00416a] border border-[#00416a]/20
-                    dark:bg-[#00416a] dark:text-[#f0ead6] dark:border-[#f0ead6]/20"
-                  >
-                    <SelectValue placeholder="Tốc độ" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0.75">0.75x</SelectItem>
-                    <SelectItem value="1.0">1.0x</SelectItem>
-                    <SelectItem value="1.25">1.25x</SelectItem>
-                    <SelectItem value="1.5">1.5x</SelectItem>
-                    <SelectItem value="2.0">2.0x</SelectItem>
-                  </SelectContent>
-                </Select>
+          {/* TRƯỜNG HỢP 2: THẤT BẠI -> Hiện thông báo lỗi từ Backend */}
+          {isFailed && (
+            <div className="py-8 flex flex-col items-center justify-center bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-100">
+              <AlertCircle className="h-10 w-10 text-red-500 mb-2" />
+              <h3 className="font-semibold text-red-700">Tạo thất bại</h3>
 
-                <Select
-                  value={currentVoiceId}
-                  onValueChange={handleVoiceChange}
+              {/* SỬA: Hiển thị đúng errorMessage lấy từ JSON  gửi */}
+              <p className="text-sm text-red-600/80 mt-1 mb-4 px-4 text-center font-medium">
+                {currentVoiceData?.errorMessage ||
+                  "Lỗi không xác định từ hệ thống AI."}
+              </p>
+
+              <Button variant="outline" size="sm" onClick={() => loadData()}>
+                <RefreshCw className="h-3 w-3 mr-2" /> Thử tải lại
+              </Button>
+            </div>
+          )}
+
+          {/* TRƯỜNG HỢP 3: THÀNH CÔNG -> Hiện Player cũ của bạn */}
+          {isReady && (
+            <div className="flex flex-col gap-4 animate-in fade-in">
+              {/* Control Bar (Nút Play, Slider...) */}
+              <div className="flex items-center gap-4 select-none">
+                <button
+                  onClick={() => skipTime(-10)}
+                  className="text-slate-500 hover:text-blue-600 font-bold text-xs w-8"
                 >
-                  <SelectTrigger
-                    className="h-9 w-auto min-w-[200px] text-xs focus:ring-0 font-medium 
-                    bg-[#f0ead6] text-[#00416a] border-[#00416a]/20
-                    dark:bg-[#00416a] dark:text-[#f0ead6] dark:border-[#f0ead6]/20"
-                  >
-                    <SelectValue placeholder="Đổi giọng đọc" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {createdVoices.map((voice) => (
-                      <SelectItem key={voice.voiceId} value={voice.voiceId}>
-                        {voice.voiceName} ({voice.voiceCode})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  -10s
+                </button>
+
+                <button
+                  onClick={togglePlay}
+                  className="flex items-center justify-center h-12 w-12 rounded-full bg-[#1e3a5f] hover:bg-[#2a4d7a] text-white shadow-lg transition-all hover:scale-105 active:scale-95"
+                >
+                  {isPlaying ? (
+                    <Pause className="h-5 w-5 fill-current" />
+                  ) : (
+                    <Play className="h-5 w-5 fill-current ml-1" />
+                  )}
+                </button>
+
+                <button
+                  onClick={() => skipTime(10)}
+                  className="text-slate-500 hover:text-blue-600 font-bold text-xs w-8"
+                >
+                  +10s
+                </button>
+
+                <span className="text-xs text-slate-500 font-mono w-10 text-right">
+                  {formatTime(currentTime)}
+                </span>
+                <div className="flex-1 mx-2">
+                  <Slider
+                    value={[currentTime]}
+                    max={duration || 100}
+                    step={0.1}
+                    onValueChange={handleSeek}
+                    className="cursor-pointer"
+                  />
+                </div>
+                <span className="text-xs text-slate-500 font-mono w-10">
+                  {formatTime(duration)}
+                </span>
               </div>
+            </div>
+          )}
+
+          {/* Bottom Bar (Select Voice & Speed) - Luôn hiển thị */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-4 mt-4 border-[#00416a]/20 dark:border-[#f0ead6]/20">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <Select
+                value={playbackSpeed}
+                onValueChange={handleSpeedChange}
+                disabled={!isReady}
+              >
+                <SelectTrigger className="h-9 w-[80px] text-xs bg-[#f0ead6] text-[#00416a] border border-[#00416a]/20 dark:bg-[#00416a] dark:text-[#f0ead6] dark:border-[#f0ead6]/20">
+                  <SelectValue placeholder="Tốc độ" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0.75">0.75x</SelectItem>
+                  <SelectItem value="1.0">1.0x</SelectItem>
+                  <SelectItem value="1.25">1.25x</SelectItem>
+                  <SelectItem value="1.5">1.5x</SelectItem>
+                  <SelectItem value="2.0">2.0x</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={currentVoiceId} onValueChange={handleVoiceChange}>
+                <SelectTrigger className="h-9 w-auto min-w-[200px] text-xs font-medium bg-[#f0ead6] text-[#00416a] border-[#00416a]/20 dark:bg-[#00416a] dark:text-[#f0ead6] dark:border-[#f0ead6]/20">
+                  <SelectValue placeholder="Đổi giọng đọc" />
+                </SelectTrigger>
+                <SelectContent>
+                  {createdVoices.map((voice) => (
+                    <SelectItem key={voice.voiceId} value={voice.voiceId}>
+                      <div className="flex items-center gap-2">
+                        {voice.voiceName} ({voice.voiceCode})
+                        {voice.status === "processing" && (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        )}
+                        {voice.status === "failed" && (
+                          <AlertCircle className="h-3 w-3 text-red-500" />
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
@@ -515,8 +703,12 @@ export default function VoiceChapterPlayer({
                     <span className="font-bold text-slate-700 dark:text-slate-300">
                       Tổng chi phí:
                     </span>
-                    <span className="font-bold text-blue-600 text-lg">
+                    {/* <span className="font-bold text-blue-600 text-lg">
                       {totalCost.toLocaleString()} chars
+                    </span> */}
+                    <span className="font-bold text-blue-600 text-lg flex items-center gap-1">
+                      {totalCost.toLocaleString()}
+                      <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
                     </span>
                   </div>
 
@@ -531,8 +723,12 @@ export default function VoiceChapterPlayer({
                       <span className="text-xs font-semibold uppercase opacity-70">
                         Số dư hiện tại
                       </span>
-                      <span className="font-bold">
+                      {/* <span className="font-bold">
                         {walletBalance.toLocaleString()} chars
+                      </span> */}
+                      <span className="font-bold flex items-center gap-1">
+                        {walletBalance.toLocaleString()}
+                        <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
                       </span>
                     </div>
 
@@ -643,7 +839,11 @@ export default function VoiceChapterPlayer({
                     <Mic className="mr-2 h-5 w-5" />
                     Tạo Audio ngay
                     <span className="ml-1 font-normal">
-                      ({totalCost.toLocaleString()} chars)
+                      {/* ({totalCost.toLocaleString()} chars) */}
+                      <span className="flex items-center gap-1 ml-1">
+                        ({totalCost.toLocaleString()}{" "}
+                        <Gem className="h-3 w-3 fill-current" />)
+                      </span>
                     </span>
                   </>
                 )}
@@ -656,7 +856,6 @@ export default function VoiceChapterPlayer({
       <VoiceTopupModal
         isOpen={isVoiceTopupOpen}
         onClose={() => setIsVoiceTopupOpen(false)}
-        currentTextBalance={walletBalance}
       />
     </>
   );
