@@ -1325,7 +1325,7 @@ export default function AuthorChapterDetailPage() {
               content={editFormData.content}
               onChange={handleEditorChange}
               placeholder="Nhập nội dung chương tại đây..."
-              maxLength={50000}
+              maxLength={10000}
               disabled={isSaving}
             />
           ) : (
