@@ -118,9 +118,17 @@ const getWithdrawHistory = (status?: WithdrawStatus) => {
   });
 };
 
+//Ký xác nhận nhận tiền
+const confirmWithdraw = (requestId: string) => {
+  return apiClient.post<{ message: string }>(
+    `/api/AuthorRevenue/withdraw/${requestId}/confirm`
+  );
+};
+
 export const authorRevenueService = {
   getSummary,
   getTransactions,
   requestWithdraw,
   getWithdrawHistory,
+  confirmWithdraw,
 };

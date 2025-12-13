@@ -10,6 +10,7 @@ import { SecondaryBanner } from "@/components/ads/secondary-banner";
 import { RankBadge } from "@/components/rank-badge";
 import { StoryCard } from "@/components/story-card";
 import { TopUpModal } from "@/components/payment/TopUpModal";
+import { HeroSection } from "@/components/ads/hero-section";
 import {
   Book,
   TrendingUp,
@@ -125,15 +126,22 @@ export default function HomePage() {
     "bg-card border border-border shadow-lg text-foreground/80 hover:text-primary hover:bg-accent hover:scale-110 transition-all " +
     "opacity-0 group-hover/carousel:opacity-100 disabled:opacity-0 cursor-pointer";
 
+  // return (
+  //   <div className="min-h-screen bg-background font-sans">
+  //     {/* Hero Carousel */}
+  //     <div className="animate-fade-in pt-4">
+  //       <div className="container mx-auto px-4">
+  //         <HeroCarousel />
+  //       </div>
+  //     </div>
   return (
     <div className="min-h-screen bg-background font-sans">
-      {/* Hero Carousel */}
-      <div className="animate-fade-in pt-4">
+      {/* Hero Section - Updated  */}
+      <div className="animate-fade-in pt-4 pb-2">
         <div className="container mx-auto px-4">
-          <HeroCarousel />
+          <HeroSection onNavigate={(path) => router.push(path)} />
         </div>
       </div>
-
       {/* Top Truyện Tuần */}
       <section className="py-2 animate-slide-up bg-background mt-2">
         <div className="container mx-auto px-4">

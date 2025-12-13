@@ -335,9 +335,9 @@ export function Navbar() {
           )}
 
           {/* Actions Right Side */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-0.5">
             {isAuthenticated && !isAuthPage && (
-              <div className="hidden xl:flex absolute right-[180px] top-1/2 -translate-y-1/2 w-auto justify-end">
+              <div className="hidden xl:flex items-center">
                 <NotificationTicker />
               </div>
             )}
@@ -346,7 +346,7 @@ export function Navbar() {
               <Button
                 variant="outline"
                 size="sm"
-                className="hidden md:flex items-center gap-2 rounded-full border-blue-500/50 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-400 mr-2"
+                className="hidden md:flex items-center gap-2 rounded-full border-blue-500/50 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-400"
                 onClick={() => setIsTopUpOpen(true)}
               >
                 <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />

@@ -107,7 +107,7 @@ export default function CreateChapterPage() {
   // -------------------
   const LIMITS = {
     TITLE: 200,
-    CONTENT: 50000,
+    CONTENT: 10000,
   };
 
   // Hàm xử lý thay đổi nội dung từ Tiptap Editor
@@ -479,7 +479,7 @@ export default function CreateChapterPage() {
               <Alert className="mt-4 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
                 <AlertTriangle className="h-4 w-4 text-blue-600" />
                 <AlertDescription className="text-sm">
-                  Sau khi tạo, chương sẽ ở trạng thái <strong>bản nháp</strong>.
+                  Sau khi tạo, chương sẽ ở trạng thái <strong>bản nháp.</strong>
                   Bạn có thể chỉnh sửa và gửi cho AI đánh giá sau.
                 </AlertDescription>
               </Alert>
