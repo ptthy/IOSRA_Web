@@ -10,22 +10,22 @@ import { Bell, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-// Import HubConnectionBuilder từ signalr
 import {
   HubConnectionBuilder,
   HubConnection,
   LogLevel,
 } from "@microsoft/signalr";
 import { useAuth } from "@/context/AuthContext";
+// [QUAN TRỌNG] Import thêm 2 cái này để xử lý refresh token thủ công
+import { jwtDecode } from "jwt-decode";
+import { refreshToken } from "@/services/apiClient";
 
 export function NotificationTicker() {
   const router = useRouter();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user } = useAuth(); // Lấy user từ context
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [visible, setVisible] = useState(true);
-
-  // State điều khiển việc tự động bung ra
   const [forceOpen, setForceOpen] = useState(false);
 
   const connectionRef = useRef<HubConnection | null>(null);
@@ -50,9 +50,35 @@ export function NotificationTicker() {
     fetchLatest();
   }, [isAuthenticated]);
 
-  // --- 2. KẾT NỐI REALTIME (LOGIC GIỐNG HỆT FILE HTML TEST) ---
+  // --- HÀM HELPER: LẤY TOKEN VÀ TỰ REFRESH NẾU SẮP HẾT HẠN ---
+  const getValidAccessToken = async (): Promise<string> => {
+    let token = localStorage.getItem("authToken");
+    if (!token) return "";
+
+    try {
+      const decoded: any = jwtDecode(token);
+      const currentTime = Date.now() / 1000;
+
+      // Nếu token còn sống dưới 60 giây nữa -> Gọi Refresh ngay lập tức
+      if (decoded.exp < currentTime + 60) {
+        console.log("🔄 SignalR: Token sắp hết hạn, đang gọi refresh...");
+        try {
+          // Gọi hàm refresh từ apiClient (nó sẽ tự lưu vào localStorage)
+          token = await refreshToken();
+          console.log("✅ SignalR: Đã refresh token thành công");
+        } catch (refreshErr) {
+          console.error("❌ SignalR: Refresh thất bại", refreshErr);
+          return ""; // Trả về rỗng để connection fail, kích hoạt retry sau
+        }
+      }
+    } catch (error) {
+      console.error("SignalR: Lỗi decode token", error);
+    }
+    return token || "";
+  };
+
+  // --- 2. KẾT NỐI REALTIME ---
   useEffect(() => {
-    // Nếu chưa đăng nhập thì thôi
     if (!isAuthenticated) {
       if (connectionRef.current) {
         connectionRef.current.stop();
@@ -63,64 +89,58 @@ export function NotificationTicker() {
 
     const HUB_URL = "https://45-132-75-29.sslip.io/hubs/notifications";
 
-    // Lấy Token đúng key "authToken" (như trong AuthContext)
-    const token = localStorage.getItem("authToken") || "";
-
-    // --- BẮT ĐẦU LOGIC KẾT NỐI ---
+    // Build connection
     const newConnection = new HubConnectionBuilder()
       .withUrl(HUB_URL, {
-        accessTokenFactory: () => token,
-        // QUAN TRỌNG: KHÔNG thêm skipNegotiation hay transport.
-        // Để mặc định cho nó tự chạy giống hệt file HTML.
+        // [QUAN TRỌNG] Dùng hàm async để check token
+        accessTokenFactory: getValidAccessToken,
       })
-      .configureLogging(LogLevel.Information) // Log ra để dễ soi
-      .withAutomaticReconnect() // Tự kết nối lại nếu rớt mạng
+      .configureLogging(LogLevel.Information)
+      .withAutomaticReconnect({
+        // Custom logic retry: Thử lại nhanh lúc đầu, chậm dần về sau
+        nextRetryDelayInMilliseconds: (retryContext) => {
+          if (retryContext.elapsedMilliseconds < 60000) {
+            return Math.random() * 5000; // < 1 phút: thử lại mỗi 0-5s
+          }
+          return 10000; // > 1 phút: thử lại mỗi 10s
+        },
+      })
       .build();
 
-    // Lắng nghe sự kiện
     newConnection.on(
       "notificationReceived",
       (notification: NotificationItem) => {
-        console.log("📬 Nhận thông báo mới:", notification);
-
-        // Cập nhật giao diện
+        console.log("📬 Nhận thông báo:", notification);
         setNotifications((prev) => [notification, ...prev]);
         setCurrentIndex(0);
         setVisible(true);
-
-        // --- LOGIC TỰ BUNG RA 10 GIÂY ---
         setForceOpen(true);
-        // --- THÊM DÒNG NÀY VÀO ĐÂY ---
-        // Bắn sự kiện để Dropdown và Page biết mà load lại
         window.dispatchEvent(new Event("notification-updated"));
-        // -----------------------------
-        setTimeout(() => {
-          setForceOpen(false);
-        }, 10000);
+        setTimeout(() => setForceOpen(false), 10000);
       }
     );
 
-    // Start kết nối
-    newConnection
-      .start()
-      .then(() => {
-        console.log(`✅ Đã kết nối SignalR thành công (${user?.username})`);
-      })
-      .catch((err) => {
-        console.error("❌ Kết nối thất bại:", err);
-      });
+    const startConnection = async () => {
+      try {
+        await newConnection.start();
+        console.log(`✅ SignalR Connected (${user?.username})`);
+      } catch (err) {
+        console.error("❌ SignalR Connection Error: ", err);
+        // Không cần retry thủ công ở đây vì đã có withAutomaticReconnect
+      }
+    };
 
+    startConnection();
     connectionRef.current = newConnection;
 
-    // Cleanup khi component bị hủy
     return () => {
       if (connectionRef.current) {
         connectionRef.current.stop();
       }
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated]); // Chỉ chạy lại khi trạng thái login thay đổi
 
-  // --- 3. AUTO SLIDE (Hiệu ứng chuyển tin) ---
+  // --- 3. AUTO SLIDE ---
   useEffect(() => {
     if (notifications.length <= 1 || forceOpen) return;
     const interval = setInterval(() => {
@@ -135,9 +155,8 @@ export function NotificationTicker() {
 
   if (!isAuthenticated || notifications.length === 0) return null;
 
+  // --- RENDER UI (Giữ nguyên như cũ) ---
   const currentItem = notifications[currentIndex];
-
-  // --- HELPERS & UI ---
   const formatTime = (dateString: string) => {
     try {
       if (!dateString) return "";
@@ -151,7 +170,6 @@ export function NotificationTicker() {
     e.stopPropagation();
     if (!currentItem) return;
     const { type, payload } = currentItem;
-
     switch (type) {
       case "voice_purchase":
         router.push("/author/revenue");
@@ -168,9 +186,8 @@ export function NotificationTicker() {
         break;
       case "chapter_comment":
       case "new_chapter":
-        if (payload.storyId && payload.chapterId) {
+        if (payload.storyId && payload.chapterId)
           router.push(`/reader/${payload.storyId}/${payload.chapterId}`);
-        }
         break;
       default:
         router.push("/notification");
@@ -210,7 +227,6 @@ export function NotificationTicker() {
             </span>
           </div>
         </div>
-
         <div
           className={cn(
             "transition-all duration-500 ease-in-out overflow-hidden",

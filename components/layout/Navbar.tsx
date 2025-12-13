@@ -103,6 +103,20 @@ export function Navbar() {
   //     console.error("Lỗi lấy thông tin profile navbar", error);
   //   }
   // };
+  // const fetchProfileData = async () => {
+  //   try {
+  //     const res = await profileService.getProfile();
+  //     if (res.data) {
+  //       setServerAvatar(res.data.avatarUrl);
+  //     }
+  //   } catch (error: any) {
+  //     // Nếu user (như mod) không có profile (Lỗi 404) -> Bỏ qua, không báo lỗi
+  //     if (error?.response?.status === 404) return;
+
+  //     console.warn("Lỗi khác:", error?.message);
+  //   }
+  // };
+  // --- CẬP NHẬT: Xử lý lỗi 404 nhẹ nhàng hơn ---
   const fetchProfileData = async () => {
     try {
       const res = await profileService.getProfile();
@@ -110,10 +124,15 @@ export function Navbar() {
         setServerAvatar(res.data.avatarUrl);
       }
     } catch (error: any) {
-      // Nếu user (như mod) không có profile (Lỗi 404) -> Bỏ qua, không báo lỗi
-      if (error?.response?.status === 404) return;
+      // CODE CŨ : console.warn("Lỗi khác:", error?.message);
 
-      console.warn("Lỗi khác:", error?.message);
+      // --- SỬA THÀNH CODE MỚI NÀY ---
+      // Nếu lỗi là 404 (Không tìm thấy Profile) -> return luôn, không log gì cả
+      if (error?.response?.status === 404) {
+        return;
+      }
+      // Các lỗi khác thì vẫn log để debug
+      console.warn("Lỗi lấy avatar:", error?.message);
     }
   };
   // ------------------------------------------
@@ -156,7 +175,13 @@ export function Navbar() {
       const res = await subscriptionService.claimDaily();
       const data = res.data;
 
-      toast.success(`Đã nhận ${data.claimedDias} Kim cương!`);
+      toast.success(
+        <div className="flex items-center gap-1">
+          <span>Đã nhận {data.claimedDias}</span>
+          <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+          <span>!</span>
+        </div>
+      );
 
       // Cập nhật UI cục bộ ngay lập tức
       setDiaBalance(data.walletBalance);
@@ -321,10 +346,10 @@ export function Navbar() {
               <Button
                 variant="outline"
                 size="sm"
-                className="hidden md:flex items-center gap-2 rounded-full border-yellow-500/50 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 mr-2"
+                className="hidden md:flex items-center gap-2 rounded-full border-blue-500/50 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-400 mr-2"
                 onClick={() => setIsTopUpOpen(true)}
               >
-                <Gem className="h-4 w-4 fill-yellow-500 text-yellow-600" />
+                <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
                 <span className="font-bold">{diaBalance.toLocaleString()}</span>
               </Button>
             )}
@@ -385,9 +410,14 @@ export function Navbar() {
                             ) : (
                               <Gift className="mr-2 h-4 w-4 animate-bounce" />
                             )}
-                            {isClaiming
-                              ? "Đang nhận..."
-                              : `Nhận ${claimInfo.amount} KC`}
+                            {isClaiming ? (
+                              "Đang nhận..."
+                            ) : (
+                              <div className="flex items-center justify-center gap-1">
+                                Nhận {claimInfo.amount}
+                                <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+                              </div>
+                            )}
                           </Button>
                         </div>
                       )}

@@ -702,40 +702,9 @@ export default function ProfilePage() {
                   </div>
                 )}
               </div>
-
-              {/* <div className="pt-2 border-t">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full text-xs h-8 text-muted-foreground hover:text-red-500"
-                  onClick={handleCancelPending}
-                >
-                  Kiểm tra đơn treo lỗi
-                </Button>
-              </div> */}
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-border/60">
-            <CardHeader className="pb-0">
-              <CardTitle className="text-l">Tài nguyên khác</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-0">
-              <div className="flex items-center justify-between px-3.5 py-2.5 bg-muted/40 rounded-lg">
-                <span className="text-sm font-medium">VC</span>
-                <span className="font-bold text-lg font-mono text-indigo-600 dark:text-indigo-400">
-                  {wallet.voiceCharBalance.toLocaleString()}
-                </span>
-              </div>
-              <Button
-                size="lg"
-                onClick={() => setIsVoiceTopupOpen(true)}
-                className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-sm"
-              >
-                Nạp ký tự Voice
-              </Button>
-            </CardContent>
-          </Card>
           <Card className="shadow-sm border-border/60">
             <CardContent className="p-4 flex flex-col gap-3">
               <Button
@@ -791,7 +760,6 @@ export default function ProfilePage() {
       <VoiceTopupModal
         isOpen={isVoiceTopupOpen}
         onClose={() => setIsVoiceTopupOpen(false)}
-        currentTextBalance={wallet.voiceCharBalance}
       />
     </div>
   );
