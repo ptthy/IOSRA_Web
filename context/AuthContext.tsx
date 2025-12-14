@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { authService } from "@/services/authService";
 import { authorUpgradeService } from "@/services/authorUpgradeService";
 import { refreshToken } from "@/services/apiClient";
-
+const STAFF_ROLES = ["admin", "omod", "cmod"];
 export interface User {
   id: string;
   username: string;
@@ -101,7 +101,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setToken(storedToken);
           setUser(parsedUser);
           setUserCookie(parsedUser); // Lưu vào cookie
-
+          // Chỉ lấy avatar mới nếu user KHÔNG phải là staff
+          const isStaff = STAFF_ROLES.includes(parsedUser.role || "");
           if (!parsedUser.avatar) {
             authService
               .getMyProfile()
@@ -201,12 +202,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         let avatarUrl = null;
         let displayName = username;
 
-        try {
-          const profileRes = await authService.getMyProfile();
-          avatarUrl = profileRes.data.avatarUrl || null;
-          displayName = profileRes.data.displayName || username; // nếu sau này có displayName thật
-        } catch (err) {
-          console.warn("Không lấy được avatar từ /api/Profile");
+        // Chỉ gọi API nếu KHÔNG PHẢI là staff
+        if (!STAFF_ROLES.includes(primaryRole)) {
+          try {
+            const profileRes = await authService.getMyProfile();
+            avatarUrl = profileRes.data.avatarUrl || null;
+            displayName = profileRes.data.displayName || username;
+          } catch (err) {
+            console.warn("Skip profile fetch: Reader profile not found.");
+          }
+        } else {
+          console.log("Skip profile fetch for Staff role:", primaryRole);
         }
 
         // Bước 3: Cập nhật lại user đầy đủ
@@ -248,14 +254,64 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast.success("Đã đăng xuất.");
   }, [router]);
 
+  // const setAuthData = useCallback(
+  //   (user: User, token: string) => {
+  //     setUser(user);
+  //     setToken(token);
+  //     localStorage.setItem("authUser", JSON.stringify(user));
+  //     localStorage.setItem("authToken", token);
+  //     setUserCookie(user); // Lưu vào cookie
+  //     router.push("/");
+  //   },
+  //   [router]
+  // );
   const setAuthData = useCallback(
-    (user: User, token: string) => {
-      setUser(user);
-      setToken(token);
-      localStorage.setItem("authUser", JSON.stringify(user));
-      localStorage.setItem("authToken", token);
-      setUserCookie(user); // Lưu vào cookie
-      router.push("/");
+    async (user: User, token: string) => {
+      // 1. Thêm từ khóa async
+      try {
+        // 2. Lưu token vào localStorage NGAY LẬP TỨC
+        // (Để authService.getMyProfile bên dưới có token mà gọi)
+        localStorage.setItem("authToken", token);
+
+        let finalUser = { ...user };
+
+        // Lấy role chính để check xem có phải admin/mod không
+        const primaryRole = user.role || getPrimaryRole(user.roles || []);
+
+        // 3. Nếu không phải Staff -> Gọi API lấy Avatar & DisplayName mới nhất
+        if (!STAFF_ROLES.includes(primaryRole)) {
+          try {
+            const profileRes = await authService.getMyProfile();
+            if (profileRes.data) {
+              finalUser = {
+                ...finalUser,
+                avatar: profileRes.data.avatarUrl || finalUser.avatar, // Ưu tiên avatar từ backend
+                displayName:
+                  profileRes.data.displayName || finalUser.displayName,
+              };
+            }
+          } catch (err) {
+            console.warn(
+              "setAuthData: Không lấy được profile bổ sung, dùng data gốc."
+            );
+          }
+        }
+
+        // 4. Cập nhật State và Cookie với user đã có avatar chuẩn
+        setUser(finalUser);
+        setToken(token);
+        localStorage.setItem("authUser", JSON.stringify(finalUser));
+        setUserCookie(finalUser);
+
+        // 5. Chuyển hướng
+        router.push("/");
+      } catch (error) {
+        console.error("Lỗi trong setAuthData", error);
+        // Fallback: Vẫn cho đăng nhập dù lỗi lấy profile
+        setUser(user);
+        setToken(token);
+        router.push("/");
+      }
     },
     [router]
   );
@@ -331,23 +387,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUserCookie(updatedUser);
 
       // Lấy thông tin profile nếu cần
-      try {
-        const profileRes = await authService.getMyProfile();
-        if (profileRes.data) {
-          const finalUser: User = {
-            ...updatedUser,
-            avatar: profileRes.data.avatarUrl || updatedUser.avatar,
-            displayName: profileRes.data.displayName || updatedUser.displayName,
-            bio: profileRes.data.bio || updatedUser.bio,
-            birthday: profileRes.data.birthday || updatedUser.birthday,
-          };
-          setUser(finalUser);
-          localStorage.setItem("authUser", JSON.stringify(finalUser));
-          setUserCookie(finalUser);
+      // Chỉ lấy profile lại nếu KHÔNG phải staff
+      if (!STAFF_ROLES.includes(primaryRole)) {
+        try {
+          const profileRes = await authService.getMyProfile();
+          if (profileRes.data) {
+            const finalUser: User = {
+              ...updatedUser,
+              avatar: profileRes.data.avatarUrl || updatedUser.avatar,
+              displayName:
+                profileRes.data.displayName || updatedUser.displayName,
+              bio: profileRes.data.bio || updatedUser.bio,
+              birthday: profileRes.data.birthday || updatedUser.birthday,
+            };
+            setUser(finalUser);
+            localStorage.setItem("authUser", JSON.stringify(finalUser));
+            setUserCookie(finalUser);
+          }
+        } catch (err) {
+          // Ignore profile error, use token data
+          console.warn("Không lấy được profile sau refresh:", err);
         }
-      } catch (err) {
-        // Ignore profile error, use token data
-        console.warn("Không lấy được profile sau refresh:", err);
       }
     } catch (error: any) {
       console.error("Lỗi refresh token:", error);

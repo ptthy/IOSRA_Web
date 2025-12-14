@@ -28,7 +28,10 @@ import {
   paymentService,
   PaymentPricingPackage,
 } from "@/services/paymentService";
-
+import {
+  subscriptionService,
+  SubscriptionPlan,
+} from "@/services/subscriptionService";
 interface TopUpModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -78,7 +81,7 @@ export function TopUpModal({
   currentBalance = 0,
 }: TopUpModalProps) {
   const [processingId, setProcessingId] = useState<string | null>(null);
-
+  const [premiumPlan, setPremiumPlan] = useState<SubscriptionPlan | null>(null);
   // State lưu danh sách gói lấy từ API
   const [packages, setPackages] = useState<PaymentPricingPackage[]>([]);
   const [isLoadingPackages, setIsLoadingPackages] = useState(false);
@@ -87,6 +90,14 @@ export function TopUpModal({
   useEffect(() => {
     if (isOpen) {
       const fetchPricing = async () => {
+        const subRes = await subscriptionService.getPlans();
+        if (subRes.data && subRes.data.length > 0) {
+          // Lấy gói đầu tiên hoặc tìm theo code "premium_month"
+          setPremiumPlan(
+            subRes.data.find((p) => p.planCode === "premium_month") ||
+              subRes.data[0]
+          );
+        }
         setIsLoadingPackages(true);
         try {
           const res = await paymentService.getPricingPackages();
@@ -201,7 +212,10 @@ export function TopUpModal({
                       </p>
                       <div className="flex items-baseline gap-1 mt-1">
                         <span className="text-3xl font-bold text-white">
-                          5.000đ
+                          {premiumPlan
+                            ? premiumPlan.priceVnd.toLocaleString()
+                            : "..."}
+                          đ
                         </span>
                         <span className="text-sm font-medium text-white/80">
                           /tháng

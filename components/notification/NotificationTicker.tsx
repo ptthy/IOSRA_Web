@@ -172,7 +172,12 @@ export function NotificationTicker() {
     const { type, payload } = currentItem;
     switch (type) {
       case "voice_purchase":
+      case "op_request": // Rút tiền
+      case "chapter_purchase": // Người khác mua chương
         router.push("/author/revenue");
+        break;
+      case "author_rank_upgrade":
+        router.push("/author/author-upgrade-rank");
         break;
       case "subscription_reminder":
         router.push("/profile");

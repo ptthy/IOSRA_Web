@@ -9,6 +9,10 @@ import {
   MessageSquare,
   Star,
   Info,
+  Coins,
+  CreditCard,
+  Trophy,
+  Mic,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NotificationItem as INotificationItem } from "@/services/notificationService";
@@ -27,6 +31,14 @@ const getIcon = (type: string) => {
       return <MessageSquare className="h-4 w-4 text-purple-500" />;
     case "story_rating":
       return <Star className="h-4 w-4 text-orange-500" />;
+    case "op_request":
+      return <CreditCard className="h-4 w-4 text-emerald-600" />;
+    case "chapter_purchase":
+      return <Coins className="h-4 w-4 text-yellow-600" />;
+    case "author_rank_upgrade":
+      return <Trophy className="h-4 w-4 text-pink-500" />;
+    case "voice_purchase":
+      return <Mic className="h-4 w-4 text-indigo-500" />;
     default:
       return <Info className="h-4 w-4 text-gray-500" />;
   }
