@@ -119,11 +119,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               .catch(() => {});
           }
 
-          // Check ngầm lại nếu cần
-          if (
-            !parsedUser.isAuthorApproved &&
-            !parsedUser.roles?.includes("author")
-          ) {
+          // Check ngầm lại nếu cần (CHỈ cho reader, KHÔNG cho staff)
+          if (!isStaff && !parsedUser.isAuthorApproved && !parsedUser.roles?.includes("author")) {
             const isApproved = await checkApprovedStatus();
             if (isApproved) {
               const updatedUser = { ...parsedUser, isAuthorApproved: true };
@@ -149,22 +146,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const response = await authService.login(data);
 
-        const {
-          accountId,
-          username,
-          email,
-          token,
-          roles: backendRoles = [],
-        } = response.data;
+        const { accountId, username, email, token, roles: backendRoles = [] } = response.data;
 
         if (!token) throw new Error("Không có token.");
 
         const decodedPayload: any = jwtDecode(token);
 
-        const rawRoles =
-          backendRoles.length > 0 ? backendRoles : decodedPayload.roles || [];
-        const userRoles = (Array.isArray(rawRoles) ? rawRoles : [rawRoles]).map(
-          (r: string) => r.toLowerCase().trim()
+        const rawRoles = backendRoles.length > 0 ? backendRoles : decodedPayload.roles || [];
+        const userRoles = (Array.isArray(rawRoles) ? rawRoles : [rawRoles]).map((r: string) =>
+          r.toLowerCase().trim()
         );
 
         const primaryRole = getPrimaryRole(userRoles);
@@ -174,9 +164,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!isApproved && primaryRole === "reader") {
           try {
             const reqRes = await authorUpgradeService.getMyRequests();
-            isApproved = reqRes.data.some(
-              (req: any) => req.status === "approved"
-            );
+            isApproved = reqRes.data.some((req: any) => req.status === "approved");
           } catch (e) {}
         }
 
@@ -287,14 +275,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               finalUser = {
                 ...finalUser,
                 avatar: profileRes.data.avatarUrl || finalUser.avatar, // Ưu tiên avatar từ backend
-                displayName:
-                  profileRes.data.displayName || finalUser.displayName,
+                displayName: profileRes.data.displayName || finalUser.displayName,
               };
             }
           } catch (err) {
-            console.warn(
-              "setAuthData: Không lấy được profile bổ sung, dùng data gốc."
-            );
+            console.warn("setAuthData: Không lấy được profile bổ sung, dùng data gốc.");
           }
         }
 
@@ -342,8 +327,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Lấy roles từ token
       const rawRoles = decodedPayload.roles || [];
-      const userRoles = (Array.isArray(rawRoles) ? rawRoles : [rawRoles]).map(
-        (r: string) => r.toLowerCase().trim()
+      const userRoles = (Array.isArray(rawRoles) ? rawRoles : [rawRoles]).map((r: string) =>
+        r.toLowerCase().trim()
       );
 
       const primaryRole = getPrimaryRole(userRoles);
@@ -353,17 +338,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!isApproved && primaryRole === "reader") {
         try {
           const reqRes = await authorUpgradeService.getMyRequests();
-          isApproved = reqRes.data.some(
-            (req: any) => req.status === "approved"
-          );
+          isApproved = reqRes.data.some((req: any) => req.status === "approved");
         } catch (e) {
           // Ignore error
         }
       }
 
       // Lấy thông tin user hiện tại để giữ avatar, displayName
-      const currentUser =
-        user || JSON.parse(localStorage.getItem("authUser") || "null");
+      const currentUser = user || JSON.parse(localStorage.getItem("authUser") || "null");
 
       // Tạo user object mới từ token
       const updatedUser: User = {
@@ -396,8 +378,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const finalUser: User = {
               ...updatedUser,
               avatar: profileRes.data.avatarUrl || updatedUser.avatar,
-              displayName:
-                profileRes.data.displayName || updatedUser.displayName,
+              displayName: profileRes.data.displayName || updatedUser.displayName,
               bio: profileRes.data.bio || updatedUser.bio,
               birthday: profileRes.data.birthday || updatedUser.birthday,
             };
@@ -418,8 +399,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   // ✅ LOGIC NAVBAR
-  const isAuthor =
-    user?.roles?.includes("author") ?? user?.isAuthorApproved ?? false;
+  const isAuthor = user?.roles?.includes("author") ?? user?.isAuthorApproved ?? false;
 
   const value: AuthContextType = {
     user,
