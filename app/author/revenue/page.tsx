@@ -45,6 +45,8 @@ import {
   FileText,
   User,
   Gem,
+  Mic,
+  CheckCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -673,6 +675,12 @@ export default function AuthorRevenuePage() {
             <CheckCircle2 className="w-3 h-3 mr-1" /> Cộng vào
           </span>
         );
+      case "voice_generation":
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+            <Mic className="w-3 h-3 mr-1" /> Tạo giọng đọc AI
+          </span>
+        );
 
       case "withdraw_reserve":
         return (
@@ -697,6 +705,13 @@ export default function AuthorRevenuePage() {
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
             <Clock className="w-3 h-3 mr-1" /> Đang xử lý
+          </span>
+        );
+
+      case "confirmed":
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-700 text-white border border-green-800 shadow-sm">
+            <CheckCircle2 className="w-3 h-3 mr-1 text-white" /> Đã ký xác nhận
           </span>
         );
 
@@ -1081,8 +1096,7 @@ export default function AuthorRevenuePage() {
                   Chưa có đơn cần xác nhận
                 </h3>
                 <p className="text-sm text-[var(--muted-foreground)] max-w-xs mx-auto mt-2">
-                  Hiện tại không có đơn đối soát nào cần bạn xác nhận. Hãy quay
-                  lại sau khi admin duyệt đơn nhé.
+                  Hiện tại không có đơn đối soát nào cần bạn xác nhận.
                 </p>
               </div>
             )}

@@ -44,7 +44,7 @@ export function Navbar() {
   // --- STATE VÍ & MODAL ---
   const [diaBalance, setDiaBalance] = useState(0);
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
-  const [serverAvatar, setServerAvatar] = useState<string | null>(null);
+
   // --- STATE NHẬN QUÀ ---
   const [claimInfo, setClaimInfo] = useState({
     canClaim: false,
@@ -53,6 +53,7 @@ export function Navbar() {
   const [isClaiming, setIsClaiming] = useState(false);
 
   const { user, isAuthenticated, logout } = useAuth();
+  const isStaff = user?.role && ["admin", "omod", "cmod"].includes(user.role);
   const isAuthor =
     user?.roles?.includes("author") || (user as any)?.isAuthorApproved;
   const isAuthPage =
@@ -91,67 +92,23 @@ export function Navbar() {
       console.error("Lỗi check daily claim navbar", error);
     }
   };
-  // --- THÊM HÀM LẤY PROFILE ĐỂ LẤY AVATAR ---
-  // const fetchProfileData = async () => {
-  //   try {
-  //     const res = await profileService.getProfile();
-  //     if (res.data) {
-  //       // Lấy đúng field "avatarUrl" từ JSON response
-  //       setServerAvatar(res.data.avatarUrl);
-  //     }
-  //   } catch (error) {
-  //     console.error("Lỗi lấy thông tin profile navbar", error);
-  //   }
-  // };
-  // const fetchProfileData = async () => {
-  //   try {
-  //     const res = await profileService.getProfile();
-  //     if (res.data) {
-  //       setServerAvatar(res.data.avatarUrl);
-  //     }
-  //   } catch (error: any) {
-  //     // Nếu user (như mod) không có profile (Lỗi 404) -> Bỏ qua, không báo lỗi
-  //     if (error?.response?.status === 404) return;
-
-  //     console.warn("Lỗi khác:", error?.message);
-  //   }
-  // };
-  // --- CẬP NHẬT: Xử lý lỗi 404 nhẹ nhàng hơn ---
-  const fetchProfileData = async () => {
-    try {
-      const res = await profileService.getProfile();
-      if (res.data) {
-        setServerAvatar(res.data.avatarUrl);
-      }
-    } catch (error: any) {
-      // CODE CŨ : console.warn("Lỗi khác:", error?.message);
-
-      // --- SỬA THÀNH CODE MỚI NÀY ---
-      // Nếu lỗi là 404 (Không tìm thấy Profile) -> return luôn, không log gì cả
-      if (error?.response?.status === 404) {
-        return;
-      }
-      // Các lỗi khác thì vẫn log để debug
-      console.warn("Lỗi lấy avatar:", error?.message);
-    }
-  };
-  // ------------------------------------------
 
   // --- EFFECT LẮNG NGHE SỰ KIỆN & LOAD DỮ LIỆU ---
   useEffect(() => {
+    // Chỉ chạy nếu đã đăng nhập VÀ KHÔNG PHẢI LÀ STAFF
+    const shouldFetchData = isAuthenticated && !isStaff;
     const handleWalletUpdate = () => {
-      if (isAuthenticated) {
+      // SỬA: Thêm điều kiện !isStaff để không gọi API ví nếu là admin/mod
+      if (isAuthenticated && !isStaff) {
         fetchWallet();
         checkClaimStatus();
-        fetchProfileData();
       }
     };
 
     // Gọi lần đầu khi component mount hoặc auth thay đổi
-    if (isAuthenticated) {
+    if (shouldFetchData) {
       fetchWallet();
       checkClaimStatus();
-      fetchProfileData();
     }
 
     // Đăng ký sự kiện cập nhật ví từ nơi khác (ví dụ: trang Profile)
@@ -161,7 +118,7 @@ export function Navbar() {
     return () => {
       window.removeEventListener("wallet-updated", handleWalletUpdate);
     };
-  }, [isAuthenticated, pathname]);
+  }, [isAuthenticated, pathname, isStaff]);
 
   // --- HÀM XỬ LÝ NHẬN QUÀ ---
   const handleQuickClaim = async (e: React.MouseEvent) => {
@@ -236,24 +193,9 @@ export function Navbar() {
     router.push("/");
   };
 
-  // const renderAvatar = (size = 10) => (
-  //   <Avatar className={`h-${size} w-${size}`}>
-  //     {user?.avatar ? (
-  //       <AvatarImage
-  //         src={user.avatar}
-  //         alt={user?.displayName || user?.username || "User"}
-  //         className="h-full w-full object-cover"
-  //       />
-  //     ) : (
-  //       <AvatarFallback className="bg-secondary text-secondary-foreground">
-  //         {getInitials(user?.displayName || user?.username || "")}
-  //       </AvatarFallback>
-  //     )}
-  //   </Avatar>
-  // );
   const renderAvatar = (size = 10) => {
     // Ưu tiên lấy serverAvatar (từ API) -> sau đó mới tới user.avatar (từ Context)
-    const displayAvatar = serverAvatar || user?.avatar;
+    const displayAvatar = user?.avatar;
     const displayName = user?.displayName || user?.username || "";
 
     return (
