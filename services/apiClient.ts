@@ -39,8 +39,7 @@ const showErrorToast = (err: any) => {
   }
 
   // --- FALLBACK (Cho các lỗi mạng hoặc lỗi không đúng chuẩn trên) ---
-  const fallbackMsg =
-    err.response?.data?.message || "Có lỗi xảy ra. Vui lòng thử lại.";
+  const fallbackMsg = err.response?.data?.message || "Có lỗi xảy ra. Vui lòng thử lại.";
 
   // Không hiện toast fallback nếu lỗi là 401 (vì sẽ xử lý refresh token)
   // hoặc các mã lỗi đặc biệt đã được xử lý riêng (như ChapterLocked log bên dưới)
@@ -77,8 +76,7 @@ export const refreshToken = async (): Promise<string> => {
     }
   );
 
-  const newToken =
-    refreshResponse.data?.token || refreshResponse.data?.data?.token;
+  const newToken = refreshResponse.data?.token || refreshResponse.data?.data?.token;
 
   if (!newToken) {
     throw new Error("Không nhận được token mới từ refresh API");
@@ -125,11 +123,7 @@ apiClient.interceptors.response.use(
     };
 
     // Xử lý lỗi 401 - CHỈ khi accessToken hết hạn
-    if (
-      error.response?.status === 401 &&
-      originalRequest &&
-      !originalRequest._retry
-    ) {
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       // Chỉ refresh ở client-side
       if (typeof window === "undefined") {
         return Promise.reject(error);
@@ -150,9 +144,7 @@ apiClient.interceptors.response.use(
       const responseData = error.response?.data as any;
       const errorCode = responseData?.error?.code;
       const errorMessage =
-        responseData?.error?.message?.toLowerCase() ||
-        responseData?.message?.toLowerCase() ||
-        "";
+        responseData?.error?.message?.toLowerCase() || responseData?.message?.toLowerCase() || "";
 
       // Nếu có error code/message rõ ràng là lỗi KHÔNG phải expired -> reject ngay
       const isNotExpiredError =
@@ -248,11 +240,7 @@ apiClient.interceptors.response.use(
     }
 
     // Xử lý lỗi 403 - THỬ REFRESH TOKEN TRƯỚC
-    if (
-      error.response?.status === 403 &&
-      originalRequest &&
-      !originalRequest._retry
-    ) {
+    if (error.response?.status === 403 && originalRequest && !originalRequest._retry) {
       // Chỉ refresh ở client-side
       if (typeof window === "undefined") {
         return Promise.reject(error);
@@ -281,8 +269,7 @@ apiClient.interceptors.response.use(
       const isAuthorPermissionError =
         errorMsgLower.includes("author") ||
         errorMsgLower.includes("tác giả") ||
-        (typeof window !== "undefined" &&
-          window.location.pathname.startsWith("/author"));
+        (typeof window !== "undefined" && window.location.pathname.startsWith("/author"));
 
       if (isAuthorPermissionError) {
         console.log("Phát hiện lỗi thiếu quyền Author -> Thử refresh token...");
@@ -409,14 +396,25 @@ const handle403Error = (error: AxiosError) => {
     errorMessage?.includes("author") ||
     errorMessage?.includes("tác giả") ||
     errorCode?.includes("Author") ||
-    (typeof window !== "undefined" &&
-      window.location.pathname.startsWith("/author"))
+    (typeof window !== "undefined" && window.location.pathname.startsWith("/author"))
   ) {
-    if (
-      typeof window !== "undefined" &&
-      !window.location.pathname.includes("author-upgrade")
-    ) {
-      window.location.href = "/author-upgrade";
+    // KHÔNG redirect nếu đang ở trang staff (Op, Admin, Content)
+    if (typeof window !== "undefined") {
+      const currentPath = window.location.pathname;
+      const isStaffPage =
+        currentPath.startsWith("/Op/") ||
+        currentPath.startsWith("/Admin") ||
+        currentPath.startsWith("/Content/");
+
+      // Chỉ redirect đến author-upgrade nếu:
+      // 1. KHÔNG phải trang staff
+      // 2. VÀ chưa ở trang author-upgrade
+      if (!isStaffPage && !currentPath.includes("author-upgrade")) {
+        window.location.href = "/author-upgrade";
+      } else if (isStaffPage) {
+        // Nếu là trang staff, chỉ hiện lỗi, không redirect
+        showErrorToast(error);
+      }
     }
     return Promise.reject(error);
   }
@@ -424,10 +422,20 @@ const handle403Error = (error: AxiosError) => {
   else {
     showErrorToast(error);
     if (typeof window !== "undefined") {
-      // Xóa token và thông tin người dùng khỏi localStorage
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("authUser");
-      window.location.href = "/";
+      const currentPath = window.location.pathname;
+      const isStaffPage =
+        currentPath.startsWith("/Op/") ||
+        currentPath.startsWith("/Admin") ||
+        currentPath.startsWith("/Content/");
+
+      // KHÔNG xóa token nếu đang ở trang staff (có thể chỉ là lỗi quyền API)
+      if (!isStaffPage) {
+        // Xóa token và thông tin người dùng khỏi localStorage
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("authUser");
+        window.location.href = "/";
+      }
+      // Nếu là trang staff, chỉ hiện lỗi, giữ nguyên trang
     }
     return Promise.reject(error);
   }
