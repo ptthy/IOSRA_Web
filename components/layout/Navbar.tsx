@@ -98,14 +98,15 @@ export function Navbar() {
     // Chỉ chạy nếu đã đăng nhập VÀ KHÔNG PHẢI LÀ STAFF
     const shouldFetchData = isAuthenticated && !isStaff;
     const handleWalletUpdate = () => {
-      if (isAuthenticated) {
+      // SỬA: Thêm điều kiện !isStaff để không gọi API ví nếu là admin/mod
+      if (isAuthenticated && !isStaff) {
         fetchWallet();
         checkClaimStatus();
       }
     };
 
     // Gọi lần đầu khi component mount hoặc auth thay đổi
-    if (isAuthenticated) {
+    if (shouldFetchData) {
       fetchWallet();
       checkClaimStatus();
     }

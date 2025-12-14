@@ -103,7 +103,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUserCookie(parsedUser); // Lưu vào cookie
           // Chỉ lấy avatar mới nếu user KHÔNG phải là staff
           const isStaff = STAFF_ROLES.includes(parsedUser.role || "");
-          if (!parsedUser.avatar) {
+          // SỬA: Thêm && !isStaff vào điều kiện
+          if (!parsedUser.avatar && !isStaff) {
             authService
               .getMyProfile()
               .then((res) => {
