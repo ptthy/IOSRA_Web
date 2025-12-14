@@ -133,6 +133,8 @@ const COMMITMENT_TEXT =
 
 export default function AuthorRankDashboard() {
   const [isLoading, setIsLoading] = useState(true);
+  // State lưu full lịch sử
+  const [allRequests, setAllRequests] = useState<RankUpgradeResponse[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [typedCommitment, setTypedCommitment] = useState("");
 
@@ -200,7 +202,8 @@ export default function AuthorRankDashboard() {
       // Gọi API requests để lấy trạng thái
       const requestsRes = await authorUpgradeService.getRankRequests();
       const requests = requestsRes.data || [];
-
+      // Lưu lại toàn bộ danh sách để hiển thị lịch sử
+      setAllRequests(requests);
       // Sắp xếp lấy request mới nhất
       const latest = requests.sort(
         (a, b) =>
@@ -421,22 +424,27 @@ export default function AuthorRankDashboard() {
                 </div>
                 <Users className="w-6 h-6 text-indigo-500 dark:text-indigo-400" />
               </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Tiến trình:</span>
-                  <span className="font-semibold text-foreground">
-                    {rankStatus.totalFollowers}/
-                    {rankStatus.nextRankMinFollowers}
-                  </span>
+              {!isMaxRank ? (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Tiến trình:</span>
+                    <span className="font-semibold text-foreground">
+                      {rankStatus.totalFollowers}/
+                      {rankStatus.nextRankMinFollowers}
+                    </span>
+                  </div>
+                  <Progress value={progressPercent} className="h-2" />
+                  <p className="text-xs text-muted-foreground">
+                    {isEligible
+                      ? "✅ Đã đủ điều kiện"
+                      : `Cần thêm ${followersNeeded} followers`}
+                  </p>
                 </div>
-                <Progress value={progressPercent} className="h-2" />
-                <p className="text-xs text-muted-foreground">
-                  {isEligible
-                    ? "✅ Đã đủ điều kiện"
-                    : `Cần thêm ${followersNeeded} followers`}
+              ) : (
+                <p className="text-sm text-indigo-600 dark:text-indigo-300 font-medium pt-2">
+                  Hãy tiếp tục phát huy phong độ nhé!
                 </p>
-              </div>
+              )}
             </CardContent>
           </Card>
 
@@ -521,9 +529,9 @@ export default function AuthorRankDashboard() {
           <Card className="shadow-xl border-2 border-cyan-200 dark:border-cyan-800 bg-gradient-to-br from-cyan-50 via-white to-cyan-100 dark:from-cyan-950/40 dark:via-background dark:to-cyan-900/20">
             <CardHeader className="text-center pb-2">
               <div className="mx-auto mb-4 p-4 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-full shadow-lg shadow-cyan-200 dark:shadow-cyan-900/50">
-                <Trophy className="w-12 h-12 text-white animate-pulse" />
+                <Trophy className="w-8 h-8 text-white animate-pulse" />
               </div>
-              <CardTitle className="text-3xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-400 dark:to-blue-400 bg-clip-text text-transparent">
+              <CardTitle className="text-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-400 dark:to-blue-400 bg-clip-text text-transparent">
                 Chúc mừng! Bạn đã chạm tới cấp bậc cao quý nhất hệ thống.
               </CardTitle>
               {/* <CardDescription className="text-lg text-cyan-700 dark:text-cyan-300 mt-2">
@@ -740,6 +748,74 @@ export default function AuthorRankDashboard() {
                   Gửi Lại Yêu Cầu
                 </Button>
               )}
+            </CardContent>
+          </Card>
+        )}
+        {/* --- LỊCH SỬ YÊU CẦU --- */}
+        {allRequests.length > 0 && (
+          <Card className="shadow-sm border mt-8">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Clock className="w-5 h-5 text-muted-foreground" />
+                Lịch sử yêu cầu nâng hạng
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
+                    <tr>
+                      <th className="px-4 py-3">Thời gian</th>
+                      <th className="px-4 py-3">Từ Rank</th>
+                      <th className="px-4 py-3">Lên Rank</th>
+                      <th className="px-4 py-3">Trạng thái</th>
+                      <th className="px-4 py-3">Ghi chú</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {allRequests.map((req) => (
+                      <tr
+                        key={req.requestId}
+                        className="hover:bg-muted/50 transition-colors"
+                      >
+                        <td className="px-4 py-3 font-medium">
+                          {new Date(req.createdAt).toLocaleDateString("vi-VN", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </td>
+                        <td className="px-4 py-3">{req.currentRankName}</td>
+                        <td className="px-4 py-3 font-bold text-primary">
+                          {req.targetRankName}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                              req.status.toLowerCase() === "approved"
+                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                : req.status.toLowerCase() === "pending"
+                                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                                : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                            }`}
+                          >
+                            {req.status === "approved"
+                              ? "Thành công"
+                              : req.status === "pending"
+                              ? "Đang chờ"
+                              : "Từ chối"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground max-w-[200px] truncate">
+                          {req.moderatorNote || "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </CardContent>
           </Card>
         )}

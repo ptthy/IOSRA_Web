@@ -123,11 +123,27 @@ export default function CreateStoryPage() {
 
       // --- C. Nếu là lỗi Validation (có details) ---
       if (details) {
+        // --- Bắt riêng lỗi Dàn ý (Outline) để việt hóa ---
+        if (details.Outline) {
+          toast.error("Dàn ý cốt truyện phải có ít nhất 20 ký tự.");
+          return;
+        }
         const firstKey = Object.keys(details)[0];
         if (firstKey && details[firstKey].length > 0) {
           toast.error(details[firstKey].join(" "));
           return;
         }
+      }
+      // 3. Sau đó mới hiển thị message chung (nếu không có details)
+      if (message) {
+        // Nếu message là "Validation failed." mà không có details thì mới hiện
+        // hoặc các lỗi logic khác từ backend
+        if (message !== "Validation failed.") {
+          toast.error(message);
+        } else {
+          toast.error("Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.");
+        }
+        return;
       }
     }
 
