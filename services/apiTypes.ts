@@ -11,7 +11,13 @@ export interface Story {
   authorId: string;
   authorUsername?: string; // Thêm trường này
   authorName?: string;
-  status: "draft" | "pending" | "rejected" | "published" | "completed";
+  status:
+    | "draft"
+    | "pending"
+    | "rejected"
+    | "published"
+    | "completed"
+    | "hidden";
   aiScore?: number;
   aiResult?: string;
   aiNote?: string;
@@ -58,7 +64,7 @@ export interface Chapter {
   languageCode: string;
   languageName: string;
   priceDias: number;
-  status: "draft" | "pending" | "rejected" | "published";
+  status: "draft" | "pending" | "rejected" | "published" | "hidden";
   createdAt: string;
   updatedAt: string;
   submittedAt?: string | null;
@@ -79,7 +85,7 @@ export interface ChapterDetails extends Chapter {
   summary?: string | null;
   accessType?: string;
   contentPath?: string;
-  readingTime?: number;
+
   rankName?: "Casual" | "Bronze" | "Gold" | "Diamond" | string;
 }
 
@@ -160,7 +166,7 @@ export interface VoiceAudio {
   voiceId: string;
   voiceName: string;
   voiceCode: string;
-  status: "processing" | "ready" | "failed";
+  status: "processing" | "ready" | "failed" | "pending";
   audioUrl: string;
   requestedAt: string;
   completedAt?: string;

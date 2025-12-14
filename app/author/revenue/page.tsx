@@ -44,6 +44,9 @@ import {
   CreditCard,
   FileText,
   User,
+  Gem,
+  Mic,
+  CheckCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -54,13 +57,45 @@ import {
 } from "@/services/authorRevenueService";
 
 // --- HELPERS ---
-const formatVND = (amount: number) => {
-  const value = new Intl.NumberFormat("vi-VN").format(amount);
-
-  // Trả về số kèm chữ AP
-  return `${value} AP`;
+// 1. Chỉ format số, BỎ chữ "AP"
+const formatNumber = (amount: number) => {
+  return new Intl.NumberFormat("vi-VN").format(amount);
 };
 
+// 2. Component hiển thị Số + Icon Gem (Dùng cái này thay thế cho text AP)
+const APDisplay = ({
+  value,
+  className = "",
+  iconSize = 14,
+  showPlus = false,
+}: {
+  value: number;
+  className?: string;
+  iconSize?: number;
+  showPlus?: boolean;
+}) => {
+  const isPositive = value > 0;
+  // Màu mặc định: Xanh lá nếu dương (khi showPlus), Đỏ nếu âm, hoặc theo class truyền vào
+  const defaultColor =
+    value < 0
+      ? "text-red-600"
+      : showPlus && isPositive
+      ? "text-green-600"
+      : "text-[var(--foreground)]";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 font-bold ${
+        className || defaultColor
+      }`}
+    >
+      {showPlus && isPositive ? "+" : ""}
+      {formatNumber(value)}
+      {/* Icon Gem màu xanh dương */}
+      <Gem size={iconSize} className="h-4 w-4 fill-blue-500 text-blue-600" />
+    </span>
+  );
+};
 const formatDate = (dateString: string) => {
   if (!dateString) return "N/A";
   return new Date(dateString).toLocaleString("vi-VN", {
@@ -171,17 +206,22 @@ const DetailModal = ({
           {/* SỐ TIỀN & THỜI GIAN */}
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 bg-[var(--muted)]/30 rounded-lg border border-[var(--border)]">
-              <span className="text-sm font-medium text-[var(--muted-foreground)]">
-                Số AP
+              <span className="text-sm font-medium text-[var(--muted-foreground)] flex items-center gap-1">
+                Số <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
               </span>
               <div
                 className={`text-2xl font-bold ${
                   data.amount > 0 ? "text-green-600" : "text-red-600"
                 }`}
               >
-                {type === "transaction"
-                  ? (data.amount > 0 ? "+" : "") + formatVND(data.amount)
-                  : formatVND(data.amount)}
+                <APDisplay
+                  value={data.amount}
+                  className={`text-2xl ${
+                    data.amount > 0 ? "text-green-600" : "text-red-600"
+                  }`}
+                  iconSize={20}
+                  showPlus={type === "transaction"}
+                />
               </div>
             </div>
             <div className="p-4 bg-[var(--muted)]/30 rounded-lg border border-[var(--border)] flex flex-col justify-center">
@@ -254,13 +294,18 @@ const DetailModal = ({
 
                             {/* Cột Phải: Giá trị */}
                             <TableCell className="text-[var(--foreground)] break-all">
-                              {key === "grossAmount"
-                                ? formatVND(Number(value))
-                                : Array.isArray(value) // Nếu còn mảng nào khác thì join lại
-                                ? value.join(", ")
-                                : typeof value === "object"
-                                ? JSON.stringify(value)
-                                : String(value)}
+                              {(key === "grossAmount" ||
+                                key.toLowerCase().includes("price") ||
+                                key.toLowerCase().includes("cost")) &&
+                              typeof value === "number" ? (
+                                <APDisplay value={Number(value)} />
+                              ) : Array.isArray(value) ? ( // Logic cũ giữ nguyên
+                                value.join(", ")
+                              ) : typeof value === "object" ? (
+                                JSON.stringify(value)
+                              ) : (
+                                String(value)
+                              )}
                             </TableCell>
                           </TableRow>
                         );
@@ -455,11 +500,21 @@ export default function AuthorRevenuePage() {
     const amountNum = Number(rawAmountStr);
 
     if (!amountNum || amountNum < 1000) {
-      toast.error("Số AP luân chuyển tối thiểu là 1.000 AP");
+      toast.error(
+        <div className="flex items-center gap-1">
+          Số <Gem className="h-4 w-4 fill-blue-500 text-blue-600" /> luân chuyển
+          tối thiểu là 1.000
+        </div>
+      );
       return;
     }
     if (amountNum > summary.revenueBalance) {
-      toast.error("Số AP khả dụng không đủ.");
+      toast.error(
+        <div className="flex items-center gap-1">
+          Số <Gem className="h-4 w-4 fill-blue-500 text-blue-600" /> khả dụng
+          không đủ.
+        </div>
+      );
       return;
     }
     if (!bankName || !bankAccount || !accountHolder) {
@@ -524,6 +579,22 @@ export default function AuthorRevenuePage() {
       handleApiError(error, "Gửi yêu cầu chuyển đối/đối soát thất bại.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+  const handleConfirmReceipt = async (requestId: string) => {
+    try {
+      setLoading(true);
+      await authorRevenueService.confirmWithdraw(requestId);
+
+      toast.success("Đã xác nhận nhận tiền thành công! Cảm ơn bạn.");
+
+      // Tải lại dữ liệu để cập nhật danh sách
+      await fetchAllData();
+    } catch (error: any) {
+      console.error("Lỗi xác nhận:", error);
+      handleApiError(error, "Xác nhận thất bại, vui lòng thử lại.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -604,6 +675,12 @@ export default function AuthorRevenuePage() {
             <CheckCircle2 className="w-3 h-3 mr-1" /> Cộng vào
           </span>
         );
+      case "voice_generation":
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+            <Mic className="w-3 h-3 mr-1" /> Tạo giọng đọc AI
+          </span>
+        );
 
       case "withdraw_reserve":
         return (
@@ -628,6 +705,13 @@ export default function AuthorRevenuePage() {
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
             <Clock className="w-3 h-3 mr-1" /> Đang xử lý
+          </span>
+        );
+
+      case "confirmed":
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-700 text-white border border-green-800 shadow-sm">
+            <CheckCircle2 className="w-3 h-3 mr-1 text-white" /> Đã ký xác nhận
           </span>
         );
 
@@ -705,32 +789,37 @@ export default function AuthorRevenuePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
           {
-            title: "Số AP khả dụng",
-            value: formatVND(summary?.revenueBalance || 0),
+            title: (
+              <span className="flex items-center gap-1">
+                Số <Gem className="w-4 h-4 fill-blue-500 text-blue-600" /> khả
+                dụng
+              </span>
+            ),
+            value: summary?.revenueBalance || 0,
             icon: <Wallet className="w-5 h-5" />,
             color: "var(--primary)",
             desc: "Có thể đối soát ngay",
           },
           {
             title: "Đang chờ xử lý",
-            value: formatVND(summary?.revenuePending || 0),
+            value: summary?.revenuePending || 0,
             icon: <History className="w-5 h-5" />,
             color: "#f59e0b",
             desc: "Yêu cầu đối soát đang duyệt",
           },
           {
             title: "Đã đối soát thành công",
-            value: formatVND(summary?.revenueWithdrawn || 0),
+            value: summary?.revenueWithdrawn || 0,
             icon: <CheckCircle2 className="w-5 h-5" />,
             color: "#10b981",
-            desc: "Tổng AP đã đối soát về",
+            desc: "Tổng dias đã đối soát về",
           },
           {
             title: "Tổng Lũy Kế",
-            value: formatVND(summary?.totalRevenue || 0),
+            value: summary?.totalRevenue || 0,
             icon: <TrendingUp className="w-5 h-5" />,
             color: "#7c3aed",
-            desc: "Bao gồm cả số AP đã đối soát ",
+            desc: "Bao gồm cả số dias đã đối soát ",
           },
         ].map((item, idx) => (
           <Card
@@ -745,7 +834,7 @@ export default function AuthorRevenuePage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-[var(--foreground)]">
-                {item.value}
+                <APDisplay value={item.value as number} />
               </div>
               <p className="text-xs text-[var(--muted-foreground)] mt-1">
                 {item.desc}
@@ -771,8 +860,9 @@ export default function AuthorRevenuePage() {
             <form onSubmit={handleWithdraw} className="space-y-4">
               <div className="space-y-1.5">
                 <Label>
-                  Số lượng AP mong muốn{" "}
-                  <span className="text-red-500 ml-1">*</span>
+                  Số lượng{" "}
+                  <Gem className="h-4 w-4 fill-blue-500 text-blue-600" /> (dias)
+                  mong muốn <span className="text-red-500 ml-1">*</span>
                 </Label>
                 <Input
                   type="text"
@@ -795,7 +885,11 @@ export default function AuthorRevenuePage() {
                   className="font-mono text-lg tracking-wider text-right bg-[var(--background)] dark:border-[#f0ead6]"
                 />
                 <p className="text-[10px] text-right text-[var(--muted-foreground)]">
-                  Khả dụng: {formatVND(summary?.revenueBalance || 0)}
+                  Khả dụng:{" "}
+                  <APDisplay
+                    value={summary?.revenueBalance || 0}
+                    iconSize={10}
+                  />
                 </p>
               </div>
 
@@ -861,70 +955,154 @@ export default function AuthorRevenuePage() {
           </CardContent>
         </Card>
 
-        {/* CHART (RESIZED) */}
-        <Card className="lg:col-span-7 border border-[var(--border)] bg-[var(--card)] shadow-sm flex flex-col">
-          <CardHeader>
-            <CardTitle className="text-[var(--primary)]">
-              Biểu Đồ Thu Nhập
-            </CardTitle>
-            <CardDescription>Xu hướng doanh thu theo ngày</CardDescription>
-          </CardHeader>
-          <CardContent className="flex-1 min-h-[300px]">
-            <div className="h-full w-full min-h-[300px]">
-              {chartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="var(--border)"
-                      vertical={false}
-                    />
-                    <XAxis
-                      dataKey="date"
-                      stroke="var(--muted-foreground)"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      stroke="var(--muted-foreground)"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(val) => `${val / 1000}k`}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "var(--popover)",
-                        borderColor: "var(--border)",
-                        borderRadius: "8px",
-                        color: "var(--popover-foreground)",
-                      }}
-                      formatter={(value: number) => [
-                        formatVND(value),
-                        "Doanh thu",
-                      ]}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="revenue"
-                      stroke="var(--primary)"
-                      strokeWidth={3}
-                      dot={{ fill: "var(--primary)", strokeWidth: 2 }}
-                      activeDot={{ r: 6 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex h-full items-center justify-center text-[var(--muted-foreground)]">
-                  Chưa có dữ liệu biểu đồ.
-                </div>
-              )}
+        {/* BILL */}
+        <Card className="lg:col-span-7 border-none shadow-none bg-transparent flex flex-col h-full">
+          {/* Header nhỏ phía trên */}
+          <div className="mb-4 flex items-center justify-between px-1">
+            <div>
+              <h3 className="text-lg font-bold text-[var(--foreground)] flex items-center gap-2">
+                <FileText className="w-5 h-5 text-green-600" />
+                Hóa Đơn Đối Soát
+              </h3>
+              <p className="text-sm text-[var(--muted-foreground)]">
+                Danh sách các khoản thanh toán đã được duyệt chi.
+              </p>
             </div>
-          </CardContent>
+            {/* Badge đếm số lượng */}
+            {withdrawHistory.filter((wd) => wd.status === "approved").length >
+              0 && (
+              <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse">
+                {
+                  withdrawHistory.filter((wd) => wd.status === "approved")
+                    .length
+                }{" "}
+                cần xác nhận
+              </span>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-6">
+            {withdrawHistory.filter((wd) => wd.status === "approved").length >
+            0 ? (
+              withdrawHistory
+                .filter((wd) => wd.status === "approved")
+                .map((wd) => (
+                  <div
+                    key={wd.requestId}
+                    className="group relative bg-white dark:bg-[#1e1e1e] border-2 border-dashed border-green-300 dark:border-green-800 rounded-xl p-0 overflow-hidden shadow-sm hover:shadow-md transition-all"
+                  >
+                    {/* --- TOP: HEADER BILL --- */}
+                    <div className="bg-green-50 dark:bg-green-900/20 p-4 border-b border-dashed border-green-200 dark:border-green-800 flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                            APPROVED
+                          </div>
+                          <span className="text-xs text-[var(--muted-foreground)] font-mono">
+                            #{wd.requestId.slice(0, 8).toUpperCase()}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[var(--muted-foreground)]">
+                          Ngày duyệt: {formatDate(wd.createdAt)}
+                        </p>
+                      </div>
+                      {/* Icon trang trí */}
+                      <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center text-green-600">
+                        <Gem className="w-5 h-5 fill-current" />
+                      </div>
+                    </div>
+
+                    {/* --- MIDDLE: BILL BODY --- */}
+                    <div className="p-5 space-y-4">
+                      {/* Thông tin người nhận (Bank) */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <p className="text-[10px] uppercase text-[var(--muted-foreground)] font-semibold tracking-wider">
+                            Ngân hàng thụ hưởng
+                          </p>
+                          <p className="text-sm font-medium flex items-center gap-1">
+                            <CreditCard className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+                            {wd.bankName}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] uppercase text-[var(--muted-foreground)] font-semibold tracking-wider">
+                            Số tài khoản
+                          </p>
+                          <p className="text-sm font-mono font-medium tracking-wide">
+                            {wd.bankAccountNumber}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Admin Note (Nếu có) */}
+                      {wd.moderatorNote && (
+                        <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 rounded-lg p-3">
+                          <p className="text-[10px] text-orange-600 dark:text-orange-400 font-bold uppercase mb-1 flex items-center gap-1">
+                            <User className="w-3 h-3" /> Lời nhắn từ Operation
+                            Mod
+                          </p>
+                          <p className="text-xs text-[var(--foreground)] italic">
+                            "{wd.moderatorNote}"
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Đường kẻ đứt ngăn cách tổng tiền */}
+                      <div className="border-t-2 border-dashed border-[var(--border)] my-2"></div>
+
+                      {/* --- BOTTOM: TOTAL & ACTION --- */}
+                      <div className="flex items-end justify-between">
+                        <div>
+                          <p className="text-[10px] uppercase text-[var(--muted-foreground)] font-semibold mb-0.5">
+                            Tổng thực nhận
+                          </p>
+                          <div className="text-2xl font-bold text-green-600 dark:text-green-400 flex items-center gap-1">
+                            <APDisplay
+                              value={wd.amount}
+                              showPlus={false}
+                              iconSize={20}
+                            />
+                          </div>
+                        </div>
+
+                        <Button
+                          onClick={() => handleConfirmReceipt(wd.requestId)}
+                          className="bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-200 dark:shadow-none transition-all active:scale-95"
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                          Xác nhận đã nhận tiền
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Họa tiết răng cưa (trang trí viền dưới - optional) */}
+                    <div
+                      className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--background)]"
+                      style={{
+                        background: `radial-gradient(circle, transparent 50%, var(--background) 50%) -5px -5px / 10px 10px repeat-x`,
+                        transform: "rotate(180deg)",
+                      }}
+                    />
+                  </div>
+                ))
+            ) : (
+              // EMPTY STATE (Khi không có bill)
+              <div className="h-full flex flex-col items-center justify-center border-2 border-dashed border-[var(--border)] rounded-xl bg-[var(--muted)]/20 p-8 text-center min-h-[300px]">
+                <div className="w-20 h-20 bg-[var(--muted)] rounded-full flex items-center justify-center mb-4">
+                  <CheckCircle2 className="w-10 h-10 text-[var(--muted-foreground)] opacity-50" />
+                </div>
+                <h3 className="text-lg font-semibold text-[var(--foreground)]">
+                  Chưa có đơn cần xác nhận
+                </h3>
+                <p className="text-sm text-[var(--muted-foreground)] max-w-xs mx-auto mt-2">
+                  Hiện tại không có đơn đối soát nào cần bạn xác nhận.
+                </p>
+              </div>
+            )}
+          </div>
         </Card>
       </div>
-
       {/* TABLES SECTION (TABS) */}
       <Tabs defaultValue="transactions" className="w-full">
         <TabsList className="grid w-full grid-cols-2 bg-[var(--muted)] mb-6">
@@ -949,14 +1127,23 @@ export default function AuthorRevenuePage() {
             </CardHeader>
             <CardContent>
               <Table>
-                <TableHeader className="bg-[var(--muted)]/50">
-                  <TableRow className="hover:bg-transparent border-b border-[var(--border)]">
+                <TableHeader>
+                  {/* FIX: Đưa màu nền vào TableRow để phủ kín cả hàng (kể cả ô rỗng góc phải) */}
+                  <TableRow className="bg-[var(--muted)]/50 hover:bg-[var(--muted)]/50 border-b border-[var(--border)]">
                     <TableHead className="w-[150px]">Thời gian</TableHead>
                     <TableHead>Loại GD</TableHead>
                     <TableHead className="hidden md:table-cell">
                       Mã giao dịch
                     </TableHead>
-                    <TableHead className="text-right">Số AP</TableHead>
+
+                    {/* FIX: Căn lề phải chuẩn */}
+                    <TableHead className="text-right">
+                      <div className="flex w-full items-center justify-end gap-1">
+                        Số{" "}
+                        <Gem className="h-4 w-4 fill-blue-500 text-blue-600 mb-0.5" />
+                      </div>
+                    </TableHead>
+
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -973,21 +1160,16 @@ export default function AuthorRevenuePage() {
                         <TableCell>{renderStatusBadge(tx.type)}</TableCell>
                         <TableCell
                           className="hidden md:table-cell text-xs text-[var(--muted-foreground)] max-w-[300px] truncate font-mono select-all"
-                          title={tx.transactionId} // Hover vào sẽ hiện full ID
+                          title={tx.transactionId}
                         >
                           {tx.transactionId}
                         </TableCell>
-                        <TableCell
-                          className={`text-right font-bold text-sm ${
-                            tx.amount > 0
-                              ? "text-[var(--primary)]"
-                              : "text-red-600"
-                          }`}
-                        >
-                          {tx.amount > 0 ? "+" : ""}
-                          {formatVND(tx.amount)}
+
+                        <TableCell className="font-bold text-[var(--foreground)] text-right">
+                          <APDisplay value={tx.amount} showPlus={true} />
                         </TableCell>
-                        <TableCell>
+
+                        <TableCell className="w-[50px]">
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1037,7 +1219,14 @@ export default function AuthorRevenuePage() {
                 <TableHeader className="bg-[var(--muted)]/50">
                   <TableRow className="hover:bg-transparent border-b border-[var(--border)]">
                     <TableHead className="w-[150px]">Thời gian</TableHead>
-                    <TableHead>Số AP</TableHead>
+                    <TableHead>
+                      <TableHead>
+                        <div className="flex items-center gap-1 whitespace-nowrap">
+                          Số{" "}
+                          <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+                        </div>
+                      </TableHead>
+                    </TableHead>
                     <TableHead>Ngân hàng</TableHead>
                     <TableHead>Trạng thái</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
@@ -1054,7 +1243,7 @@ export default function AuthorRevenuePage() {
                           {formatDate(wd.createdAt)}
                         </TableCell>
                         <TableCell className="font-bold text-[var(--foreground)]">
-                          {formatVND(wd.amount)}
+                          <APDisplay value={wd.amount} />
                         </TableCell>
                         <TableCell className="text-sm">
                           <div className="font-medium">{wd.bankName}</div>

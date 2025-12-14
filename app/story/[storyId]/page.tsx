@@ -25,6 +25,8 @@ import {
   Flag,
   AlertCircle,
   FileText,
+  Crown,
+  Unlock,
 } from "lucide-react";
 import { storyCatalogApi, Story } from "@/services/storyCatalog";
 import {
@@ -746,7 +748,6 @@ export default function StoryDetailPage() {
 
             <CardContent className="p-0">
               <TabsContent value="chapters" className="m-0 p-6">
-                {/* Chapters list... (Keep original) */}
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="font-semibold text-lg">Danh sách chương</h3>
                   <div className="flex items-center gap-2">
@@ -795,12 +796,23 @@ export default function StoryDetailPage() {
                             </span>
                           </div>
                         </div>
-                        {chapter.isLocked && (
+                        {/* {chapter.isLocked && (
+                          <Lock className="h-4 w-4 text-orange-500" />
+                        )} */}
+                        {/* Chỉ hiện icon khóa nếu bị khóa VÀ CHƯA SỞ HỮU */}
+                        {chapter.isLocked && !chapter.isOwned && (
                           <Lock className="h-4 w-4 text-orange-500" />
                         )}
-
-                        {/* 2. Hiển thị Badge: Miễn phí hoặc Giá tiền */}
-                        {chapter.accessType === "dias" ? (
+                        {/* Ưu tiên 1: Đã sở hữu (isOwned = true) -> Hiện badge "Đã mở" */}
+                        {chapter.isOwned ? (
+                          <Badge
+                            variant="secondary"
+                            className="bg-green-100 text-green-700 hover:bg-green-200 gap-1"
+                          >
+                            <Unlock className="w-3 h-3" /> Đã mở
+                          </Badge>
+                        ) : chapter.accessType === "dias" ? (
+                          // Ưu tiên 2: Chưa mua nhưng tốn phí -> Hiện giá
                           <Badge
                             variant="outline"
                             className="border-yellow-500 text-yellow-600 font-bold"
@@ -808,6 +820,7 @@ export default function StoryDetailPage() {
                             {chapter.priceDias} Dias
                           </Badge>
                         ) : (
+                          // Ưu tiên 3: Miễn phí
                           <Badge
                             variant="secondary"
                             className="bg-green-100 text-green-700 hover:bg-green-200"

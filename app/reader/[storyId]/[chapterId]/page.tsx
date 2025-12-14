@@ -590,6 +590,12 @@ export default function ReaderPage() {
                 onUnlockSuccess={handleChapterUnlockSuccess}
                 currentBalance={balance}
                 setShowTopUpModal={setShowTopUpModal}
+                chapterTitle={chapter?.title || ""}
+                chapterNo={chapter?.chapterNo || 0}
+                // Lấy tên truyện từ danh sách chương hoặc fallback text
+                storyTitle={
+                  currentChapterSummary?.title || "Đang tải tên truyện..."
+                }
               />
             ) : (
               <ReaderContent

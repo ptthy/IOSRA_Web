@@ -41,6 +41,7 @@ import {
   Globe,
   Sparkles,
   AlertCircle,
+  Gem,
 } from "lucide-react";
 import { chapterService } from "@/services/chapterService";
 import type { ChapterDetails } from "@/services/apiTypes";
@@ -48,7 +49,7 @@ import { toast } from "sonner";
 import TiptapEditor from "@/components/editor/TiptapEditor";
 import VoiceChapterPlayer from "@/components/author/VoiceChapterPlayer";
 import { profileService } from "@/services/profileService";
-
+import { voiceChapterService } from "@/services/voiceChapterService";
 // Hàm trích xuất phần tiếng Việt từ AI Feedback
 const extractVietnameseFeedback = (feedback: string | null): string | null => {
   if (!feedback) return null;
@@ -251,6 +252,7 @@ export default function AuthorChapterDetailPage() {
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [authorRank, setAuthorRank] = useState<string>("Casual");
   const [rankLoading, setRankLoading] = useState(true);
+  const [voicePrice, setVoicePrice] = useState<number | null>(null);
   // State mới cho chế độ chỉnh sửa
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -360,6 +362,11 @@ export default function AuthorChapterDetailPage() {
         chapterId
       );
       setChapter(chapterData);
+      const voiceData = await voiceChapterService
+        .getVoiceChapter(chapterId)
+        .catch(() => null);
+      // Lấy giá của giọng đầu tiên (nếu có)
+      setVoicePrice(voiceData?.voices?.[0]?.priceDias ?? null);
 
       // Khởi tạo form edit (dùng title, language... trước)
       setEditFormData({
@@ -970,9 +977,7 @@ export default function AuthorChapterDetailPage() {
                 </Select>
               ) : (
                 <p className="font-medium">
-                  {chapter.accessType === "free"
-                    ? "Miễn phí"
-                    : "Trả phí (Kim cương)"}
+                  {chapter.accessType === "free" ? "Miễn phí" : "Trả phí"}
                 </p>
               )}
             </div>
@@ -983,10 +988,28 @@ export default function AuthorChapterDetailPage() {
             {/* Giá */}
             <div>
               <p className="text-sm text-slate-400 mb-1">
-                Giá cho 1 chương nếu mất phí (Dias)
+                Giá cho 1 chương nếu mất phí
               </p>
-              {/* Luôn hiển thị giá trị Dias gốc từ hệ thống */}
-              <p className="font-medium">{chapter.priceDias} Dias</p>
+
+              <div className="font-medium flex items-center gap-1">
+                {chapter?.priceDias}{" "}
+                <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-slate-400 mb-1">Giá bán Audio AI</p>
+              <div className="font-medium min-h-[24px] flex items-center">
+                {voicePrice !== null ? (
+                  <span className="flex items-center gap-1">
+                    {voicePrice}{" "}
+                    <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+                  </span>
+                ) : (
+                  <span className="text-slate-500 text-sm italic">
+                    Chưa có audio
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Trạng thái AI */}
@@ -1078,6 +1101,27 @@ export default function AuthorChapterDetailPage() {
             </Card>
           )}
         </>
+      )}
+      {/* Chapter Summary - Styled like AI Assessment */}
+      {chapter && chapter.summary && (
+        <Card className="border-indigo-200 dark:border-indigo-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-indigo-700 dark:text-indigo-300">
+              <FileText className="h-5 w-5" />
+              Tóm tắt chương
+            </CardTitle>
+            <CardDescription>
+              Nội dung tóm tắt sơ lược của chương truyện
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="p-5 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-800">
+              <div className="prose prose-sm dark:prose-invert max-w-none text-gray-800 dark:text-gray-200 leading-relaxed">
+                {renderContent(chapter.summary)}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
       {/* AI Assessment */}
       {chapter && (chapter.aiScore !== undefined || vietnameseFeedback) && (
@@ -1281,7 +1325,7 @@ export default function AuthorChapterDetailPage() {
               content={editFormData.content}
               onChange={handleEditorChange}
               placeholder="Nhập nội dung chương tại đây..."
-              maxLength={50000}
+              maxLength={10000}
               disabled={isSaving}
             />
           ) : (

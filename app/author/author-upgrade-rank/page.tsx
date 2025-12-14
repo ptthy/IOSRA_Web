@@ -208,11 +208,22 @@ export default function AuthorRankDashboard() {
       )[0];
 
       if (latest) {
-        setLatestRequest({
-          status: latest.status.toLowerCase() as any,
-          rejectionReason: latest.moderatorNote || undefined,
-          submittedDate: new Date(latest.createdAt).toLocaleDateString("vi-VN"),
-        });
+        const currentStatus = latest.status.toLowerCase();
+
+        // --- FIX LOGIC TẠI ĐÂY ---
+        // Nếu request gần nhất đã Approved, nghĩa là xong rồi -> Reset về "none"
+        // để UI hiện Form cam kết cho Rank tiếp theo (nếu đủ điều kiện).
+        if (currentStatus === "approved") {
+          setLatestRequest({ status: "none" });
+        } else {
+          setLatestRequest({
+            status: latest.status.toLowerCase() as any,
+            rejectionReason: latest.moderatorNote || undefined,
+            submittedDate: new Date(latest.createdAt).toLocaleDateString(
+              "vi-VN"
+            ),
+          });
+        }
       } else {
         setLatestRequest({ status: "none" });
       }
@@ -296,7 +307,11 @@ export default function AuthorRankDashboard() {
   );
   const isEligible =
     rankStatus.totalFollowers >= rankStatus.nextRankMinFollowers;
-
+  // THÊM DÒNG NÀY: Kiểm tra xem có phải rank Diamond không (hoặc check nextRankName rỗng)
+  const isMaxRank =
+    rankStatus.currentRankName === "Diamond" ||
+    rankStatus.currentRankName === "Kim Cương" ||
+    !rankStatus.nextRankName; // Fallback nếu không có rank tiếp theo
   const currentRankStyle =
     RANK_STYLES[rankStatus.currentRankName] || RANK_STYLES["Casual"];
   const nextRankStyle =
@@ -338,7 +353,11 @@ export default function AuthorRankDashboard() {
         </div>
 
         {/* --- STATS CARDS --- */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div
+          className={`grid grid-cols-1 gap-6 ${
+            isMaxRank ? "md:grid-cols-2 max-w-5xl mx-auto" : "md:grid-cols-3"
+          }`}
+        >
           {/* Card 1: Rank Hiện Tại */}
           <Card
             className={`relative overflow-hidden border-2 transition-all duration-300 hover:scale-105 hover:${currentRankStyle.borderGlow} ${currentRankStyle.bg}`}
@@ -422,198 +441,231 @@ export default function AuthorRankDashboard() {
           </Card>
 
           {/* Card 3: Rank Mục Tiêu */}
-          <Card
-            className={`relative overflow-hidden border-2 transition-all duration-300 hover:scale-105 ${
-              isEligible
-                ? `${nextRankStyle.borderGlow} ${nextRankStyle.bg}`
-                : "bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900/20 dark:to-slate-800/20"
-            }`}
-          >
-            <div className="absolute top-0 right-0 w-32 h-32 opacity-10">
-              <Award className={`w-full h-full ${nextRankStyle.iconColor}`} />
-            </div>
-            {isEligible && (
-              <div className="absolute top-2 right-2 z-20">
-                <div className="bg-green-500 text-white text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1 shadow-lg animate-pulse">
-                  <CheckCircle2 className="w-3 h-3" />
-                  Đủ điều kiện
+          {!isMaxRank && (
+            <Card
+              className={`relative overflow-hidden border-2 transition-all duration-300 hover:scale-105 ${
+                isEligible
+                  ? `${nextRankStyle.borderGlow} ${nextRankStyle.bg}`
+                  : "bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900/20 dark:to-slate-800/20"
+              }`}
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 opacity-10">
+                <Award className={`w-full h-full ${nextRankStyle.iconColor}`} />
+              </div>
+              {isEligible && (
+                <div className="absolute top-2 right-2 z-20">
+                  <div className="bg-green-500 text-white text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1 shadow-lg animate-pulse">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Đủ điều kiện
+                  </div>
                 </div>
-              </div>
-            )}
-            <CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Rank Mục Tiêu
-              </CardTitle>
-              <div
-                className={`p-2 ${
-                  isEligible
-                    ? nextRankStyle.badgeGradient
-                    : "bg-gradient-to-r from-slate-400 to-slate-600"
-                } rounded-xl shadow-lg`}
-              >
-                <Target className="w-5 h-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent className="relative z-10">
-              <div className="flex items-center gap-3 mb-2">
-                <RankIcon rank={rankStatus.nextRankName} size={8} />
+              )}
+              <CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Rank Mục Tiêu
+                </CardTitle>
                 <div
-                  className={`text-2xl font-extrabold ${
+                  className={`p-2 ${
                     isEligible
-                      ? nextRankStyle.color
-                      : "text-slate-700 dark:text-slate-300"
-                  }`}
+                      ? nextRankStyle.badgeGradient
+                      : "bg-gradient-to-r from-slate-400 to-slate-600"
+                  } rounded-xl shadow-lg`}
                 >
-                  {rankStatus.nextRankName}
+                  <Target className="w-5 h-5 text-white" />
                 </div>
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-sm">
-                  <Zap className="w-4 h-4 text-yellow-600" />
-                  <span className="text-muted-foreground">
-                    Tỷ lệ thưởng mới:
-                  </span>
-                  <span className="font-semibold text-foreground">
-                    {rankStatus.nextRankRewardRate}%
-                  </span>
+              </CardHeader>
+              <CardContent className="relative z-10">
+                <div className="flex items-center gap-3 mb-2">
+                  <RankIcon rank={rankStatus.nextRankName} size={8} />
+                  <div
+                    className={`text-2xl font-extrabold ${
+                      isEligible
+                        ? nextRankStyle.color
+                        : "text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    {rankStatus.nextRankName}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Users className="w-4 h-4 text-blue-600" />
-                  <span className="text-muted-foreground">Yêu cầu:</span>
-                  <span className="font-semibold text-foreground">
-                    {rankStatus.nextRankMinFollowers} followers
-                  </span>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Zap className="w-4 h-4 text-yellow-600" />
+                    <span className="text-muted-foreground">
+                      Tỷ lệ thưởng mới:
+                    </span>
+                    <span className="font-semibold text-foreground">
+                      {rankStatus.nextRankRewardRate}%
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Users className="w-4 h-4 text-blue-600" />
+                    <span className="text-muted-foreground">Yêu cầu:</span>
+                    <span className="font-semibold text-foreground">
+                      {rankStatus.nextRankMinFollowers} followers
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {isEligible
-                  ? "Sẵn sàng thăng hạng!"
-                  : `Cần tối thiểu ${rankStatus.nextRankMinFollowers} followers`}
-              </p>
-            </CardContent>
-          </Card>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {isEligible
+                    ? "Sẵn sàng thăng hạng!"
+                    : `Cần tối thiểu ${rankStatus.nextRankMinFollowers} followers`}
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* --- FORM CAM KẾT NÂNG CẤP --- */}
-        {latestRequest.status === "none" && isEligible && (
-          <Card className="shadow-xl border-2 border-primary/20">
-            <CardHeader className="text-center pb-4">
-              <CardTitle className="text-2xl text-foreground flex items-center justify-center gap-2">
-                <Sparkles className="w-6 h-6 text-primary" />
-                Đăng Ký Nâng Cấp Rank
-                <Sparkles className="w-6 h-6 text-primary" />
+        {/* CASE 1: Đã đạt Max Rank (Diamond) -> Hiện bảng chúc mừng */}
+        {isMaxRank ? (
+          <Card className="shadow-xl border-2 border-cyan-200 dark:border-cyan-800 bg-gradient-to-br from-cyan-50 via-white to-cyan-100 dark:from-cyan-950/40 dark:via-background dark:to-cyan-900/20">
+            <CardHeader className="text-center pb-2">
+              <div className="mx-auto mb-4 p-4 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-full shadow-lg shadow-cyan-200 dark:shadow-cyan-900/50">
+                <Trophy className="w-12 h-12 text-white animate-pulse" />
+              </div>
+              <CardTitle className="text-3xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-400 dark:to-blue-400 bg-clip-text text-transparent">
+                Chúc mừng! Bạn đã chạm tới cấp bậc cao quý nhất hệ thống.
               </CardTitle>
-              <CardDescription className="text-muted-foreground">
-                Hoàn thành cam kết để gửi yêu cầu nâng cấp lên{" "}
-                {rankStatus.nextRankName}
-              </CardDescription>
+              {/* <CardDescription className="text-lg text-cyan-700 dark:text-cyan-300 mt-2">
+                Chúc mừng! Bạn đã chạm tới cấp bậc cao quý nhất hệ thống.
+              </CardDescription> */}
             </CardHeader>
-
-            <CardContent className="space-y-6">
-              {/* Thông tin tóm tắt */}
-              <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-xl ${currentRankStyle.bg}`}>
-                      <RankIcon rank={rankStatus.currentRankName} size={6} />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Từ</p>
-                      <p
-                        className={`text-lg font-bold ${currentRankStyle.color}`}
-                      >
-                        {rankStatus.currentRankName}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-primary text-2xl">→</div>
-
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-xl ${nextRankStyle.bg}`}>
-                      <RankIcon rank={rankStatus.nextRankName} size={6} />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Lên</p>
-                      <p className={`text-lg font-bold ${nextRankStyle.color}`}>
-                        {rankStatus.nextRankName}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Form cam kết */}
-              <div className="space-y-4">
-                <Label
-                  htmlFor="commitment-input"
-                  className="text-base font-semibold text-foreground"
-                >
-                  Xác nhận Cam kết
-                </Label>
-                <div className="bg-muted border border-border rounded-lg p-4 text-sm font-medium">
-                  <p className="text-muted-foreground">
-                    Để xác nhận, vui lòng gõ lại chính xác câu sau vào ô bên
-                    dưới:
-                  </p>
-                  <p className="mt-2 text-primary font-semibold">
-                    {COMMITMENT_TEXT}
-                  </p>
-                </div>
-                <Textarea
-                  id="commitment-input"
-                  placeholder="Gõ lại câu cam kết tại đây..."
-                  value={typedCommitment}
-                  onChange={(e) => setTypedCommitment(e.target.value)}
-                  disabled={isSubmitting}
-                  rows={3}
-                  className={`text-sm leading-relaxed transition-all ${
-                    isCommitmentMatched
-                      ? "border-green-500 focus-visible:ring-green-500 dark:border-green-400 dark:focus-visible:ring-green-400 bg-green-50 dark:bg-green-950/20"
-                      : typedCommitment.length > 0
-                      ? "border-destructive focus-visible:ring-destructive dark:border-destructive/70 dark:focus-visible:ring-destructive/70 bg-red-50 dark:bg-red-950/20"
-                      : "bg-card"
-                  }`}
-                />
-                {typedCommitment.length > 0 && (
-                  <p
-                    className={`text-sm font-medium ${
-                      isCommitmentMatched
-                        ? "text-green-600 dark:text-green-400"
-                        : "text-destructive dark:text-destructive/70"
-                    }`}
-                  >
-                    {isCommitmentMatched
-                      ? "✓ Đã trùng khớp! Bạn có thể gửi yêu cầu."
-                      : "❌ Câu cam kết chưa trùng khớp."}
-                  </p>
-                )}
-              </div>
+            <CardContent className="text-center space-y-4 max-w-2xl mx-auto">
+              <p className="text-muted-foreground leading-relaxed">
+                Bạn hiện là một tác giả <strong>Diamond</strong> xuất sắc. Những
+                đóng góp của bạn là nguồn cảm hứng lớn cho cộng đồng độc giả và
+                các tác giả khác. Hãy tiếp tục duy trì phong độ đỉnh cao này
+                nhé!
+              </p>
             </CardContent>
-
-            <CardFooter className="pt-4">
-              <Button
-                onClick={handleSubmit}
-                disabled={isSubmitting || !isCommitmentMatched}
-                className="w-full h-12 text-base font-semibold"
-                size="lg"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Đang gửi yêu cầu...
-                  </>
-                ) : (
-                  <>
-                    <Send className="mr-2 h-4 w-4" />
-                    Gửi Yêu Cầu Nâng Cấp
-                  </>
-                )}
-              </Button>
-            </CardFooter>
           </Card>
-        )}
+        ) : (
+          /* CASE 2: Chưa Max Rank & Không có request đang chờ -> Hiện Form nâng cấp */
+          latestRequest.status === "none" &&
+          isEligible && (
+            <Card className="shadow-xl border-2 border-primary/20">
+              {/* ... (GIỮ NGUYÊN CODE FORM CŨ CỦA ÔNG Ở ĐÂY) ... */}
+              <CardHeader className="text-center pb-4">
+                <CardTitle className="text-2xl text-foreground flex items-center justify-center gap-2">
+                  <Sparkles className="w-6 h-6 text-primary" />
+                  Đăng Ký Nâng Cấp Rank
+                  <Sparkles className="w-6 h-6 text-primary" />
+                </CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  Hoàn thành cam kết để gửi yêu cầu nâng cấp lên{" "}
+                  {rankStatus.nextRankName}
+                </CardDescription>
+              </CardHeader>
 
+              <CardContent className="space-y-6">
+                {/* Copy lại nội dung bên trong CardContent cũ vào đây */}
+                {/* Thông tin tóm tắt rank cũ -> rank mới */}
+                <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6">
+                  {/* ... */}
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-3 rounded-xl ${currentRankStyle.bg}`}>
+                        <RankIcon rank={rankStatus.currentRankName} size={6} />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Từ</p>
+                        <p
+                          className={`text-lg font-bold ${currentRankStyle.color}`}
+                        >
+                          {rankStatus.currentRankName}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-primary text-2xl">→</div>
+
+                    <div className="flex items-center gap-4">
+                      <div className={`p-3 rounded-xl ${nextRankStyle.bg}`}>
+                        <RankIcon rank={rankStatus.nextRankName} size={6} />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Lên</p>
+                        <p
+                          className={`text-lg font-bold ${nextRankStyle.color}`}
+                        >
+                          {rankStatus.nextRankName}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Input Cam kết */}
+                <div className="space-y-4">
+                  <Label
+                    htmlFor="commitment-input"
+                    className="text-base font-semibold text-foreground"
+                  >
+                    Xác nhận Cam kết
+                  </Label>
+                  <div className="bg-muted border border-border rounded-lg p-4 text-sm font-medium">
+                    <p className="text-muted-foreground">
+                      Để xác nhận, vui lòng gõ lại chính xác câu sau vào ô bên
+                      dưới:
+                    </p>
+                    <p className="mt-2 text-primary font-semibold">
+                      {COMMITMENT_TEXT}
+                    </p>
+                  </div>
+                  <Textarea
+                    id="commitment-input"
+                    placeholder="Gõ lại câu cam kết tại đây..."
+                    value={typedCommitment}
+                    onChange={(e) => setTypedCommitment(e.target.value)}
+                    disabled={isSubmitting}
+                    rows={3}
+                    className={`text-sm leading-relaxed transition-all ${
+                      isCommitmentMatched
+                        ? "border-green-500 focus-visible:ring-green-500 dark:border-green-400 dark:focus-visible:ring-green-400 bg-green-50 dark:bg-green-950/20"
+                        : typedCommitment.length > 0
+                        ? "border-destructive focus-visible:ring-destructive dark:border-destructive/70 dark:focus-visible:ring-destructive/70 bg-red-50 dark:bg-red-950/20"
+                        : "bg-card"
+                    }`}
+                  />
+                  {typedCommitment.length > 0 && (
+                    <p
+                      className={`text-sm font-medium ${
+                        isCommitmentMatched
+                          ? "text-green-600 dark:text-green-400"
+                          : "text-destructive dark:text-destructive/70"
+                      }`}
+                    >
+                      {isCommitmentMatched
+                        ? "✓ Đã trùng khớp! Bạn có thể gửi yêu cầu."
+                        : "❌ Câu cam kết chưa trùng khớp."}
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+
+              <CardFooter className="pt-4">
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || !isCommitmentMatched}
+                  className="w-full h-12 text-base font-semibold"
+                  size="lg"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Đang gửi yêu cầu...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Gửi Yêu Cầu Nâng Cấp
+                    </>
+                  )}
+                </Button>
+              </CardFooter>
+            </Card>
+          )
+        )}
         {/* --- THÔNG BÁO TRẠNG THÁI --- */}
         {latestRequest.status !== "none" && (
           <Card

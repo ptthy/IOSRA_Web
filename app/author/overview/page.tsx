@@ -25,10 +25,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import React from "react";
 import { ImageWithFallback } from "@/components/ui/ImageWithFallback";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 export default function AuthorDashboardPage() {
   const router = useRouter();
+  //const { refreshAndUpdateUser, user, isAuthor } = useAuth();
+  const { user, isAuthor } = useAuth();
   const [stories, setStories] = useState<Story[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // const [isRefreshing, setIsRefreshing] = useState(false);
   const handleApiError = (error: any, defaultMessage: string) => {
     // 1. Check lỗi Validation/Logic từ Backend
     if (error.response && error.response.data && error.response.data.error) {
@@ -56,9 +60,70 @@ export default function AuthorDashboardPage() {
     const fallbackMsg = error.response?.data?.message || defaultMessage;
     toast.error(fallbackMsg);
   };
+  // // Refresh token khi vào trang
+  // useEffect(() => {
+  //   const handleRefresh = async () => {
+  //     try {
+  //       setIsRefreshing(true);
+  //       await refreshAndUpdateUser();
+  //     } catch (error) {
+  //       console.error("Lỗi refresh token:", error);
+  //     } finally {
+  //       setIsRefreshing(false);
+  //     }
+  //   };
+
+  //   handleRefresh();
+  // }, [refreshAndUpdateUser]);
+
+  // // Kiểm tra quyền author sau khi refresh và load stories
+  // useEffect(() => {
+  //   // Chỉ kiểm tra sau khi đã refresh xong
+  //   if (isRefreshing) return;
+
+  //   // Nếu không có user, không làm gì (đang loading)
+  //   if (!user) return;
+
+  //   // Kiểm tra quyền author
+  //   const isUserAuthor =
+  //     user.roles?.includes("author") || user.isAuthorApproved;
+
+  //   if (!isUserAuthor) {
+  //     // Nếu không phải author, redirect về trang nâng cấp
+  //     router.push(
+  //       "/author-upgrade?message=Bạn cần nâng cấp tài khoản để truy cập trang này."
+  //     );
+  //     return;
+  //   }
+
+  //   // Nếu đã là author, load stories
+  //   loadStories();
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [user, isRefreshing, router]);
+  // ✅ SỬA THÀNH NHƯ THẾ NÀY:
+  // Kiểm tra quyền author sau khi load stories
   useEffect(() => {
+    // ❌ BỎ DÒNG NÀY: if (isRefreshing) return;
+
+    // Nếu không có user, không làm gì (đang loading)
+    if (!user) return;
+
+    // Kiểm tra quyền author
+    const isUserAuthor =
+      user.roles?.includes("author") || user.isAuthorApproved;
+
+    if (!isUserAuthor) {
+      // Nếu không phải author, redirect về trang nâng cấp
+      router.push(
+        "/author-upgrade?message=Bạn cần nâng cấp tài khoản để truy cập trang này."
+      );
+      return;
+    }
+
+    // Nếu đã là author, load stories
     loadStories();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, router]); // ❌ Bỏ isRefreshing khỏi dependency
 
   const loadStories = async () => {
     setIsLoading(true);

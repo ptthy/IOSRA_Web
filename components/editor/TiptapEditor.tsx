@@ -36,7 +36,7 @@ export default function TiptapEditor({
   content,
   onChange,
   placeholder = "Nhập nội dung...",
-  maxLength = 50000,
+  maxLength = 10000,
   disabled = false,
 }: TiptapEditorProps) {
   const editor = useEditor({

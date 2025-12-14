@@ -44,18 +44,17 @@ export interface ChapterVoiceHistoryItem {
   audioUrl: string; // Link để nghe lại
   purchasedAt: string;
 }
-
-// // Lịch sử mua giọng toàn hệ thống (Global Voice History - Nested)
-// export interface GlobalVoiceHistoryItem {
-//   storyId: string;
-//   storyTitle: string;
-//   chapters: {
-//     chapterId: string;
-//     chapterNo: number;
-//     chapterTitle: string;
-//     voices: ChapterVoiceHistoryItem[];
-//   }[];
-// }
+export interface BuyChapterResponse {
+  purchaseId: string;
+  chapterId: string;
+  storyId: string;
+  chapterNo: number;
+  chapterTitle: string;
+  priceDias: number;
+  walletBalanceAfter: number; // Quan trọng để cập nhật UI ngay lập tức
+  authorShareAmount: number;
+  purchasedAt: string;
+}
 export interface VoiceItem {
   purchaseVoiceId: string;
   chapterId: string;
@@ -83,13 +82,12 @@ export interface StoryItem {
 export const chapterPurchaseApi = {
   // 1. Mua chương truyện (Unlock Text)
   // POST /api/ChapterPurchase/{chapterId}
-  buyChapter: (chapterId: string): Promise<void> => {
-    // Body rỗng
+  //  Cập nhật return type từ Promise<void> sang Promise<BuyChapterResponse>
+  buyChapter: (chapterId: string): Promise<BuyChapterResponse> => {
     return apiClient
       .post(`/api/ChapterPurchase/${chapterId}`, {})
       .then((response) => response.data);
   },
-
   // 2. Mua giọng đọc (Unlock Audio)
   // POST /api/ChapterPurchase/{chapterId}/order-voice
   buyVoice: (

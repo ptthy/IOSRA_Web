@@ -93,7 +93,10 @@ export default function ManageStoriesPage() {
 
   const activeStory = stories.find(
     (s) =>
-      s.status === "draft" || s.status === "pending" || s.status === "published"
+      s.status === "draft" ||
+      s.status === "pending" ||
+      s.status === "published" ||
+      s.status === "hidden"
   );
   const hasActiveStory = !!activeStory;
 
@@ -113,10 +116,17 @@ export default function ManageStoriesPage() {
             Đã xuất bản
           </Badge>
         );
+      case "hidden":
+        return (
+          <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800">
+            Đã ẩn
+          </Badge>
+        );
       case "rejected":
         return <Badge variant="destructive">Bị từ chối</Badge>;
       case "completed":
         return <Badge variant="outline">Hoàn thành</Badge>;
+
       default:
         return <Badge variant="outline">{status}</Badge>;
     }

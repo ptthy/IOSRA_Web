@@ -15,6 +15,10 @@ import {
   MessageSquare,
   Star,
   Info,
+  Coins,
+  CreditCard,
+  Trophy,
+  Mic,
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,6 +58,14 @@ const NotificationRow = ({
         return <MessageSquare className="h-5 w-5 text-purple-500" />;
       case "story_rating":
         return <Star className="h-5 w-5 text-orange-500" />;
+      case "op_request":
+        return <CreditCard className="h-5 w-5 text-emerald-600" />;
+      case "chapter_purchase":
+        return <Coins className="h-5 w-5 text-yellow-600" />;
+      case "author_rank_upgrade":
+        return <Trophy className="h-5 w-5 text-pink-500" />;
+      case "voice_purchase":
+        return <Mic className="h-4 w-4 text-indigo-500" />;
       default:
         return <Info className="h-5 w-5 text-gray-500" />;
     }
@@ -168,6 +180,22 @@ export default function NotificationPage() {
   // useEffect bắt sự kiện thay đổi trang (Giữ nguyên)
   useEffect(() => {
     fetchNotifications();
+    // --- THÊM ĐOẠN NÀY ---
+    const handleRealtimeUpdate = () => {
+      // Chỉ tự động load lại nếu đang ở trang 1
+      // (Để tránh người dùng đang xem trang 5 tự nhiên bị giật về trang 1 hoặc bị trôi nội dung)
+      if (page === 1) {
+        console.log("🔄 Page: Có tin mới -> Refresh list...");
+        fetchNotifications();
+      }
+    };
+
+    window.addEventListener("notification-updated", handleRealtimeUpdate);
+
+    return () => {
+      window.removeEventListener("notification-updated", handleRealtimeUpdate);
+    };
+    // ---------------------
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
@@ -176,7 +204,12 @@ export default function NotificationPage() {
 
     switch (type) {
       case "voice_purchase":
+      case "op_request": // Yêu cầu rút tiền
+      case "chapter_purchase": // Bán chương truyện
         router.push("/author/revenue");
+        break;
+      case "author_rank_upgrade":
+        router.push("/author/author-upgrade-rank");
         break;
       //  Nhắc nhở gói cước -> /profile
       case "subscription_reminder":

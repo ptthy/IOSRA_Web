@@ -24,6 +24,7 @@ import {
   FileText,
   Lightbulb,
   AlertTriangle,
+  EyeOff,
 } from "lucide-react";
 import { storyService } from "@/services/storyService";
 import { chapterService } from "@/services/chapterService";
@@ -193,6 +194,14 @@ export default function StoryDetailPage() {
           className:
             "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300",
         };
+      case "hidden":
+        return {
+          label: "Đã ẩn",
+          variant: "secondary" as const,
+          icon: EyeOff, // Icon con mắt gạch chéo
+          className:
+            "bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800",
+        };
       case "rejected":
         return {
           label: "Bị từ chối",
@@ -234,6 +243,16 @@ export default function StoryDetailPage() {
             <Clock className="h-4 w-4 text-blue-600" />
             <AlertDescription>
               Truyện đang chờ được Content Mod đánh giá. Vui lòng chờ kết quả.
+            </AlertDescription>
+          </Alert>
+        );
+      case "hidden":
+        return (
+          <Alert className="mb-6 bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+            <EyeOff className="h-4 w-4 text-amber-600" />
+            <AlertDescription>
+              Truyện này đang bị ẩn khỏi danh sách công khai. Chỉ có bạn mới
+              nhìn thấy.
             </AlertDescription>
           </Alert>
         );
@@ -376,7 +395,7 @@ export default function StoryDetailPage() {
                         variant="secondary"
                         className="bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
                       >
-                        Ngắn (từ 5-20 chương)
+                        Ngắn (từ 6-20 chương)
                       </Badge>
                     )}
                     {story.lengthPlan === "novel" && (
@@ -537,7 +556,10 @@ export default function StoryDetailPage() {
               <div>
                 <CardTitle>Danh sách Chương</CardTitle>
                 <CardDescription>
-                  {story.status === "published" || story.status === "completed"
+                  {story.status === "hidden"
+                    ? "Các chương của truyện đang bị ẩn này"
+                    : story.status === "published" ||
+                      story.status === "completed"
                     ? "Các chương đã được xuất bản của truyện này"
                     : "Các chương của truyện (chưa xuất bản)"}
                 </CardDescription>
@@ -604,7 +626,8 @@ export default function StoryDetailPage() {
 
                     <div className="flex items-center gap-2">
                       {(story.status === "published" ||
-                        story.status === "completed") &&
+                        story.status === "completed" ||
+                        story.status === "hidden") &&
                         chapter.status === "published" && (
                           <Button
                             size="sm"

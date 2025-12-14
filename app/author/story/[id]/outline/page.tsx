@@ -61,7 +61,7 @@ const getLengthPlanLabel = (lengthPlan: string | undefined): string => {
     case "super_short":
       return "Siêu ngắn (1-5 chương)";
     case "short":
-      return "Ngắn (5-20 chương)";
+      return "Ngắn (6-20 chương)";
     case "novel":
       return "Dài (trên 20 chương)";
     default:

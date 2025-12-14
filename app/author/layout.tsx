@@ -104,12 +104,12 @@ export default function AuthorLayout({ children }: AuthorLayoutProps) {
               variant="ghost"
               className="w-full justify-start"
               onClick={() => setIsVoiceModalOpen(true)}
-              title="Mua Ký tự AI"
+              title="Định mức chi phí"
             >
               {/* Giữ màu tím cho Icon để nhận diện tính năng AI, hoặc xóa class text-indigo-500 nếu muốn đen hoàn toàn */}
               <Sparkles className="h-5 w-5 shrink-0 text-indigo-500" />
               {!isCollapsed && (
-                <span className="ml-2 truncate">Mua Ký tự AI</span>
+                <span className="ml-2 truncate">Định mức chi phí</span>
               )}
             </Button>
           </nav>
@@ -131,7 +131,6 @@ export default function AuthorLayout({ children }: AuthorLayoutProps) {
       <VoiceTopupModal
         isOpen={isVoiceModalOpen}
         onClose={() => setIsVoiceModalOpen(false)}
-        currentTextBalance={0}
       />
     </div>
   );

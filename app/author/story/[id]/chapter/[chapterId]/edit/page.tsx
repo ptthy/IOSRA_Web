@@ -85,7 +85,7 @@ export default function EditChapterPage() {
   // -------------------
   const LIMITS = {
     TITLE: 200,
-    CONTENT: 50000, // 50k ký tự cho nội dung chương
+    CONTENT: 10000, // 50k ký tự cho nội dung chương
   };
 
   // 1. Tải chapter cũ và draft từ Local Storage

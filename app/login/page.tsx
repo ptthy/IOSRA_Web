@@ -23,6 +23,16 @@ import { jwtDecode } from "jwt-decode";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
+// Thêm helper function ở đầu file (sau imports)
+const getPrimaryRole = (roles: string[]): string => {
+  if (!roles || roles.length === 0) return "reader";
+  if (roles.includes("admin")) return "admin";
+  if (roles.includes("omod")) return "omod";
+  if (roles.includes("cmod")) return "cmod";
+  if (roles.includes("author")) return "author";
+  return roles[0] || "reader";
+};
+
 export default function LoginRoute() {
   const { login, setAuthData } = useAuth();
   const router = useRouter();
@@ -110,14 +120,22 @@ export default function LoginRoute() {
         displayName,
         avatar,
       } = response.data;
-
+      console.log(response.data);
       if (backendToken && username && email) {
         const decodedPayload: any = jwtDecode(backendToken);
+
+        // Xử lý roles tương tự như trong AuthContext
+        const userRoles = (Array.isArray(roles) ? roles : [roles]).map(
+          (r: string) => r.toLowerCase().trim()
+        );
+        const primaryRole = getPrimaryRole(userRoles);
+
         const userToSet = {
           id: decodedPayload.sub,
           username: username,
           email: email,
-          role: roles && roles.length > 0 ? roles[0] : "reader",
+          role: primaryRole, // SỬA: Dùng getPrimaryRole thay vì roles[0]
+          roles: userRoles, // THÊM: Lưu cả array roles
           displayName: displayName || username,
           avatar: avatar,
         };

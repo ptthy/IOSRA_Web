@@ -44,7 +44,7 @@ export function Navbar() {
   // --- STATE VÍ & MODAL ---
   const [diaBalance, setDiaBalance] = useState(0);
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
-  const [serverAvatar, setServerAvatar] = useState<string | null>(null);
+
   // --- STATE NHẬN QUÀ ---
   const [claimInfo, setClaimInfo] = useState({
     canClaim: false,
@@ -53,6 +53,7 @@ export function Navbar() {
   const [isClaiming, setIsClaiming] = useState(false);
 
   const { user, isAuthenticated, logout } = useAuth();
+  const isStaff = user?.role && ["admin", "omod", "cmod"].includes(user.role);
   const isAuthor =
     user?.roles?.includes("author") || (user as any)?.isAuthorApproved;
   const isAuthPage =
@@ -91,48 +92,23 @@ export function Navbar() {
       console.error("Lỗi check daily claim navbar", error);
     }
   };
-  // --- THÊM HÀM LẤY PROFILE ĐỂ LẤY AVATAR ---
-  // const fetchProfileData = async () => {
-  //   try {
-  //     const res = await profileService.getProfile();
-  //     if (res.data) {
-  //       // Lấy đúng field "avatarUrl" từ JSON response
-  //       setServerAvatar(res.data.avatarUrl);
-  //     }
-  //   } catch (error) {
-  //     console.error("Lỗi lấy thông tin profile navbar", error);
-  //   }
-  // };
-  const fetchProfileData = async () => {
-    try {
-      const res = await profileService.getProfile();
-      if (res.data) {
-        setServerAvatar(res.data.avatarUrl);
-      }
-    } catch (error: any) {
-      // Nếu user (như mod) không có profile (Lỗi 404) -> Bỏ qua, không báo lỗi
-      if (error?.response?.status === 404) return;
-
-      console.warn("Lỗi khác:", error?.message);
-    }
-  };
-  // ------------------------------------------
 
   // --- EFFECT LẮNG NGHE SỰ KIỆN & LOAD DỮ LIỆU ---
   useEffect(() => {
+    // Chỉ chạy nếu đã đăng nhập VÀ KHÔNG PHẢI LÀ STAFF
+    const shouldFetchData = isAuthenticated && !isStaff;
     const handleWalletUpdate = () => {
-      if (isAuthenticated) {
+      // SỬA: Thêm điều kiện !isStaff để không gọi API ví nếu là admin/mod
+      if (isAuthenticated && !isStaff) {
         fetchWallet();
         checkClaimStatus();
-        fetchProfileData();
       }
     };
 
     // Gọi lần đầu khi component mount hoặc auth thay đổi
-    if (isAuthenticated) {
+    if (shouldFetchData) {
       fetchWallet();
       checkClaimStatus();
-      fetchProfileData();
     }
 
     // Đăng ký sự kiện cập nhật ví từ nơi khác (ví dụ: trang Profile)
@@ -142,7 +118,7 @@ export function Navbar() {
     return () => {
       window.removeEventListener("wallet-updated", handleWalletUpdate);
     };
-  }, [isAuthenticated, pathname]);
+  }, [isAuthenticated, pathname, isStaff]);
 
   // --- HÀM XỬ LÝ NHẬN QUÀ ---
   const handleQuickClaim = async (e: React.MouseEvent) => {
@@ -156,7 +132,13 @@ export function Navbar() {
       const res = await subscriptionService.claimDaily();
       const data = res.data;
 
-      toast.success(`Đã nhận ${data.claimedDias} Kim cương!`);
+      toast.success(
+        <div className="flex items-center gap-1">
+          <span>Đã nhận {data.claimedDias}</span>
+          <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+          <span>!</span>
+        </div>
+      );
 
       // Cập nhật UI cục bộ ngay lập tức
       setDiaBalance(data.walletBalance);
@@ -182,8 +164,9 @@ export function Navbar() {
   };
   // Ẩn Navbar ở các trang đọc truyện
   if (
-    pathname &&
-    (pathname.startsWith("/Op") || pathname.startsWith("/Content")) || pathname.startsWith("/Admin")
+    (pathname &&
+      (pathname.startsWith("/Op") || pathname.startsWith("/Content"))) ||
+    pathname.startsWith("/Admin")
   ) {
     return null;
   }
@@ -210,24 +193,9 @@ export function Navbar() {
     router.push("/");
   };
 
-  // const renderAvatar = (size = 10) => (
-  //   <Avatar className={`h-${size} w-${size}`}>
-  //     {user?.avatar ? (
-  //       <AvatarImage
-  //         src={user.avatar}
-  //         alt={user?.displayName || user?.username || "User"}
-  //         className="h-full w-full object-cover"
-  //       />
-  //     ) : (
-  //       <AvatarFallback className="bg-secondary text-secondary-foreground">
-  //         {getInitials(user?.displayName || user?.username || "")}
-  //       </AvatarFallback>
-  //     )}
-  //   </Avatar>
-  // );
   const renderAvatar = (size = 10) => {
     // Ưu tiên lấy serverAvatar (từ API) -> sau đó mới tới user.avatar (từ Context)
-    const displayAvatar = serverAvatar || user?.avatar;
+    const displayAvatar = user?.avatar;
     const displayName = user?.displayName || user?.username || "";
 
     return (
@@ -292,10 +260,10 @@ export function Navbar() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                Đăng ký tác giả
+                Góc tác giả
               </button>
 
-              <button
+              {/* <button
                 onClick={() => handleNavigate("/author/overview")}
                 className={`text-sm transition-colors ${
                   isActive("/author/overview")
@@ -304,14 +272,14 @@ export function Navbar() {
                 }`}
               >
                 Góc sáng tác
-              </button>
+              </button> */}
             </div>
           )}
 
           {/* Actions Right Side */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-0.5">
             {isAuthenticated && !isAuthPage && (
-              <div className="hidden xl:flex absolute right-[170px] top-1/2 -translate-y-1/2 w-[220px] justify-end">
+              <div className="hidden xl:flex items-center">
                 <NotificationTicker />
               </div>
             )}
@@ -320,10 +288,10 @@ export function Navbar() {
               <Button
                 variant="outline"
                 size="sm"
-                className="hidden md:flex items-center gap-2 rounded-full border-yellow-500/50 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 mr-2"
+                className="hidden md:flex items-center gap-2 rounded-full border-blue-500/50 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-400"
                 onClick={() => setIsTopUpOpen(true)}
               >
-                <Gem className="h-4 w-4 fill-yellow-500 text-yellow-600" />
+                <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
                 <span className="font-bold">{diaBalance.toLocaleString()}</span>
               </Button>
             )}
@@ -384,9 +352,14 @@ export function Navbar() {
                             ) : (
                               <Gift className="mr-2 h-4 w-4 animate-bounce" />
                             )}
-                            {isClaiming
-                              ? "Đang nhận..."
-                              : `Nhận ${claimInfo.amount} KC`}
+                            {isClaiming ? (
+                              "Đang nhận..."
+                            ) : (
+                              <div className="flex items-center justify-center gap-1">
+                                Nhận {claimInfo.amount}
+                                <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+                              </div>
+                            )}
                           </Button>
                         </div>
                       )}
@@ -508,11 +481,11 @@ export function Navbar() {
                         onClick={() => handleNavigate("/author-upgrade")}
                         className="text-left py-2 text-lg"
                       >
-                        Đăng ký tác giả
+                        Góc tác giả
                       </button>
 
                       {/* Luôn hiện nút Góc sáng tác */}
-                      <button
+                      {/* <button
                         onClick={() => {
                           handleNavigate("/author/overview");
                           // setOpen(false);
@@ -520,7 +493,7 @@ export function Navbar() {
                         className="text-left py-2 text-lg"
                       >
                         Góc sáng tác
-                      </button>
+                      </button> */}
                     </>
                   )}
 

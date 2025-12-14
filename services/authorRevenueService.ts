@@ -23,6 +23,9 @@ export interface TransactionMetadata {
   priceDias?: number;
   rewardRate: number;
   bankName?: string;
+  generatedVoices?: string[]; // Mảng ID giọng đã tạo
+  charCount?: number; // Số ký tự
+  buyerId?: string; // ID người mua
 }
 
 export interface TransactionItem {
@@ -38,6 +41,9 @@ export interface TransactionItem {
   bankName?: string;
   bankAccountNumber?: string;
   accountHolderName?: string;
+
+  chapterId?: string | null;
+  voicePurchaseId?: string | null;
 }
 
 export interface TransactionResponse {
@@ -112,9 +118,17 @@ const getWithdrawHistory = (status?: WithdrawStatus) => {
   });
 };
 
+//Ký xác nhận nhận tiền
+const confirmWithdraw = (requestId: string) => {
+  return apiClient.post<{ message: string }>(
+    `/api/AuthorRevenue/withdraw/${requestId}/confirm`
+  );
+};
+
 export const authorRevenueService = {
   getSummary,
   getTransactions,
   requestWithdraw,
   getWithdrawHistory,
+  confirmWithdraw,
 };
