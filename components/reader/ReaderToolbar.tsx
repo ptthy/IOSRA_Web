@@ -749,9 +749,10 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                             <Check className="w-3 h-3" /> <span>Sở hữu</span>
                           </div>
                         ) : (
-                          <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full">
-                            {v.priceDias} Dias
-                          </span>
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full">
+                            {v.priceDias}
+                            <Gem className="h-3 w-3 fill-blue-500 text-blue-600" />
+                          </div>
                         )}
                       </div>
                     </SelectItem>
