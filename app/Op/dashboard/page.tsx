@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import OpLayout from "@/components/OpLayout";
 import {
   Card,
   CardContent,
@@ -33,9 +32,9 @@ import {
   Star,
   Wallet,
   Calendar,
+  Gem,
 } from "lucide-react";
 
-// Import API
 import {
   getSystemRevenue,
   getRequestStats,
@@ -43,19 +42,28 @@ import {
 
 export default function DashboardAnalytics() {
   const [loading, setLoading] = useState(true);
-  
-  // State quản lý thời gian lọc (Mặc định là month)
   const [period, setPeriod] = useState("month");
 
   const [stats, setStats] = useState({
-    totalRevenue: 0,
-    becomeAuthorRequests: 0, // Type: become_author
-    rankUpRequests: 0,       // Type: rank_up
-    withdrawRequests: 0,     // Type: withdraw
+    currentRevenue: 0, // Đổi tên biến để rõ nghĩa hơn
+    totalRevenueAccumulated: 0, // Lưu tổng tích lũy nếu cần dùng
+    becomeAuthorRequests: 0,
+    rankUpRequests: 0,
+    withdrawRequests: 0,
     revenueTrend: [] as any[],
   });
 
-  // Hàm mapping label hiển thị cho đẹp
+  // Hàm lấy label hiển thị cho Card Doanh thu
+  const getRevenueLabel = () => {
+    switch (period) {
+      case "day": return "hôm nay";
+      case "week": return "tuần này";
+      case "month": return "tháng này";
+      case "year": return "năm nay";
+      default: return "kỳ này";
+    }
+  };
+
   const getPeriodLabel = () => {
     switch (period) {
       case "day": return "Hôm nay";
@@ -71,7 +79,6 @@ export default function DashboardAnalytics() {
       try {
         setLoading(true);
 
-        // Gọi song song 4 API với tham số period được chọn
         const [
           revenueRes, 
           becomeAuthorRes, 
@@ -84,21 +91,34 @@ export default function DashboardAnalytics() {
           getRequestStats("withdraw", period)       
         ]);
 
-        // 1. Tính tổng doanh thu (3 nguồn)
-        const totalRev =
+        // --- XỬ LÝ SỐ LIỆU DOANH THU ---
+        const points = revenueRes.points || [];
+        
+        // 1. Tính tổng tích lũy toàn bộ chart (Số 71,000 cũ)
+        const totalAccumulated = 
           (revenueRes.diaTopup || 0) +
           (revenueRes.subscription || 0) +
           (revenueRes.voiceTopup || 0);
 
-        // 2. Map dữ liệu biểu đồ
-        const chartData = revenueRes.points?.map((p: any) => ({
-          name: p.periodLabel, // VD: "2025-11-28" hoặc "2025-11"
+        // 2. Lấy doanh thu của THỜI ĐIỂM HIỆN TẠI (Last Data Point)
+        // Nếu chọn 'day', lấy value của ngày cuối cùng trong mảng.
+        // Nếu chọn 'week', lấy value của tuần cuối cùng.
+        let currentPeriodRev = 0;
+        if (points.length > 0) {
+            currentPeriodRev = points[points.length - 1].value;
+        } else {
+            // Fallback nếu không có point nào (ví dụ đầu ngày chưa có data)
+            currentPeriodRev = totalAccumulated; 
+        }
+
+        const chartData = points.map((p: any) => ({
+          name: p.periodLabel,
           revenue: p.value,
-        })) || [];
+        }));
 
         setStats({
-          totalRevenue: totalRev,
-          // Lấy field .total từ API trả về
+          currentRevenue: currentPeriodRev, // <--- Dùng số này để hiển thị
+          totalRevenueAccumulated: totalAccumulated,
           becomeAuthorRequests: becomeAuthorRes?.total || 0,
           rankUpRequests: rankUpRes?.total || 0,
           withdrawRequests: withdrawRes?.total || 0,
@@ -115,7 +135,6 @@ export default function DashboardAnalytics() {
   }, [period]); 
 
   return (
-    
       <main className="p-6 space-y-6">
         {/* Header & Filter */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -124,11 +143,10 @@ export default function DashboardAnalytics() {
               Tổng quan hệ thống
             </h1>
             <p className="text-sm text-[var(--muted-foreground)]">
-              Thống kê dữ liệu: <span className="font-semibold text-foreground">{getPeriodLabel()}</span>
+              Dữ liệu đang xem: <span className="font-semibold text-foreground">{getPeriodLabel()}</span>
             </p>
           </div>
 
-          {/* Nút Select chọn kỳ thống kê */}
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-muted-foreground" />
             <Select value={period} onValueChange={setPeriod}>
@@ -157,16 +175,18 @@ export default function DashboardAnalytics() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {loading ? "..." : `${stats.totalRevenue.toLocaleString()}₫`}
+              <div className="text-2xl font-bold flex items-center gap-1">
+                {/* HIỂN THỊ SỐ currentRevenue THAY VÌ TOTAL */}
+                {loading ? "..." : stats.currentRevenue.toLocaleString()} 
+                <Gem className="h-5 w-5 text-blue-500 fill-blue-500" />
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Tổng thu nhập {getPeriodLabel().toLowerCase()}
+                Tổng thu nhập {getRevenueLabel()}
               </p>
             </CardContent>
           </Card>
 
-          {/* Card 2: Đơn đăng ký Author (type: become_author) */}
+          {/* Các Card khác giữ nguyên */}
           <Card className="shadow-sm border-l-4 border-l-blue-500">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Yêu cầu lên Author</CardTitle>
@@ -184,7 +204,6 @@ export default function DashboardAnalytics() {
             </CardContent>
           </Card>
 
-          {/* Card 3: Đơn nâng hạng (type: rank_up) - Thay cho Active Authors cũ */}
           <Card className="shadow-sm border-l-4 border-l-yellow-500">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Yêu cầu Nâng hạng</CardTitle>
@@ -202,7 +221,6 @@ export default function DashboardAnalytics() {
             </CardContent>
           </Card>
 
-          {/* Card 4: Đơn rút tiền (type: withdraw) */}
           <Card className="shadow-sm border-l-4 border-l-purple-500">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Yêu cầu chờ duyệt</CardTitle>
@@ -215,13 +233,13 @@ export default function DashboardAnalytics() {
                 {loading ? "..." : stats.withdrawRequests}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Số đơn cần xử lý
+                Số đơn rút tiền cần xử lý
               </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* 2. Main Chart: Revenue Trend */}
+        {/* 2. Main Chart */}
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-[var(--primary)] flex items-center gap-2">
@@ -239,37 +257,28 @@ export default function DashboardAnalytics() {
                   <AreaChart data={stats.revenueTrend}>
                     <defs>
                       <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                        <stop
-                          offset="5%"
-                          stopColor="var(--primary)"
-                          stopOpacity={0.8}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="var(--primary)"
-                          stopOpacity={0}
-                        />
+                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                     <XAxis 
                       dataKey="name" 
                       fontSize={12} 
-                      // Format lại ngày tháng cho gọn nếu quá dài
                       tickFormatter={(val) => {
-                        if(period === 'day') return val.split(' ')[1] || val; // VD lấy giờ
+                        // Rút gọn ngày nếu cần
+                        if(period === 'day') return val.split('-').slice(1).join('/');
                         return val;
                       }}
                     />
                     <YAxis
                       fontSize={12}
-                      tickFormatter={(val) => `${val / 1000000}M`}
+                      tickFormatter={(val) => `${val / 1000}K`} // Format gọn hơn (71000 -> 71K)
                     />
                     <Tooltip
-                      formatter={(value: number) =>
-                        `${value.toLocaleString()}₫`
-                      }
+                      formatter={(value: number) => `${value.toLocaleString()}`}
                       contentStyle={{ borderRadius: "8px" }}
+                      labelStyle={{ color: "#333" }}
                     />
                     <Area
                       type="monotone"
@@ -286,6 +295,5 @@ export default function DashboardAnalytics() {
           </CardContent>
         </Card>
       </main>
-  
   );
 }

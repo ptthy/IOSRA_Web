@@ -1,74 +1,124 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+const STAFF_ROLES = ["admin", "omod", "cmod"];
+
+const isStaff = (role?: string) =>
+  !!role && STAFF_ROLES.includes(role);
+
+const isAuthor = (user: any) =>
+  user?.roles?.includes("author") || user?.isAuthorApproved;
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const userCookie = request.cookies.get("authUser");
 
-  // Xử lý route /author-upgrade
-  if (pathname === "/author-upgrade") {
-    // Đọc cookie chứa thông tin user
-    const userCookie = request.cookies.get("authUser");
+  let user: any = null;
 
-    if (userCookie) {
-      try {
-        const user = JSON.parse(userCookie.value);
-
-        // Kiểm tra nếu user đã là author
-        const isAlreadyAuthor =
-          user.roles?.includes("author") || user.isAuthorApproved;
-
-        if (isAlreadyAuthor) {
-          // Redirect về trang author overview
-          const url = request.nextUrl.clone();
-          url.pathname = "/author/overview";
-          return NextResponse.redirect(url);
-        }
-      } catch (error) {
-        // Nếu parse cookie lỗi, bỏ qua và cho phép truy cập
-        console.error("Error parsing user cookie:", error);
-      }
-    }
-  }
-
-  // Xử lý tất cả routes /author/* (trừ /author-upgrade)
-  if (pathname.startsWith("/author/") && pathname !== "/author-upgrade") {
-    const userCookie = request.cookies.get("authUser");
-
-    if (userCookie) {
-      try {
-        const user = JSON.parse(userCookie.value);
-
-        // Kiểm tra nếu user KHÔNG phải author
-        const isAuthor =
-          user.roles?.includes("author") || user.isAuthorApproved;
-
-        // Cho phép vào trang để client-side có thể refresh token
-        // Client-side sẽ kiểm tra lại và redirect nếu cần
-        // Chỉ redirect nếu chắc chắn không phải author (để tránh chặn refresh token)
-        if (!isAuthor) {
-          // Cho phép vào trang, client-side sẽ refresh token và kiểm tra lại
-          // Nếu sau khi refresh vẫn không phải author, client sẽ redirect
-          return NextResponse.next();
-        }
-      } catch (error) {
-        // Nếu parse cookie lỗi, redirect về login
-        console.error("Error parsing user cookie:", error);
-        const url = request.nextUrl.clone();
-        url.pathname = "/login";
-        return NextResponse.redirect(url);
-      }
-    } else {
-      // Không có cookie -> chưa login, redirect về login
+  if (userCookie) {
+    try {
+      user = JSON.parse(userCookie.value);
+    } catch {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       return NextResponse.redirect(url);
     }
   }
 
-  // Cho phép request tiếp tục
+  const role = user?.role;
+
+  /* =================================================
+     1️⃣ AUTHOR / READER KHÔNG ĐƯỢC VÀO STAFF
+     ================================================= */
+  if (
+    !isStaff(role) &&
+    (pathname.startsWith("/Op") || pathname.startsWith("/Admin"))
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/";
+    return NextResponse.redirect(url);
+  }
+
+  /* =================================================
+     2️⃣ STAFF KHÔNG ĐƯỢC VÀO USER / AUTHOR
+     👉 ĐÁ VỀ LOGIN
+     ================================================= */
+  const userAuthorRoutes = [
+    "/",
+    "/search",
+    "/profile",
+    "/author",
+    "/author-upgrade",
+  ];
+
+  if (
+    isStaff(role) &&
+    userAuthorRoutes.some(
+      (path) =>
+        pathname === path || pathname.startsWith(path + "/")
+    )
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  /* =================================================
+     3️⃣ /author-upgrade
+     ================================================= */
+  if (pathname === "/author-upgrade") {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
+
+    if (isStaff(role)) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
+
+    if (isAuthor(user)) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/author/overview";
+      return NextResponse.redirect(url);
+    }
+  }
+
+  /* =================================================
+     4️⃣ /author/*
+     ================================================= */
+  if (pathname.startsWith("/author/") && pathname !== "/author-upgrade") {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
+
+    if (isStaff(role)) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
+
+    if (!isAuthor(user)) {
+      // cho client-side refresh token
+      return NextResponse.next();
+    }
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/author-upgrade", "/author/:path*"],
+  matcher: [
+    "/",
+    "/search/:path*",
+    "/profile/:path*",
+    "/author-upgrade",
+    "/author/:path*",
+    "/Op/:path*",
+    "/Admin/:path*",
+  ],
 };

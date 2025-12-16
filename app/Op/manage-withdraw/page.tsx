@@ -36,7 +36,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { CheckCircle, Clock, XCircle, Search, Loader2 } from "lucide-react";
+import { CheckCircle, Clock, XCircle, Search, Loader2, Gem } from "lucide-react"; // <--- Đã thêm Gem
 import { toast } from "sonner";
 
 // Import API Service
@@ -59,7 +59,7 @@ interface WithdrawRequest {
   createdAt: string;
   reviewedAt?: string;
   // Các field khác nếu API trả về
-  authorName?: string; // API hiện tại chưa trả về tên tác giả, sẽ dùng tạm accountHolderName
+  authorName?: string; 
 }
 
 export default function WithdrawManagement() {
@@ -201,7 +201,10 @@ export default function WithdrawManagement() {
             <CardHeader className="py-4"><CardTitle className="text-sm text-yellow-700">Chờ xử lý</CardTitle></CardHeader>
             <CardContent className="pb-4">
               <div className="text-2xl font-bold text-yellow-900">{stats.pending}</div>
-              <div className="text-xs text-yellow-700 font-medium">Tổng: {stats.totalAmountPending.toLocaleString()}₫</div>
+              <div className="text-xs text-yellow-700 font-medium flex items-center gap-1">
+                Tổng: {stats.totalAmountPending.toLocaleString()}
+                <Gem className="h-4 w-4 text-blue-500 fill-blue-500" />
+              </div>
             </CardContent>
           </Card>
           <Card className="bg-green-50 border-green-200">
@@ -263,7 +266,12 @@ export default function WithdrawManagement() {
                   filteredRequests.map((req) => (
                     <TableRow key={req.requestId}>
                       <TableCell>{new Date(req.createdAt).toLocaleDateString('vi-VN')}</TableCell>
-                      <TableCell className="font-bold text-green-600">{req.amount.toLocaleString()}₫</TableCell>
+                      <TableCell className="font-bold text-green-600">
+                        <div className="flex items-center gap-1">
+                          {req.amount.toLocaleString()} 
+                          <Gem className="h-4 w-4 text-blue-500 fill-blue-500" />
+                        </div>
+                      </TableCell>
                       <TableCell>{req.bankName}</TableCell>
                       <TableCell>{req.accountHolderName}</TableCell>
                       <TableCell>{req.bankAccountNumber}</TableCell>
@@ -300,7 +308,10 @@ export default function WithdrawManagement() {
                 <div className="bg-muted p-3 rounded text-sm">
                   <p><strong>Người nhận:</strong> {selectedRequest.accountHolderName}</p>
                   <p><strong>Ngân hàng:</strong> {selectedRequest.bankName} - {selectedRequest.bankAccountNumber}</p>
-                  <p className="text-lg font-bold text-green-600 mt-1">Số tiền: {selectedRequest.amount.toLocaleString()}₫</p>
+                  <div className="text-lg font-bold text-green-600 mt-1 flex items-center gap-1">
+                    Số tiền: {selectedRequest.amount.toLocaleString()} 
+                    <Gem className="h-5 w-5 text-blue-500 fill-blue-500" />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Mã giao dịch (Optional)</Label>
