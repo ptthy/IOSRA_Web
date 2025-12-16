@@ -171,8 +171,15 @@ export function ChatBotWidget() {
   ];
   const isAuthPage = authPaths.includes(pathname);
 
-  // C. Nếu thuộc Role ẩn HOẶC đang ở trang Auth -> Return null
-  if (isHiddenRole || isAuthPage) {
+  // C. [FIX MỚI] Check các trang quản trị (Admin, Op, Content)
+  // Dùng .some() để xem URL hiện tại có bắt đầu bằng bất kỳ cái nào trong list không
+  const managementPrefixes = ["/admin", "/op", "/content"];
+  const isManagementPage = managementPrefixes.some((prefix) =>
+    pathname.toLowerCase().startsWith(prefix)
+  );
+
+  // D. Tổng hợp điều kiện để Return null
+  if (isHiddenRole || isAuthPage || isManagementPage) {
     return null;
   }
   // --- TRẠNG THÁI 1: BONG BÓNG TRÒN (KHI ĐÓNG) ---

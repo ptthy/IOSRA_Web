@@ -1,9 +1,69 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-
+// [Bổ sung 1]: Thêm cấu hình đường dẫn cho Staff để dễ quản lý
+const STAFF_CONFIG: Record<string, { dashboard: string; allowedBase: string }> =
+  {
+    admin: {
+      dashboard: "/Admin",
+      allowedBase: "/Admin",
+    },
+    omod: {
+      dashboard: "/Op/dashboard",
+      allowedBase: "/Op",
+    },
+    cmod: {
+      dashboard: "/Content/dashboard",
+      allowedBase: "/Content",
+    },
+  };
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const userCookie = request.cookies.get("authUser");
+  // [Bổ sung 2]: Thêm logic kiểm tra Role Staff ngay đầu hàm
+  if (userCookie) {
+    try {
+      const user = JSON.parse(userCookie.value);
+      const roles = user.roles || [];
 
+      // Xác định Role cao nhất của user
+      let role = "reader";
+      if (roles.includes("admin")) role = "admin";
+      else if (roles.includes("omod")) role = "omod";
+      else if (roles.includes("cmod")) role = "cmod";
+      else if (roles.includes("author") || user.isAuthorApproved)
+        role = "author";
+
+      // A. LOGIC CHO STAFF (Admin, Omod, Cmod)
+
+      //  Staff đi lung tung (ra trang chủ, trang truyện...), bắt về Dashboard ngay.
+      if (STAFF_CONFIG[role]) {
+        const config = STAFF_CONFIG[role];
+
+        // Kiểm tra: Nếu đường dẫn hiện tại KHÔNG bắt đầu bằng vùng cho phép
+        if (!pathname.startsWith(config.allowedBase)) {
+          const url = request.nextUrl.clone();
+          url.pathname = config.dashboard;
+          return NextResponse.redirect(url);
+        }
+      }
+
+      // B. LOGIC CHO READER/AUTHOR
+      //Ngăn chặn Reader tò mò gõ đường dẫn của Staff
+      if (role === "reader" || role === "author") {
+        if (
+          pathname.startsWith("/Admin") ||
+          pathname.startsWith("/Op") ||
+          pathname.startsWith("/Content")
+        ) {
+          const url = request.nextUrl.clone();
+          url.pathname = "/"; // Đá về trang chủ
+          return NextResponse.redirect(url);
+        }
+      }
+    } catch (error) {
+      console.error("Middleware cookie parse error:", error);
+    }
+  }
   // Xử lý route /author-upgrade
   if (pathname === "/author-upgrade") {
     // Đọc cookie chứa thông tin user
@@ -70,5 +130,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/author-upgrade", "/author/:path*"],
+  // matcher: ["/author-upgrade", "/author/:path*"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|login|register).*)"],
 };

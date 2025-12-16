@@ -357,7 +357,7 @@ export default function SearchPage() {
             </Select>
 
             {/* Premium Filter - ĐÃ XÓA NÚT X */}
-            <Select value={isPremium} onValueChange={setIsPremium}>
+            {/* <Select value={isPremium} onValueChange={setIsPremium}>
               <SelectTrigger className="w-[140px] bg-background/50">
                 <SelectValue placeholder="Trạng thái" />
               </SelectTrigger>
@@ -366,7 +366,7 @@ export default function SearchPage() {
                 <SelectItem value="true">Premium</SelectItem>
                 <SelectItem value="false">Miễn phí</SelectItem>
               </SelectContent>
-            </Select>
+            </Select> */}
 
             {/* Rating Filter - ĐÃ XÓA NÚT X */}
             <Select value={minAvgRating} onValueChange={setMinAvgRating}>

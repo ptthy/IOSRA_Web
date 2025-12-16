@@ -27,6 +27,7 @@ import {
   FileText,
   Crown,
   Unlock,
+  Gem,
 } from "lucide-react";
 import { storyCatalogApi, Story } from "@/services/storyCatalog";
 import {
@@ -817,7 +818,8 @@ export default function StoryDetailPage() {
                             variant="outline"
                             className="border-yellow-500 text-yellow-600 font-bold"
                           >
-                            {chapter.priceDias} Dias
+                            {chapter.priceDias}{" "}
+                            <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
                           </Badge>
                         ) : (
                           // Ưu tiên 3: Miễn phí
