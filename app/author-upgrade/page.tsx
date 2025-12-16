@@ -311,6 +311,11 @@ export default function AuthorUpgradePage() {
    * Xử lý gửi yêu cầu (khi bấm nút ở form 'default')
    */
   const handleSubmitRequest = async () => {
+    // === CODE BỔ SUNG BẮT ĐẦU ===
+    if (!user) {
+      toast.error("Bạn cần đăng nhập để thực hiện đăng ký.");
+      return;
+    }
     if (!isCommitmentMatched) {
       toast.error("Vui lòng nhập chính xác câu cam kết để tiếp tục.");
       return;
@@ -370,6 +375,11 @@ export default function AuthorUpgradePage() {
    * Xử lý gửi lại yêu cầu (khi bấm nút ở form 'rejected')
    */
   const handleResubmit = () => {
+    if (!user) {
+      toast.error("Bạn cần đăng nhập để thực hiện thao tác này.");
+
+      return;
+    }
     // Đơn giản là reset về trạng thái "default" để user thấy lại form
     // Và reset luôn text đã gõ
     setTypedCommitment("");

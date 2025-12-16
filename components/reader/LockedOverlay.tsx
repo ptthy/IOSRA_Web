@@ -177,8 +177,8 @@ export const LockedOverlay: React.FC<LockedOverlayProps> = ({
             Số dư hiện tại
           </p>
           <div className="text-xl font-bold text-blue-600 dark:text-blue-400 flex items-center justify-center gap-2">
-            <Gem className="h-5 w-5 fill-blue-600 dark:fill-blue-400" />
-            {currentBalance.toLocaleString()} Dias
+            {currentBalance.toLocaleString()}{" "}
+            <Gem className="h-6 w-6 fill-blue-500 text-blue-600" />
           </div>
         </div>
 
@@ -197,8 +197,8 @@ export const LockedOverlay: React.FC<LockedOverlayProps> = ({
               </>
             ) : (
               <>
-                <Unlock className="mr-2 h-5 w-5" /> Mở khóa ngay ({priceDias}{" "}
-                Dias)
+                <Unlock className="mr-2 h-5 w-5" /> Mở khóa ngay ({priceDias}
+                <Gem className="h-7 w-7 fill-blue-500 text-blue-600 ml-1" />)
               </>
             )}
           </Button>
@@ -211,7 +211,7 @@ export const LockedOverlay: React.FC<LockedOverlayProps> = ({
             className="w-full h-12 border-2 border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700 font-semibold transition-all"
           >
             <Zap className="mr-2 h-5 w-5" />
-            Nạp Dias
+            Nạp <Gem className="h-4 w-4 fill-blue-500 text-blue-600 ml-1" />
           </Button>
 
           <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground bg-white/50 dark:bg-black/20 py-2 rounded-lg">
