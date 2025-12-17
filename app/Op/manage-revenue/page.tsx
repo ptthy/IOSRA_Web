@@ -47,8 +47,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-
-// 👉 Dialog (Modal)
 import {
   Dialog,
   DialogContent,
@@ -62,11 +60,11 @@ import {
 import {
   getSystemRevenue,
   getWithdrawRequests,
+  exportSystemRevenue,
 } from "@/services/operationModStatService";
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 
-// ================= TYPES =================
 interface Transaction {
   requestId: string;
   amount: number;
@@ -79,25 +77,27 @@ interface Transaction {
   reviewedAt: string;
 }
 
-// ================= PAGE =================
 export default function ManageRevenuePage() {
-  const [period, setPeriod] = useState("month");
+  // --- SỬA LỖI Ở ĐÂY: Đổi "month" thành "monthly" để khớp với SelectItem ---
+  const [period, setPeriod] = useState("monthly");
+  
   const [loading, setLoading] = useState(true);
-
   const [revenueData, setRevenueData] = useState<any>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-
-  // 👉 State modal chi tiết
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [openDetail, setOpenDetail] = useState(false);
+  
+  // State loading cho button export
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
       try {
         setLoading(true);
-
-        const apiPeriod =
-          period === "daily" ? "day" : period === "yearly" ? "year" : "month";
+        // Map period của Select ("daily", "monthly", "yearly") sang period của API ("day", "month", "year")
+        let apiPeriod = "month";
+        if (period === "daily") apiPeriod = "day";
+        if (period === "yearly") apiPeriod = "year";
 
         const [resRevenue, resConfirmed, resRejected] = await Promise.all([
           getSystemRevenue(apiPeriod),
@@ -128,11 +128,34 @@ export default function ManageRevenuePage() {
     fetchData();
   }, [period]);
 
-  const handleExport = () => {
-    toast.success("Tính năng xuất báo cáo đang phát triển 😅");
+  // Xử lý nút Xuất Excel
+  const handleExport = async () => {
+    try {
+      setIsExporting(true);
+      let apiPeriod = "month";
+      if (period === "daily") apiPeriod = "day";
+      if (period === "yearly") apiPeriod = "year";
+      
+      const blob = await exportSystemRevenue(apiPeriod);
+      
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Revenue_Report_${apiPeriod}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success("Xuất file thành công!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Lỗi khi xuất file Excel");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
-  // ================= DATA =================
   const pieData = revenueData
     ? [
         { name: "Nạp Kim Cương", value: revenueData.diaTopup },
@@ -171,7 +194,6 @@ export default function ManageRevenuePage() {
     }
   };
 
-  // ================= RENDER =================
   return (
     <OpLayout>
       <main className="p-6 space-y-6">
@@ -187,7 +209,8 @@ export default function ManageRevenuePage() {
           <div className="flex gap-2">
             <Select value={period} onValueChange={setPeriod}>
               <SelectTrigger className="w-[140px]">
-                <SelectValue />
+                {/* Thêm placeholder để tránh bị trống nếu chưa load */}
+                <SelectValue placeholder="Chọn thời gian" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="daily">Theo ngày</SelectItem>
@@ -196,20 +219,30 @@ export default function ManageRevenuePage() {
               </SelectContent>
             </Select>
 
-            <Button variant="outline" onClick={handleExport}>
-              <Download className="w-4 h-4 mr-2" />
-              Xuất Excel
+            {/* BUTTON DOWNLOAD */}
+            <Button 
+                variant="outline" 
+                onClick={handleExport} 
+                disabled={isExporting}
+            >
+              {isExporting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
+              {isExporting ? "Đang tạo..." : "Xuất Excel"}
             </Button>
           </div>
         </div>
 
-        {/* Charts */}
+        {/* Charts Section */}
         {loading ? (
           <div className="h-96 flex justify-center items-center">
             <Loader2 className="w-10 h-10 animate-spin text-gray-400" />
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* BAR CHART */}
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle>Biến động Doanh thu</CardTitle>
@@ -225,38 +258,91 @@ export default function ManageRevenuePage() {
                       <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                       <XAxis dataKey="name" />
                       <YAxis />
-                      <Tooltip />
+                      <Tooltip formatter={(value) => value.toLocaleString()} />
                       <Legend />
-                      <Bar dataKey="value" fill="#3A506B" />
+                      <Bar dataKey="value" name="Doanh thu" fill="#3A506B" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            {/* PIE CHART VỚI CUSTOM LIST CHI TIẾT */}
+            <Card className="flex flex-col">
               <CardHeader>
                 <CardTitle>Cơ cấu Nguồn thu</CardTitle>
+                <CardDescription>Tỉ lệ đóng góp theo nguồn</CardDescription>
               </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      dataKey="value"
-                      innerRadius={60}
-                      outerRadius={80}
-                    >
-                      {pieData.map((_, i) => (
-                        <Cell
-                          key={i}
-                          fill={COLORS[i % COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+              <CardContent className="flex-1 flex flex-col justify-between">
+                {/* Chart Area */}
+                <div className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                      >
+                        {pieData.map((_, i) => (
+                          <Cell
+                            key={`cell-${i}`}
+                            fill={COLORS[i % COLORS.length]}
+                            strokeWidth={0}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: number) => value.toLocaleString()} 
+                        contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Custom List Chi Tiết (Legend) */}
+                <div className="mt-4 space-y-3">
+                  {pieData.map((item, index) => {
+                    const percent = totalRevenue > 0 
+                      ? ((item.value / totalRevenue) * 100).toFixed(1) 
+                      : "0";
+                    
+                    return (
+                      <div key={index} className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          {/* Dot màu */}
+                          <div 
+                            className="w-3 h-3 rounded-full shadow-sm" 
+                            style={{ backgroundColor: COLORS[index % COLORS.length] }} 
+                          />
+                          <span className="text-sm font-medium text-slate-700">
+                            {item.name}
+                          </span>
+                        </div>
+                        
+                        <div className="text-right">
+                          <div className="text-sm font-bold flex items-center justify-end gap-1">
+                            {item.value.toLocaleString()}
+                            <Gem className="w-3 h-3 text-blue-500" />
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {percent}%
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  {pieData.length === 0 && (
+                    <p className="text-center text-sm text-muted-foreground py-4">
+                      Chưa có dữ liệu
+                    </p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>
