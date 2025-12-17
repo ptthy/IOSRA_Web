@@ -92,7 +92,12 @@ const APDisplay = ({
       {showPlus && isPositive ? "+" : ""}
       {formatNumber(value)}
       {/* Icon Gem màu xanh dương */}
-      <Gem size={iconSize} className="h-4 w-4 fill-blue-500 text-blue-600" />
+      <div className="relative inline-flex items-center">
+        <Gem size={iconSize} className="h-4 w-4 fill-blue-500 text-blue-600" />
+        <span className="absolute -bottom-3 -right-2 text-yellow-500 text-lg font-bold leading-none">
+          *
+        </span>
+      </div>
     </span>
   );
 };
@@ -207,7 +212,13 @@ const DetailModal = ({
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 bg-[var(--muted)]/30 rounded-lg border border-[var(--border)]">
               <span className="text-sm font-medium text-[var(--muted-foreground)] flex items-center gap-1">
-                Số <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+                Số
+                <div className="relative inline-flex items-center">
+                  <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+                  <span className="absolute -bottom-2 -right-2 text-yellow-500 text-lg font-bold leading-none">
+                    *
+                  </span>
+                </div>
               </span>
               <div
                 className={`text-2xl font-bold ${
@@ -502,8 +513,11 @@ export default function AuthorRevenuePage() {
     if (!amountNum || amountNum < 1000) {
       toast.error(
         <div className="flex items-center gap-1">
-          Số <Gem className="h-4 w-4 fill-blue-500 text-blue-600" /> luân chuyển
-          tối thiểu là 1.000
+          Số <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+          <span className="absolute -bottom-2 -right-1 text-yellow-500 text-lg font-bold leading-none">
+            *
+          </span>{" "}
+          luân chuyển tối thiểu là 1.000
         </div>
       );
       return;
@@ -511,8 +525,11 @@ export default function AuthorRevenuePage() {
     if (amountNum > summary.revenueBalance) {
       toast.error(
         <div className="flex items-center gap-1">
-          Số <Gem className="h-4 w-4 fill-blue-500 text-blue-600" /> khả dụng
-          không đủ.
+          Số <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+          <span className="absolute -bottom-2 -right-1 text-yellow-500 text-lg font-bold leading-none">
+            *
+          </span>{" "}
+          khả dụng không đủ.
         </div>
       );
       return;
@@ -586,7 +603,7 @@ export default function AuthorRevenuePage() {
       setLoading(true);
       await authorRevenueService.confirmWithdraw(requestId);
 
-      toast.success("Đã xác nhận nhận tiền thành công! Cảm ơn bạn.");
+      toast.success("Đã xác nhận thành công! Cảm ơn bạn.");
 
       // Tải lại dữ liệu để cập nhật danh sách
       await fetchAllData();
@@ -791,8 +808,14 @@ export default function AuthorRevenuePage() {
           {
             title: (
               <span className="flex items-center gap-1">
-                Số <Gem className="w-4 h-4 fill-blue-500 text-blue-600" /> khả
-                dụng
+                Số
+                <div className="relative inline-flex items-center">
+                  <Gem className="w-4 h-4 fill-blue-500 text-blue-600" />
+                  <span className="absolute -bottom-3 -right-1 text-yellow-500 text-lg font-bold leading-none">
+                    *
+                  </span>
+                </div>
+                khả dụng
               </span>
             ),
             value: summary?.revenueBalance || 0,
@@ -861,8 +884,13 @@ export default function AuthorRevenuePage() {
               <div className="space-y-1.5">
                 <Label>
                   Số lượng{" "}
-                  <Gem className="h-4 w-4 fill-blue-500 text-blue-600" /> (dias)
-                  mong muốn <span className="text-red-500 ml-1">*</span>
+                  <div className="relative inline-flex items-center">
+                    <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+                    <span className="absolute -bottom-2 -right-2 text-yellow-500 text-lg font-bold leading-none">
+                      *
+                    </span>
+                  </div>{" "}
+                  (dias) mong muốn <span className="text-red-500 ml-1">*</span>
                 </Label>
                 <Input
                   type="text"
@@ -884,13 +912,13 @@ export default function AuthorRevenuePage() {
                   }}
                   className="font-mono text-lg tracking-wider text-right bg-[var(--background)] dark:border-[#f0ead6]"
                 />
-                <p className="text-[10px] text-right text-[var(--muted-foreground)]">
+                <div className="text-[10px] text-right text-[var(--muted-foreground)]">
                   Khả dụng:{" "}
                   <APDisplay
                     value={summary?.revenueBalance || 0}
                     iconSize={10}
                   />
-                </p>
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -1071,7 +1099,7 @@ export default function AuthorRevenuePage() {
                           className="bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-200 dark:shadow-none transition-all active:scale-95"
                         >
                           <CheckCircle2 className="w-4 h-4 mr-2" />
-                          Xác nhận đã nhận tiền
+                          Xác nhận đã nhận
                         </Button>
                       </div>
                     </div>
@@ -1140,7 +1168,12 @@ export default function AuthorRevenuePage() {
                     <TableHead className="text-right">
                       <div className="flex w-full items-center justify-end gap-1">
                         Số{" "}
-                        <Gem className="h-4 w-4 fill-blue-500 text-blue-600 mb-0.5" />
+                        <div className="relative inline-flex items-center mb-0.5">
+                          <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+                          <span className="absolute -bottom-3 -right-2 text-yellow-500 text-lg font-bold leading-none">
+                            *
+                          </span>
+                        </div>
                       </div>
                     </TableHead>
 
@@ -1220,12 +1253,15 @@ export default function AuthorRevenuePage() {
                   <TableRow className="hover:bg-transparent border-b border-[var(--border)]">
                     <TableHead className="w-[150px]">Thời gian</TableHead>
                     <TableHead>
-                      <TableHead>
-                        <div className="flex items-center gap-1 whitespace-nowrap">
-                          Số{" "}
+                      <div className="flex items-center gap-1 whitespace-nowrap">
+                        Số{" "}
+                        <div className="relative inline-flex items-center">
                           <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+                          <span className="absolute -bottom-2 -right-2 text-yellow-500 text-lg font-bold leading-none">
+                            *
+                          </span>
                         </div>
-                      </TableHead>
+                      </div>
                     </TableHead>
                     <TableHead>Ngân hàng</TableHead>
                     <TableHead>Trạng thái</TableHead>
