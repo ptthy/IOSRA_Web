@@ -157,9 +157,9 @@ export function VoiceTopupModal({ isOpen, onClose }: VoiceTopupModalProps) {
                 <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-0.5">
                   Số dư ví
                 </p>
-                <div className="text-xl font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                <div className="text-xl font-bold text-blue-600 flex items-center gap-2">
                   {balance.toLocaleString()}
-                  <Gem className="h-5 w-5 fill-indigo-500 text-indigo-600" />
+                  <Gem className="h-5 w-5 fill-blue-600" />
                 </div>
               </div>
             </div>
@@ -207,13 +207,13 @@ export function VoiceTopupModal({ isOpen, onClose }: VoiceTopupModalProps) {
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1.5 text-sm font-semibold">
                                 {rule.generationCostDias}
-                                <Gem className="h-4 w-4 text-indigo-500 fill-indigo-500 opacity-80" />
+                                <Gem className="h-4 w-4 text-blue-500 fill-blue-500 opacity-80" />
                               </div>
                             </TableCell>
                             <TableCell className="text-right pr-6">
                               <div className="flex items-center justify-end gap-1.5 text-sm font-semibold">
                                 {rule.sellingPriceDias}
-                                <Gem className="h-4 w-4 text-green-500 fill-green-500 opacity-80" />
+                                <Gem className="h-4 w-4 text-blue-500 fill-blue-500 opacity-80" />
                               </div>
                             </TableCell>
                           </TableRow>

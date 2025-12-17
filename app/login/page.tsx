@@ -72,23 +72,7 @@ export default function LoginRoute() {
           }
         }
 
-        // 2. Xử lý các mã lỗi nghiệp vụ đặc thù (Giữ lại để hiển thị tiếng Việt)
-        // if (code === "InvalidCredentials") {
-        //   toast.error("Thông tin đăng nhập không chính xác.");
-        //   return;
-        // }
-
-        // if (code === "AccountNotFound") {
-        //   toast.error("Tài khoản không tồn tại.");
-        //   return;
-        // }
-
-        // if (code === "UserLocked") {
-        //   toast.error("Tài khoản đã bị khóa. Vui lòng liên hệ admin.");
-        //   return;
-        // }
-
-        // 3. Fallback: Hiển thị message từ Backend nếu không rơi vào các case trên
+        // . Fallback: Hiển thị message từ Backend nếu không rơi vào các case trên
         if (message) {
           toast.error(message);
           return;
