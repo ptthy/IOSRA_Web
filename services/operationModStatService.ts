@@ -14,40 +14,69 @@ export interface RevenueStatResponse {
   }[];
 }
 
-// 1. API Doanh thu
+// 1. API Doanh thu (JSON)
 export const getSystemRevenue = async (period: string, from?: string, to?: string) => {
-  // Swagger yêu cầu tham số viết hoa: Period, From, To
   const params: any = { Period: period }; 
   if (from) params.From = from;
   if (to) params.To = to;
 
-  // ✅ SỬA: Thêm /api vào đầu đường dẫn (vì .env của bạn chưa có)
   const res = await apiClient.get("/api/OperationModStat/revenue", { params });
   return res.data;
 };
 
+// 👉 1.1 API Xuất Excel Doanh thu (Blob)
+export const exportSystemRevenue = async (period: string, from?: string, to?: string) => {
+  const params: any = { 
+    Period: period, 
+    GenerateReport: true // Kích hoạt mode xuất file
+  }; 
+  if (from) params.From = from;
+  if (to) params.To = to;
+
+  // Quan trọng: responseType 'blob' để nhận file binary
+  const res = await apiClient.get("/api/OperationModStat/revenue", { 
+    params,
+    responseType: 'blob' 
+  });
+  return res.data; // Trả về Blob
+};
+
 // 2. API Số lượng Requests
 export const getRequestStats = async (type: string, period: string = 'month') => {
-  // ✅ SỬA: Thêm /api vào đầu
   const res = await apiClient.get(`/api/OperationModStat/requests/${type}`, { 
     params: { Period: period } 
   });
   return res.data;
 };
 
+// 👉 2.1 API Xuất Excel Requests
+export const exportRequestStats = async (type: string, period: string = 'month') => {
+  const res = await apiClient.get(`/api/OperationModStat/requests/${type}`, { 
+    params: { Period: period, GenerateReport: true },
+    responseType: 'blob'
+  });
+  return res.data;
+};
+
 // 3. API Doanh thu Author
 export const getAuthorRevenueStats = async (metric: string, period: string = 'month') => {
-  // ✅ SỬA: Thêm /api vào đầu
   const res = await apiClient.get(`/api/OperationModStat/author-revenue/${metric}`, { 
     params: { Period: period } 
   });
   return res.data;
 };
 
-// --- API Rút tiền (Withdraw) ---
+// 👉 3.1 API Xuất Excel Author Revenue
+export const exportAuthorRevenueStats = async (metric: string, period: string = 'month') => {
+  const res = await apiClient.get(`/api/OperationModStat/author-revenue/${metric}`, { 
+    params: { Period: period, GenerateReport: true },
+    responseType: 'blob'
+  });
+  return res.data;
+};
 
+// --- API Rút tiền (Withdraw) ---
 export const getWithdrawRequests = async (status?: string) => {
-  // ✅ SỬA: Thêm /api vào đầu
   const res = await apiClient.get("/api/OperationMod/withdraw-requests", {
     params: { status },
   });
@@ -55,7 +84,6 @@ export const getWithdrawRequests = async (status?: string) => {
 };
 
 export const approveWithdrawRequest = async (requestId: string, transactionCode: string, note?: string) => {
-  // ✅ SỬA: Thêm /api vào đầu
   const res = await apiClient.post(`/api/OperationMod/withdraw-requests/${requestId}/approve`, {
     transactionCode,
     note 
@@ -64,7 +92,6 @@ export const approveWithdrawRequest = async (requestId: string, transactionCode:
 };
 
 export const rejectWithdrawRequest = async (requestId: string, note: string) => {
-  // ✅ SỬA: Thêm /api vào đầu
   const res = await apiClient.post(`/api/OperationMod/withdraw-requests/${requestId}/reject`, {
     note 
   });

@@ -26,34 +26,38 @@ import {
 import {
   DollarSign,
   Users,
-  TrendingUp,
   Zap,
   Loader2,
   Star,
   Wallet,
   Calendar,
   Gem,
+  Download, // Import icon Download
 } from "lucide-react";
+import { Button } from "@/components/ui/button"; // Import Button
 
 import {
   getSystemRevenue,
   getRequestStats,
+  exportSystemRevenue, // 👉 Import hàm export mới
 } from "@/services/operationModStatService";
 
 export default function DashboardAnalytics() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("month");
+  
+  // State để disable nút khi đang tải file
+  const [isExporting, setIsExporting] = useState(false);
 
   const [stats, setStats] = useState({
-    currentRevenue: 0, // Đổi tên biến để rõ nghĩa hơn
-    totalRevenueAccumulated: 0, // Lưu tổng tích lũy nếu cần dùng
+    currentRevenue: 0,
+    totalRevenueAccumulated: 0,
     becomeAuthorRequests: 0,
     rankUpRequests: 0,
     withdrawRequests: 0,
     revenueTrend: [] as any[],
   });
 
-  // Hàm lấy label hiển thị cho Card Doanh thu
   const getRevenueLabel = () => {
     switch (period) {
       case "day": return "hôm nay";
@@ -74,6 +78,33 @@ export default function DashboardAnalytics() {
     }
   };
 
+  // 👉 Hàm xử lý Xuất Excel
+  const handleExport = async () => {
+    try {
+      setIsExporting(true);
+      // Gọi API lấy Blob
+      const blob = await exportSystemRevenue(period);
+      
+      // Tạo URL ảo từ Blob
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      // Đặt tên file (VD: Revenue_Report_month.xlsx)
+      a.download = `Revenue_Report_${period}_${new Date().toISOString().split('T')[0]}.xlsx`; 
+      document.body.appendChild(a);
+      a.click();
+      
+      // Dọn dẹp
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Export error:", error);
+      alert("Xuất file thất bại, vui lòng thử lại sau.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -91,23 +122,16 @@ export default function DashboardAnalytics() {
           getRequestStats("withdraw", period)       
         ]);
 
-        // --- XỬ LÝ SỐ LIỆU DOANH THU ---
         const points = revenueRes.points || [];
-        
-        // 1. Tính tổng tích lũy toàn bộ chart (Số 71,000 cũ)
         const totalAccumulated = 
           (revenueRes.diaTopup || 0) +
           (revenueRes.subscription || 0) +
           (revenueRes.voiceTopup || 0);
 
-        // 2. Lấy doanh thu của THỜI ĐIỂM HIỆN TẠI (Last Data Point)
-        // Nếu chọn 'day', lấy value của ngày cuối cùng trong mảng.
-        // Nếu chọn 'week', lấy value của tuần cuối cùng.
         let currentPeriodRev = 0;
         if (points.length > 0) {
             currentPeriodRev = points[points.length - 1].value;
         } else {
-            // Fallback nếu không có point nào (ví dụ đầu ngày chưa có data)
             currentPeriodRev = totalAccumulated; 
         }
 
@@ -117,7 +141,7 @@ export default function DashboardAnalytics() {
         }));
 
         setStats({
-          currentRevenue: currentPeriodRev, // <--- Dùng số này để hiển thị
+          currentRevenue: currentPeriodRev,
           totalRevenueAccumulated: totalAccumulated,
           becomeAuthorRequests: becomeAuthorRes?.total || 0,
           rankUpRequests: rankUpRes?.total || 0,
@@ -160,14 +184,30 @@ export default function DashboardAnalytics() {
                 <SelectItem value="year">Theo Năm</SelectItem>
               </SelectContent>
             </Select>
+
+            {/* 👉 BUTTON XUẤT EXCEL */}
+            <Button 
+                variant="outline" 
+                onClick={handleExport} 
+                disabled={isExporting}
+                className="ml-2"
+            >
+              {isExporting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
+              {isExporting ? "Đang xuất..." : "Xuất Excel"}
+            </Button>
           </div>
         </div>
 
+        {/* ... (Phần Card và Chart giữ nguyên như cũ) ... */}
+        
         {/* 1. Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          
-          {/* Card 1: Doanh thu */}
-          <Card className="shadow-sm border-l-4 border-l-green-500">
+           {/* Copy lại nội dung Card từ code cũ của bạn vào đây */}
+             <Card className="shadow-sm border-l-4 border-l-green-500">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Doanh thu</CardTitle>
               <div className="p-2 bg-green-100 rounded-full text-green-600">
@@ -176,7 +216,6 @@ export default function DashboardAnalytics() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold flex items-center gap-1">
-                {/* HIỂN THỊ SỐ currentRevenue THAY VÌ TOTAL */}
                 {loading ? "..." : stats.currentRevenue.toLocaleString()} 
                 <Gem className="h-5 w-5 text-blue-500 fill-blue-500" />
               </div>
@@ -185,8 +224,8 @@ export default function DashboardAnalytics() {
               </p>
             </CardContent>
           </Card>
-
-          {/* Các Card khác giữ nguyên */}
+           
+           {/* Card 2 */}
           <Card className="shadow-sm border-l-4 border-l-blue-500">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Yêu cầu lên Author</CardTitle>
@@ -204,6 +243,7 @@ export default function DashboardAnalytics() {
             </CardContent>
           </Card>
 
+          {/* Card 3 */}
           <Card className="shadow-sm border-l-4 border-l-yellow-500">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Yêu cầu Nâng hạng</CardTitle>
@@ -221,6 +261,7 @@ export default function DashboardAnalytics() {
             </CardContent>
           </Card>
 
+          {/* Card 4 */}
           <Card className="shadow-sm border-l-4 border-l-purple-500">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Yêu cầu chờ duyệt</CardTitle>
@@ -266,14 +307,13 @@ export default function DashboardAnalytics() {
                       dataKey="name" 
                       fontSize={12} 
                       tickFormatter={(val) => {
-                        // Rút gọn ngày nếu cần
                         if(period === 'day') return val.split('-').slice(1).join('/');
                         return val;
                       }}
                     />
                     <YAxis
                       fontSize={12}
-                      tickFormatter={(val) => `${val / 1000}K`} // Format gọn hơn (71000 -> 71K)
+                      tickFormatter={(val) => `${val / 1000}K`} 
                     />
                     <Tooltip
                       formatter={(value: number) => `${value.toLocaleString()}`}
