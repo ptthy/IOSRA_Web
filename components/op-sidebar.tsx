@@ -75,7 +75,7 @@ export function AppSidebar({
       localStorage.removeItem("refreshToken");
       document.cookie = `accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;`;
       document.cookie = `refreshToken=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;`;
-      toast.success("Đã đăng xuất");
+      // toast.success("Đã đăng xuất");
       router.push("/login");
     } catch {
       router.push("/login");
