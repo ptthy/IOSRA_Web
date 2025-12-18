@@ -23,6 +23,23 @@ import { getHandlingReports, ReportItem } from "@/services/moderationApi";
 import { ReportActionModal } from "./report-action-modal";
 import { cn } from "@/lib/utils";
 
+// ========================= MAP LÝ DO VI PHẠM =========================
+const REASON_MAP: { [key: string]: string } = {
+  "spam": "Spam/Quảng cáo",
+  "negative_content": "Nội dung tiêu cực",
+  "misinformation": "Thông tin sai lệch",
+  "ip_infringement": "Vi phạm bản quyền",
+  "harassment": "Quấy rối",
+  "hate_speech": "Ngôn từ thù ghét",
+  "other": "Khác"
+};
+
+const getTranslatedReason = (rawReason: string) => {
+  const key = rawReason ? rawReason.trim().toLowerCase() : "other";
+  // Trả về tiếng Việt nếu có trong map, ngược lại trả về nguyên gốc hoặc "Khác"
+  return REASON_MAP[key] || rawReason || "Khác";
+};
+
 // ========================= MOTION VARIANTS =========================
 
 const tabContentVariants: Variants = {
@@ -119,8 +136,9 @@ export function ReportsList() {
                   </Badge>
                 </TableCell>
 
+                {/* ✅ ÁP DỤNG HÀM DỊCH THUẬT Ở ĐÂY */}
                 <TableCell className="py-4 px-6 font-medium text-red-600">
-                  {report.reason}
+                  {getTranslatedReason(report.reason)}
                 </TableCell>
 
                 <TableCell
@@ -253,11 +271,11 @@ export function ReportsList() {
           </TabsList>
 
           <div className="relative w-full md:w-96">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
+            {/* <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
             <Input
               placeholder="Tìm ID hoặc lý do..."
               className="pl-10 h-12 bg-[var(--card)] border border-[var(--border)]"
-            />
+            /> */}
           </div>
         </div>
 

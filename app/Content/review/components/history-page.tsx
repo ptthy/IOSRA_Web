@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  Search,
   Download,
   Filter,
   Clock,
@@ -13,9 +12,11 @@ import {
   User,
   Loader2,
   FileText,
-  Info
+  Info,
+  BookOpen,
+  FileType,
+  Bot // <--- Thêm icon Bot
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -45,67 +46,100 @@ import {
 import { cn } from "@/lib/utils";
 import moment from "moment";
 import "moment/locale/vi";
-import { getModerationStories } from "@/services/moderationApi";
+import { getModerationStories, getModerationChapters } from "@/services/moderationApi";
 
 moment.locale("vi");
 
-interface StoryFromAPI {
-  reviewId: string;
-  storyId: string;
-  title: string;
-  authorUsername: string;
+// Interface chung để hiển thị lên bảng
+interface HistoryItem {
+  id: string; 
+  type: "story" | "chapter";
+  title: string; 
+  subTitle?: string; 
+  author: string;
   status: "pending" | "published" | "rejected";
-  submittedAt: string;
-  pendingNote?: string;
-  aiResult: string;
+  date: string;
+  note?: string; 
+  aiScore?: number; // <--- MỚI: Thêm trường điểm AI
 }
 
 export function HistoryPage() {
-  const [historyData, setHistoryData] = useState<StoryFromAPI[]>([]);
+  const [activeTab, setActiveTab] = useState<"story" | "chapter">("story");
+  const [data, setData] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // State quản lý item đang được chọn để xem chi tiết
-  const [selectedRejectItem, setSelectedRejectItem] = useState<StoryFromAPI | null>(null);
+  // Filter states
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterTime, setFilterTime] = useState("7days");
 
-  const stats = useMemo(() => {
-    const publishedCount = historyData.filter(
-      (item) => item.status === "published"
-    ).length;
-    const rejectedCount = historyData.filter(
-      (item) => item.status === "rejected"
-    ).length;
-    const totalCount = historyData.length;
-    const pendingCount = 0;
-    const approvalRate =
-      totalCount > 0
-        ? `${((publishedCount / totalCount) * 100).toFixed(0)}%`
-        : "N/A";
+  // Modal detail
+  const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
 
-    return [
-      { label: "Tổng số", value: totalCount.toString(), color: "text-[var(--foreground)]" },
-      { label: "Đã duyệt", value: publishedCount.toString(), color: "text-green-600" },
-      { label: "Đã từ chối", value: rejectedCount.toString(), color: "text-red-600" },
-      { label: "Đang chờ", value: pendingCount.toString(), color: "text-yellow-500" },
-      { label: "Tỷ lệ duyệt", value: approvalRate, color: "text-[var(--primary)]" },
-    ];
-  }, [historyData]);
+  // Helper: Màu sắc cho điểm AI
+  const getScoreColor = (score?: number) => {
+    if (score === undefined || score === null) return "text-gray-500";
+    if (score >= 8) return "text-green-600 dark:text-green-400";
+    if (score >= 5) return "text-yellow-600 dark:text-yellow-400";
+    return "text-red-600 dark:text-red-400";
+  };
 
+  // --- 1. Fetch Data Logic ---
   useEffect(() => {
-    const fetchHistory = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true);
+        setError(null);
+        let combined: HistoryItem[] = [];
 
-        const published = await getModerationStories("published");
-        const rejected = await getModerationStories("rejected");
+        if (activeTab === "story") {
+          // Gọi API Truyện
+          const [published, rejected] = await Promise.all([
+            getModerationStories("published"),
+            getModerationStories("rejected"),
+          ]);
 
-        const combined = [...published, ...rejected].sort(
-          (a, b) =>
-            new Date(b.submittedAt).getTime() -
-            new Date(a.submittedAt).getTime()
-        );
+          const mapStory = (list: any[], status: any) =>
+            list.map((item: any) => ({
+              id: item.reviewId,
+              type: "story" as const,
+              title: item.title,
+              author: item.authorUsername,
+              status: item.status,
+              date: item.submittedAt,
+              note: item.pendingNote,
+              aiScore: item.aiScore, // <--- Map dữ liệu aiScore
+            }));
 
-        setHistoryData(combined);
+          combined = [...mapStory(published, "published"), ...mapStory(rejected, "rejected")];
+
+        } else {
+          // Gọi API Chương
+          const [published, rejected] = await Promise.all([
+            getModerationChapters("published"),
+            getModerationChapters("rejected"),
+          ]);
+
+          const mapChapter = (list: any[], status: any) =>
+            list.map((item: any) => ({
+              id: item.reviewId,
+              type: "chapter" as const,
+              title: item.chapterTitle,
+              subTitle: item.storyTitle,
+              author: item.authorUsername,
+              status: item.status,
+              date: item.submittedAt,
+              note: item.aiFeedback,
+              aiScore: item.aiScore, // <--- Map dữ liệu aiScore
+            }));
+
+          combined = [...mapChapter(published, "published"), ...mapChapter(rejected, "rejected")];
+        }
+
+        // Sort mặc định theo thời gian mới nhất
+        combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setData(combined);
+
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -113,65 +147,131 @@ export function HistoryPage() {
       }
     };
 
-    fetchHistory();
-  }, []);
+    fetchData();
+  }, [activeTab]);
+
+  // --- 2. Filter Logic (Client-side) ---
+  const filteredData = useMemo(() => {
+    return data.filter((item) => {
+      // Lọc theo Status
+      if (filterStatus !== "all") {
+        if (filterStatus === "published" && item.status !== "published") return false;
+        if (filterStatus === "rejected" && item.status !== "rejected") return false;
+      }
+
+      // Lọc theo Time
+      if (filterTime !== "all") {
+        const itemDate = moment(item.date);
+        const now = moment();
+        if (filterTime === "today" && !itemDate.isSame(now, "day")) return false;
+        if (filterTime === "7days" && itemDate.isBefore(now.subtract(7, "days"))) return false;
+        if (filterTime === "30days" && itemDate.isBefore(now.subtract(30, "days"))) return false;
+      }
+
+      return true;
+    });
+  }, [data, filterStatus, filterTime]);
+
+  // --- 3. Stats Calculation ---
+  const stats = useMemo(() => {
+    const total = filteredData.length;
+    const published = filteredData.filter((i) => i.status === "published").length;
+    const rejected = filteredData.filter((i) => i.status === "rejected").length;
+    const rate = total > 0 ? ((published / total) * 100).toFixed(0) : 0;
+
+    return [
+      { label: "Tổng số mục", value: total, color: "text-[var(--foreground)]" },
+      { label: "Đã duyệt", value: published, color: "text-green-600" },
+      { label: "Đã từ chối", value: rejected, color: "text-red-600" },
+      { label: "Tỷ lệ duyệt", value: `${rate}%`, color: "text-blue-600" },
+    ];
+  }, [filteredData]);
 
   return (
     <div className="min-h-screen bg-[var(--background)] p-8 transition-colors duration-300">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
         <h1 className="text-3xl font-bold text-[var(--primary)] mb-2">Lịch Sử Kiểm Duyệt</h1>
-        <p className="text-[var(--muted-foreground)]">Theo dõi các quyết định kiểm duyệt đã thực hiện</p>
+        <p className="text-[var(--muted-foreground)]">Theo dõi các quyết định duyệt Truyện và Chương</p>
       </motion.div>
 
-      {/* Filter Bar */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-        className="mb-6 flex flex-col sm:flex-row gap-4 items-stretch"
+      {/* FILTER BAR */}
+      <motion.div 
+        initial={{ opacity: 0, y: -10 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        transition={{ delay: 0.1 }}
+        className="mb-6 flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center"
       >
-        <div className="relative flex-1 min-w-[300px]">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--muted-foreground)]" />
-          <Input placeholder="Tìm kiếm theo tiêu đề hoặc tác giả..."
-            className="pl-12 bg-[var(--card)] border-[var(--border)] h-12 w-full"
-          />
-        </div>
+        <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
+          
+          {/* 1. Filter Loại Nội Dung */}
+          <div className="bg-[var(--card)] p-1 rounded-lg border border-[var(--border)] flex">
+            <button
+              onClick={() => setActiveTab("story")}
+              className={cn(
+                "px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2",
+                activeTab === "story" 
+                  ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm" 
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]"
+              )}
+            >
+              <BookOpen className="w-4 h-4" /> Truyện
+            </button>
+            <button
+              onClick={() => setActiveTab("chapter")}
+              className={cn(
+                "px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2",
+                activeTab === "chapter" 
+                  ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm" 
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]"
+              )}
+            >
+              <FileType className="w-4 h-4" /> Chương
+            </button>
+          </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 flex-1">
-          <Select defaultValue="all">
-            <SelectTrigger className="flex-1 bg-[var(--card)] border-[var(--border)] h-12">
-              <div className="flex items-center gap-2"><Filter className="w-4 h-4" /><SelectValue placeholder="Tất cả hành động" /></div>
+          {/* 2. Filter Trạng Thái */}
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-[180px] bg-[var(--card)] border-[var(--border)] h-11">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-[var(--muted-foreground)]" />
+                <SelectValue placeholder="Trạng thái" />
+              </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tất cả</SelectItem>
-              <SelectItem value="approved">Đã duyệt</SelectItem>
-              <SelectItem value="rejected">Từ chối</SelectItem>
+              <SelectItem value="all">Tất cả trạng thái</SelectItem>
+              <SelectItem value="published">Đã duyệt</SelectItem>
+              <SelectItem value="rejected">Đã từ chối </SelectItem>
             </SelectContent>
           </Select>
 
-          <Select defaultValue="7days">
-            <SelectTrigger className="flex-1 bg-[var(--card)] border-[var(--border)] h-12">
-              <div className="flex items-center gap-2"><Clock className="w-4 h-4" /><SelectValue placeholder="7 ngày qua" /></div>
+          {/* 3. Filter Thời Gian */}
+          <Select value={filterTime} onValueChange={setFilterTime}>
+            <SelectTrigger className="w-[180px] bg-[var(--card)] border-[var(--border)] h-11">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[var(--muted-foreground)]" />
+                <SelectValue placeholder="Thời gian" />
+              </div>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="today">Hôm nay</SelectItem>
               <SelectItem value="7days">7 ngày qua</SelectItem>
               <SelectItem value="30days">30 ngày qua</SelectItem>
-              <SelectItem value="all">Tất cả</SelectItem>
+              <SelectItem value="all">Tất cả thời gian</SelectItem>
             </SelectContent>
           </Select>
         </div>
-
-        <Button className="bg-[var(--primary)] text-[var(--primary-foreground)] h-12 min-w-[140px]">
-          <Download className="w-4 h-4 mr-2" />
-          Xuất báo cáo
-        </Button>
       </motion.div>
 
       {/* Stats Cards */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-        className="grid grid-cols-2 md:grid-cols-5 gap-5 mb-8"
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        transition={{ delay: 0.2 }}
+        className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8"
       >
         {stats.map((s, i) => (
-          <Card key={i} className="p-5 border border-[var(--border)] bg-[var(--card)] rounded-xl shadow-sm hover:shadow-md transition">
+          <Card key={i} className="p-5 border border-[var(--border)] bg-[var(--card)] rounded-xl shadow-sm">
             <p className={`text-3xl font-semibold mb-1 ${s.color}`}>{s.value}</p>
             <p className="text-sm text-[var(--muted-foreground)]">{s.label}</p>
           </Card>
@@ -183,11 +283,13 @@ export function HistoryPage() {
         <Table className={cn("w-full text-sm", isLoading && "opacity-50 pointer-events-none")}>
           <TableHeader>
             <TableRow className="bg-[var(--muted)]/20">
-              <TableHead className="py-4 px-6">Thời gian</TableHead>
-              <TableHead className="py-4 px-6">Tiêu đề</TableHead>
+              <TableHead className="py-4 px-6 w-[180px]">Thời gian</TableHead>
+              <TableHead className="py-4 px-6 min-w-[250px]">
+                {activeTab === "story" ? "Tên Truyện" : "Thông tin Chương"}
+              </TableHead>
               <TableHead className="py-4 px-6">Tác giả</TableHead>
-              <TableHead className="py-4 px-6">Trạng thái</TableHead>
-              <TableHead className="py-4 px-6">Ghi chú / Lý do</TableHead>
+              <TableHead className="py-4 px-6 w-[150px]">Trạng thái</TableHead>
+              <TableHead className="py-4 px-6 text-right">Chi tiết</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -196,7 +298,7 @@ export function HistoryPage() {
               <TableRow>
                 <TableCell colSpan={5} className="h-48 text-center">
                   <Loader2 className="w-8 h-8 mx-auto animate-spin text-[var(--primary)]" />
-                  <p className="mt-2 text-[var(--muted-foreground)]">Đang tải...</p>
+                  <p className="mt-2 text-[var(--muted-foreground)]">Đang tải dữ liệu {activeTab === "story" ? "truyện" : "chương"}...</p>
                 </TableCell>
               </TableRow>
             ) : error ? (
@@ -206,55 +308,62 @@ export function HistoryPage() {
                   <p className="mt-2">Lỗi: {error}</p>
                 </TableCell>
               </TableRow>
-            ) : historyData.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="h-48 text-center text-[var(--muted-foreground)]">Không có dữ liệu</TableCell></TableRow>
+            ) : filteredData.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="h-48 text-center text-[var(--muted-foreground)]">
+                  Không có dữ liệu trong khoảng thời gian này
+                </TableCell>
+              </TableRow>
             ) : (
-              historyData.map((item) => (
-                <TableRow key={item.reviewId} className="border-b hover:bg-[var(--muted)]/20 transition">
-                  <TableCell className="py-4 px-6 text-[var(--muted-foreground)] flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
-                    {moment(item.submittedAt).fromNow()}
+              filteredData.map((item) => (
+                <TableRow key={item.id} className="border-b hover:bg-[var(--muted)]/20 transition">
+                  <TableCell className="py-4 px-6 text-[var(--muted-foreground)]">
+                    <div className="flex flex-col">
+                      <span className="font-medium text-[var(--foreground)]">{moment(item.date).format("HH:mm")}</span>
+                      <span className="text-xs">{moment(item.date).format("DD/MM/YYYY")}</span>
+                    </div>
                   </TableCell>
 
-                  <TableCell className="py-4 px-6 font-medium">
-                    {item.title}
+                  <TableCell className="py-4 px-6">
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium text-base">{item.title}</span>
+                      {item.type === "chapter" && (
+                        <span className="text-xs text-[var(--muted-foreground)] flex items-center gap-1">
+                          <BookOpen className="w-3 h-3" /> Truyện: {item.subTitle}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
 
                   <TableCell className="py-4 px-6">
                     <div className="flex items-center gap-2 text-[var(--primary)]">
                       <User className="w-4 h-4" />
-                      {item.authorUsername}
+                      {item.author}
                     </div>
                   </TableCell>
 
                   <TableCell className="py-4 px-6">
                     <Badge
                       className={cn(
-                        "gap-2 border-0 px-3 py-1.5",
-                        item.status === "published" && "bg-green-100 text-green-700",
-                        item.status === "rejected" && "bg-red-100 text-red-600",
-                        item.status === "pending" && "bg-yellow-100 text-yellow-600"
+                        "gap-2 border-0 px-3 py-1.5 w-fit",
+                        item.status === "published" && "bg-green-100 text-green-700 hover:bg-green-200",
+                        item.status === "rejected" && "bg-red-100 text-red-600 hover:bg-red-200"
                       )}
                     >
-                      {item.status === "published" && <CheckCircle2 className="w-4 h-4" />}
-                      {item.status === "rejected" && <XCircle className="w-4 h-4" />}
-                      {item.status === "pending" && <Clock className="w-4 h-4" />}
-                      {item.status === "published" ? "Đã duyệt" : item.status === "rejected" ? "Đã từ chối" : "Chờ duyệt"}
+                      {item.status === "published" ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                      {item.status === "published" ? "Đã duyệt" : "Từ chối"}
                     </Badge>
                   </TableCell>
 
-                  {/* Nút Xem chi tiết */}
-                  <TableCell className="py-4 px-6 text-sm">
-                    {item.status === "rejected" ? (
-                      <button
-                        onClick={() => setSelectedRejectItem(item)}
-                        className="text-blue-600 hover:underline font-medium flex items-center gap-1"
-                      >
-                        <Info className="w-4 h-4" /> Xem chi tiết
-                      </button>
-                    ) : (
-                      <span className="text-[var(--muted-foreground)]">-</span>
-                    )}
+                  <TableCell className="py-4 px-6 text-right">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setSelectedItem(item)}
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    >
+                      <Info className="w-4 h-4 mr-1" /> Xem
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
@@ -263,42 +372,71 @@ export function HistoryPage() {
         </Table>
       </Card>
 
-      {/* Modal hiển thị chi tiết lý do */}
-      <Dialog open={!!selectedRejectItem} onOpenChange={() => setSelectedRejectItem(null)}>
-        <DialogContent className="bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)] sm:max-w-[500px]">
+      {/* Modal Detail */}
+      <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
+        <DialogContent className="bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)] sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle className="text-red-600 flex items-center gap-2">
-                <XCircle className="w-5 h-5"/> Chi tiết từ chối
+            <DialogTitle className={cn("flex items-center gap-2 text-xl", selectedItem?.status === 'rejected' ? "text-red-600" : "text-green-600")}>
+              {selectedItem?.status === 'rejected' ? <XCircle className="w-6 h-6"/> : <CheckCircle2 className="w-6 h-6"/>}
+              {selectedItem?.status === 'rejected' ? "Chi tiết từ chối" : "Thông tin đã duyệt"}
             </DialogTitle>
             <DialogDescription>
-                Thông tin chi tiết về lý do tác phẩm bị từ chối.
+              ID: <span className="font-mono text-xs">{selectedItem?.id}</span>
             </DialogDescription>
           </DialogHeader>
           
-          {selectedRejectItem && (
+          {selectedItem && (
             <div className="space-y-4 pt-2">
-                <div className="grid grid-cols-3 gap-2 text-sm bg-[var(--muted)]/50 p-3 rounded-md">
+                <div className="grid grid-cols-3 gap-3 text-sm bg-[var(--muted)]/50 p-4 rounded-lg border border-[var(--border)]">
+                    <span className="text-[var(--muted-foreground)]">Loại:</span>
+                    <span className="col-span-2 font-medium capitalize">{selectedItem.type === 'story' ? 'Truyện' : 'Chương'}</span>
+
                     <span className="text-[var(--muted-foreground)]">Tiêu đề:</span>
-                    <span className="col-span-2 font-medium truncate">{selectedRejectItem.title}</span>
+                    <span className="col-span-2 font-medium">{selectedItem.title}</span>
                     
+                    {selectedItem.type === 'chapter' && (
+                      <>
+                        <span className="text-[var(--muted-foreground)]">Thuộc truyện:</span>
+                        <span className="col-span-2">{selectedItem.subTitle}</span>
+                      </>
+                    )}
+
                     <span className="text-[var(--muted-foreground)]">Tác giả:</span>
-                    <span className="col-span-2 font-medium">{selectedRejectItem.authorUsername}</span>
+                    <span className="col-span-2 font-medium text-[var(--primary)]">{selectedItem.author}</span>
                     
-                    <span className="text-[var(--muted-foreground)]">Ngày gửi:</span>
-                    <span className="col-span-2">{new Date(selectedRejectItem.submittedAt).toLocaleString('vi-VN')}</span>
+                    {/* --- HIỂN THỊ AI SCORE --- */}
+                    <span className="text-[var(--muted-foreground)] flex items-center gap-2">
+                       <Bot className="w-4 h-4"/> Điểm AI:
+                    </span>
+                    <span className={cn("col-span-2 font-bold text-base", getScoreColor(selectedItem.aiScore))}>
+                       {selectedItem.aiScore !== undefined ? `${selectedItem.aiScore} / 10` : "Chưa có đánh giá"}
+                    </span>
+                    {/* ------------------------- */}
+
+                    <span className="text-[var(--muted-foreground)]">Thời gian xử lý:</span>
+                    <span className="col-span-2">{new Date(selectedItem.date).toLocaleString('vi-VN')}</span>
                 </div>
 
-                <div className="p-4 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-lg">
-                    <h4 className="text-red-700 dark:text-red-400 font-semibold mb-2 text-sm flex items-center gap-2">
-                        <FileText className="w-4 h-4"/> Lý do từ chối:
+                <div className={cn(
+                  "p-4 rounded-lg border",
+                  selectedItem.status === 'rejected' 
+                    ? "bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30"
+                    : "bg-green-50 dark:bg-green-900/10 border-green-100 dark:border-green-900/30"
+                )}>
+                    <h4 className={cn(
+                      "font-semibold mb-2 text-sm flex items-center gap-2",
+                      selectedItem.status === 'rejected' ? "text-red-700 dark:text-red-400" : "text-green-700 dark:text-green-400"
+                    )}>
+                        <FileText className="w-4 h-4"/> 
+                        {selectedItem.status === 'rejected' ? "Lý do từ chối:" : "Ghi chú / Feedback:"}
                     </h4>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line leading-relaxed">
-                        {selectedRejectItem.pendingNote || "Không có lý do cụ thể."}
+                    <p className="text-sm text-[var(--foreground)] whitespace-pre-line leading-relaxed max-h-[200px] overflow-y-auto">
+                        {selectedItem.note || "Không có nội dung chi tiết."}
                     </p>
                 </div>
                 
                 <div className="flex justify-end pt-2">
-                    <Button variant="outline" onClick={() => setSelectedRejectItem(null)}>Đóng</Button>
+                    <Button variant="outline" onClick={() => setSelectedItem(null)}>Đóng</Button>
                 </div>
             </div>
           )}
