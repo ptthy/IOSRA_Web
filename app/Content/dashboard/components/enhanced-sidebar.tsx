@@ -58,7 +58,7 @@ export function EnhancedSidebar({
 
   const handleLogout = async () => {
     await logout();
-    toast.success("Đã đăng xuất");
+    // toast.success("Đã đăng xuất");
     router.push("/login");
   };
 
