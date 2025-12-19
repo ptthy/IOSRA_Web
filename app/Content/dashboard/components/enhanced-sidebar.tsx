@@ -3,11 +3,11 @@
 
 import { useRouter } from "next/navigation";
 import {
-  BookOpen, BarChart3, FileText, MessageSquare,
-  Settings, Bell, History, ChartPie, LogOut,
+  BookOpen, BarChart3, MessageSquare,
+  Bell, History, ChartPie, LogOut,
   Moon, Sun, Tags,
   FileCheck,
-  Music // <--- Đã thêm icon Music
+  Music 
 } from "lucide-react";
 import {
   SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem,
@@ -51,10 +51,6 @@ export function EnhancedSidebar({
     { id: "music", label: "Nhạc nền", icon: Music, href: "/Content/music" }, 
   ];
 
-  const bottomItems = [
-    { id: "settings", label: "Cài đặt", icon: Settings, href: "/Content/settings" }
-  ];
-
   const navigateTo = (item: any) => {
     router.push(item.href);
     onNavigate(item.id);
@@ -62,7 +58,7 @@ export function EnhancedSidebar({
 
   const handleLogout = async () => {
     await logout();
-    toast.success("Đã đăng xuất");
+    // toast.success("Đã đăng xuất");
     router.push("/login");
   };
 
@@ -141,26 +137,8 @@ export function EnhancedSidebar({
             <SidebarGroup className="pt-6 border-t border-[var(--border)] mt-6">
               <SidebarGroupLabel className="text-[var(--muted-foreground)]">HỖ TRỢ</SidebarGroupLabel>
               <SidebarMenu className="space-y-1">
-                {bottomItems.map((item) => {
-                  const active = currentPage === item.id;
-                  return (
-                    <SidebarMenuItem key={item.id}>
-                      <SidebarMenuButton
-                        onClick={() => navigateTo(item)}
-                        isActive={active}
-                        className={cn(
-                          "rounded-lg transition-colors duration-200",
-                          active
-                            ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-md"
-                            : "text-[var(--foreground)] font-medium hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-gray-900 dark:hover:text-white"
-                        )}
-                      >
-                        <item.icon className="w-5 h-5" />
-                        <span>{item.label}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
+                
+                {/* Đã xóa mục Cài đặt (bottomItems) ở đây */}
 
                 {/* Dark mode switch */}
                 <SidebarMenuItem>

@@ -97,16 +97,16 @@ export default function DashboardPage(): JSX.Element {
               link="/Content/chapters" // ✅ Updated Link
             />
             <CardStat
-              title="Báo cáo mới (hôm nay)"
+              title="Báo cáo mới"
               value={stats?.newReportsToday ?? 0}
               subtitle="Cần xử lý"
               icon={<AlertCircle className="w-5 h-5 text-red-500" />}
               link="/Content/moderation?tab=reports" // ✅ Updated Link
             />
             <CardStat
-              title="Đã duyệt hôm nay"
+              title="Đã duyệt"
               value={stats?.approvedToday ?? 0}
-              subtitle="Số quyết định hôm nay"
+              subtitle="Số quyết định"
               icon={<TrendingUp className="w-5 h-5 text-green-500" />}
             />
           </div>

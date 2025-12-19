@@ -1,4 +1,4 @@
-// app/content/statistics/page.tsx
+// File: app/content/statistics/page.tsx
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
@@ -19,10 +19,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Download, Loader2 } from "lucide-react";
-import { getContentModStats, getViolationBreakdown, StatSeriesResponse, ViolationStatsResponse } from "@/services/moderationApi";
+import { 
+    getContentModStats, 
+    getViolationBreakdown, 
+    exportContentModStats, // Hàm xuất file
+    StatSeriesResponse, 
+    ViolationStatsResponse 
+} from "@/services/moderationApi";
+import { Roboto } from "next/font/google";
 
 type Period = "day" | "week" | "month" | "year";
 type Endpoint = "stories" | "chapters" | "story-decisions" | "reports" | "reports/handled";
+
+const roboto = Roboto({
+  subsets: ["latin", "vietnamese"],
+  weight: ["300", "400", "500", "700"],
+});
 
 const ENDPOINTS: { label: string; value: Endpoint }[] = [
   { label: "Truyện (published)", value: "stories" },
@@ -54,7 +66,10 @@ export default function StatisticsPage(): JSX.Element {
   const [violation, setViolation] = useState<ViolationStatsResponse | null>(null);
   const [violationLoading, setViolationLoading] = useState<boolean>(false);
 
-  // Fetch series
+  // State hiển thị loading khi xuất file
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+
+  // Fetch series (Bar Chart)
   const fetchSeries = useCallback(async () => {
     setSeriesLoading(true);
     setSeriesError(null);
@@ -73,7 +88,7 @@ export default function StatisticsPage(): JSX.Element {
     }
   }, [endpoint, period, from, to]);
 
-  // Fetch violation breakdown
+  // Fetch violation breakdown (Pie Chart - Aggregated from Real Data)
   const fetchViolation = useCallback(async () => {
     setViolationLoading(true);
     try {
@@ -92,19 +107,61 @@ export default function StatisticsPage(): JSX.Element {
     fetchViolation();
   }, [fetchSeries, fetchViolation]);
 
-  const exportCsv = () => {
-    alert("Tải CSV (tạm) - tích hợp export backend nếu cần");
+  // Hàm xử lý xuất file Excel
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      // Gọi API xuất file với các filter hiện tại
+      const blob = await exportContentModStats(endpoint, { 
+        period, 
+        from, 
+        to 
+      });
+
+      // Tạo link download ảo
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      // Tạo tên file: stats-{loại}-{ngày}.xlsx
+      const timestamp = new Date().toISOString().split('T')[0];
+      a.download = `stats-${endpoint}-${timestamp}.xlsx`; 
+      
+      document.body.appendChild(a);
+      a.click();
+      
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+    } catch (error) {
+      console.error("Export failed", error);
+      alert("Xuất file thất bại. Có thể backend chưa hỗ trợ định dạng này.");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
-    <main className="p-8 min-h-screen bg-[var(--background)]">
+    <main className={`${roboto.className} p-8 min-h-screen bg-[var(--background)]`}>
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-[var(--primary)]">Thống Kê Kiểm Duyệt</h1>
           <p className="text-[var(--muted-foreground)]">Phân tích theo khoảng thời gian</p>
         </div>
-        <Button className="bg-[var(--primary)] text-[var(--primary-foreground)]" onClick={exportCsv}>
-          <Download className="w-4 h-4 mr-2" /> Xuất CSV
+        
+        {/* Nút Xuất Excel */}
+        <Button 
+            className="bg-[var(--primary)] text-[var(--primary-foreground)]" 
+            onClick={handleExport}
+            disabled={isExporting}
+        >
+          {isExporting ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <Download className="w-4 h-4 mr-2" />
+          )}
+          {isExporting ? "Đang xuất..." : "Xuất Excel"}
         </Button>
       </div>
 
@@ -193,11 +250,16 @@ export default function StatisticsPage(): JSX.Element {
           </Card>
         </div>
 
-        {/* Right: Pie Chart - ĐÃ SỬA HOÀN HẢO */}
+        {/* Right: Pie Chart */}
         <div className="h-full flex flex-col">
           <Card className="border border-[var(--border)] bg-[var(--card)] flex flex-col h-full">
             <CardHeader className="pb-3">
-              <CardTitle className="text-[var(--primary)] text-lg">Phân loại vi phạm</CardTitle>
+              <CardTitle className="text-[var(--primary)] text-lg">
+                Phân loại vi phạm
+                <span className="block mt-1 text-xs font-normal text-[var(--muted-foreground)]">
+                  (Dựa trên 100 báo cáo gần nhất)
+                </span>
+              </CardTitle>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col">
               {violationLoading && (
@@ -231,7 +293,6 @@ export default function StatisticsPage(): JSX.Element {
                             />
                           ))}
                         </Pie>
-
                         <Tooltip
                           formatter={(value: number) => value.toLocaleString()}
                           contentStyle={{
@@ -241,8 +302,6 @@ export default function StatisticsPage(): JSX.Element {
                             fontSize: "14px",
                           }}
                         />
-
-                        {/* Legend nằm dưới, đẹp trên mọi kích thước */}
                         <Legend
                           layout="horizontal"
                           verticalAlign="bottom"
@@ -257,7 +316,7 @@ export default function StatisticsPage(): JSX.Element {
 
                   <div className="mt-4 text-center">
                     <p className="text-sm text-[var(--muted-foreground)]">
-                      Tổng báo cáo:{" "}
+                      Tổng số mẫu:{" "}
                       <span className="font-semibold text-foreground">
                         {violation.totalReports.toLocaleString()}
                       </span>

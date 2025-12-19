@@ -3,9 +3,11 @@
 import apiClient from "@/services/apiClient"; 
 import { AxiosResponse } from 'axios';
 
+// ========================= INTERFACES =========================
+
 // Giao diện chung cho các API liên quan đến Report
-export interface ReportItem { // Export ra để Component dùng lại
-    reportId: string; // ✅ Đổi id -> reportId
+export interface ReportItem { 
+    reportId: string;
     targetType: "story" | "chapter" | "comment" | string;
     targetId: string;
     targetAccountId: string;
@@ -13,7 +15,7 @@ export interface ReportItem { // Export ra để Component dùng lại
     details: string;
     status: "pending" | "resolved" | "rejected" | string;
     reporterId: string;
-    createdAt: string; // ✅ Đổi reportedAt -> createdAt
+    createdAt: string;
     
     // Các trường optional
     story?: any;
@@ -32,22 +34,21 @@ interface ApiResponse<T> {
     pageSize?: number;
 }
 
-
-// ========================= STATS INTERFACES (Cần cho cả Statistics và Dashboard) =========================
-
+// Stats Interfaces
 type StatPeriod = 'day' | 'week' | 'month' | 'year';
 
 interface StatQueryRequest {
     from?: string; // YYYY-MM-DD
-    to?: string; // YYYY-MM-DD
+    to?: string;   // YYYY-MM-DD
     period?: StatPeriod;
     status?: 'approved' | 'pending' | 'rejected' | 'resolved' | 'removed';
+    GenerateReport?: boolean; // ✅ Cờ để xuất file Excel
 }
 
 export interface StatPoint {
-    periodLabel: string; // VD: 2025-45, 2025-11-03
-    periodStart: string; // YYYY-MM-DD
-    periodEnd: string; // YYYY-MM-DD
+    periodLabel: string;
+    periodStart: string;
+    periodEnd: string;
     value: number;
 }
 
@@ -57,7 +58,7 @@ export interface StatSeriesResponse {
     points: StatPoint[];
 }
 
-// Thêm interface cho Biểu đồ Tròn (Violation Breakdown)
+// Interface cho Biểu đồ Tròn (Violation Breakdown)
 export interface ViolationStat {
     violationType: string;
     count: number;
@@ -78,13 +79,12 @@ export interface RealtimeStats {
     approvedToday: number;
 }
 
-
 const R2_BASE_URL = "https://pub-15618311c0ec468282718f80c66bcc13.r2.dev";
 
-// --- API Xử lý Nội dung (Moderation Stories, Chapters, Comments) ---
-// -------------------------------------------------------------------
 
-// 1. Hàm API chính cho Biểu đồ cột (Bar Chart) - SỬ DỤNG API THẬT
+// ========================= API THỐNG KÊ (STATS) =========================
+
+// 1. Hàm API chính cho Biểu đồ cột (Bar Chart)
 type StatEndpoint = 'stories' | 'chapters' | 'story-decisions' | 'reports' | 'reports/handled';
 
 export async function getContentModStats(
@@ -92,78 +92,123 @@ export async function getContentModStats(
     query: StatQueryRequest = {}
 ): Promise<StatSeriesResponse> {
     try {
+        // Luôn set false để lấy JSON
+        const params = { ...query, GenerateReport: false };
         const response: AxiosResponse<StatSeriesResponse> = await apiClient.get(`/api/ContentModStat/${endpoint}`, { 
-            params: query 
+            params 
         });
         return response.data;
     } catch (error: any) {
-        // Dùng error.response?.data?.message nếu có, nếu không dùng thông báo chung
         throw new Error(error.response?.data?.message || `Lỗi khi tải thống kê ${endpoint}`);
     }
 }
 
-
-// --- API CHO BIỂU ĐỒ TRÒN (MOCK) ---
-// *Cần API backend mới: /api/ContentModStat/violation-breakdown (hoặc tương tự)*
-export async function getViolationBreakdown(): Promise<ViolationStatsResponse> {
-    // Tạm thời dùng MOCK DATA cho đến khi API thật được tạo
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            resolve({
-                totalReports: 378,
-                breakdown: [
-                    { violationType: "Spam/Quảng cáo", count: 145, percentage: 38.4 },
-                    { violationType: "Nội dung nhạy cảm", count: 89, percentage: 23.5 },
-                    { violationType: "Vi phạm Bản quyền", count: 43, percentage: 11.4 },
-                    { violationType: "Quấy rối/Bắt nạt", count: 67, percentage: 17.7 },
-                    { violationType: "Khác", count: 34, percentage: 9.0 },
-                ],
-            });
-        }, 500);
-    });
+// 2. Hàm API Xuất file Excel/CSV (MỚI)
+export async function exportContentModStats(
+    endpoint: StatEndpoint,
+    query: StatQueryRequest = {}
+): Promise<Blob> {
+    try {
+        // Set true để báo backend tạo file
+        const params = { ...query, GenerateReport: true };
+        
+        // responseType: 'blob' là bắt buộc để tải file binary
+        const response = await apiClient.get(`/api/ContentModStat/${endpoint}`, { 
+            params,
+            responseType: 'blob' 
+        });
+        
+        return response.data;
+    } catch (error: any) {
+        console.error("Export error:", error);
+        throw new Error("Lỗi khi xuất báo cáo. Vui lòng thử lại sau.");
+    }
 }
 
-// --- API CHO DASHBOARD TỨC THỜI (Realtime) ---
+// 3. Hàm API cho Biểu đồ tròn (Pie Chart) - ĐÃ VIỆT HÓA
+export async function getViolationBreakdown(): Promise<ViolationStatsResponse> {
+    try {
+        // Lấy 100 report mới nhất để phân tích mẫu
+        const response = await getHandlingReports(null, null, 1, 100);
+        
+        const reports = response.items || [];
+        const totalReports = response.total || reports.length;
+
+        // Map dịch thuật
+        const REASON_MAP: { [key: string]: string } = {
+            "spam": "Spam/Quảng cáo",
+            "negative_content": "Nội dung tiêu cực",
+            "misinformation": "Thông tin sai lệch",
+            "ip_infringement": "Vi phạm bản quyền",
+            // Fallback cho các trường hợp khác nếu có
+            "harassment": "Quấy rối",
+            "hate_speech": "Ngôn từ thù ghét",
+            "other": "Khác"
+        };
+
+        // Tính toán phân loại
+        const reasonCounts: { [key: string]: number } = {};
+
+        reports.forEach((report) => {
+            // Lấy raw reason, chuyển về chữ thường để map chính xác
+            const rawReason = report.reason ? report.reason.trim().toLowerCase() : "other";
+            
+            // Dịch sang Tiếng Việt, nếu không có trong map thì giữ nguyên tiếng Anh hoặc hiển thị raw
+            const displayReason = REASON_MAP[rawReason] || report.reason || "Khác";
+            
+            reasonCounts[displayReason] = (reasonCounts[displayReason] || 0) + 1;
+        });
+
+        // Chuyển đổi định dạng
+        const breakdown: ViolationStat[] = Object.keys(reasonCounts).map((key) => {
+            const count = reasonCounts[key];
+            return {
+                violationType: key,
+                count: count,
+                percentage: parseFloat(((count / reports.length) * 100).toFixed(1)),
+            };
+        });
+
+        // Sắp xếp giảm dần
+        breakdown.sort((a, b) => b.count - a.count);
+
+        return {
+            totalReports: totalReports,
+            breakdown: breakdown,
+        };
+
+    } catch (error) {
+        console.error("Lỗi khi tính toán phân loại vi phạm:", error);
+        return { totalReports: 0, breakdown: [] };
+    }
+}
+
+// 4. API Dashboard Tức thời (Realtime)
 export async function getRealtimeStats(): Promise<RealtimeStats> {
-    
     let approvedToday = 0;
     let newReportsToday = 0;
     
-    // 1. Lấy Decisions Today (API thật)
     try {
-        // Giả định tổng số Decisions (story-decisions) là số lượng Approved/Rejected hôm nay
         const decisionData = await getContentModStats('story-decisions', { period: 'day' });
         approvedToday = decisionData.total;
-    } catch(e) {
-        console.error("Lỗi khi tải Approved Today:", e);
-        // Giữ 0 nếu lỗi
-    }
+    } catch(e) { console.error(e); }
 
-    // 2. Lấy Reports Today (API thật)
     try {
         const reportData = await getContentModStats('reports', { period: 'day' });
         newReportsToday = reportData.total;
-    } catch(e) {
-        console.error("Lỗi khi tải Reports Today:", e);
-        // Giữ 0 nếu lỗi
-    }
+    } catch(e) { console.error(e); }
     
-    // 3. Pending & Sent-back: Gán cứng là 0 (theo yêu cầu) vì chưa có API backend
-    const pendingSentBackDefaults = {
+    return {
         pendingStories: 0, 
         pendingChapters: 0, 
         sentBack: 0, 
-    };
-    
-    return {
-        ...pendingSentBackDefaults,
         newReportsToday: newReportsToday,
         approvedToday: approvedToday,
     };
 }
 
 
-// ========================= CÁC API KHÁC (Đã được chuyển từ code gốc) =========================
+// ========================= API XỬ LÝ NỘI DUNG (MODERATION) =========================
 
 // --- API 1: Lấy danh sách TRUYỆN ---
 export async function getModerationStories(status: 'pending' | 'published' | 'rejected') {
@@ -185,7 +230,6 @@ export async function getStoryDetail(reviewId: string) {
         throw new Error(error.response?.data?.message || "Lỗi khi tải chi tiết truyện");
     }
 }
-
 
 // --- API 2: Ra quyết định TRUYỆN ---
 export async function postModerationDecision(
@@ -274,7 +318,7 @@ export async function postChapterDecision(
 
 // --- API 8: Lấy danh sách Report ---
 export async function getHandlingReports(
-    status: string | null, // ✅ Cho phép string chung chung để dễ gọi từ UI
+    status: string | null,
     targetType: string | null,
     page: number,
     pageSize: number
@@ -303,18 +347,13 @@ export async function getReportDetail(reportId: string): Promise<ReportItem> {
   }
 }
 
-// --- API 10. Chốt trạng thái Report (Resolved - Phạt / Rejected - Bỏ qua) ---
+// --- API 10. Chốt trạng thái Report ---
 export async function updateReportStatus(
   reportId: string,
-  // 🔴 SỬA: Cho phép cả "resolved" để khớp với logic mới của bạn
   status: "pending" | "rejected" | "resolved", 
   data?: { strike?: number; restrictedUntil?: string | null } 
 ) {
   try {
-    // Nếu Backend thực sự chỉ nhận "approved" hoặc "rejected", bạn cần map lại ở đây
-    // Ví dụ: const backendStatus = status === "resolved" ? "approved" : status;
-    // Nhưng nếu Backend đã đổi sang dùng "resolved", hãy gửi thẳng "resolved"
-    
     const payload = { status, ...data };
     const response = await apiClient.put(
       `/api/ContentModHandling/reports/${reportId}/status`,
@@ -326,24 +365,19 @@ export async function updateReportStatus(
   }
 }
 
-// --- API 11. Ẩn/Hiện Nội dung (Story, Chapter, Comment) ---
+// --- API 11. Ẩn/Hiện Nội dung ---
 export async function updateContentStatus(
     targetType: 'story' | 'chapter' | 'comment',
     targetId: string,
-    status: 'hidden' | 'published' | 'visible' | 'completed' // Bổ sung 'completed' cho Story
+    status: 'hidden' | 'published' | 'visible' | 'completed'
 ) {
     try {
         let endpoint = '';
-        // Story: hidden/published/completed
         if (targetType === 'story') endpoint = `/api/ContentModHandling/stories/${targetId}`;
-        // Chapter: hidden/published
         else if (targetType === 'chapter') endpoint = `/api/ContentModHandling/chapters/${targetId}`;
-        // Comment: visible/hidden
         else if (targetType === 'comment') endpoint = `/api/ContentModHandling/comments/${targetId}`;
         else throw new Error("Loại nội dung không hợp lệ");
 
-        // Comment dùng 'visible' | 'hidden'
-        // Story/Chapter dùng 'published' | 'hidden' | 'completed'
         const apiStatus = (targetType === 'comment' && status === 'published') ? 'visible' : status;
 
         const response = await apiClient.put(endpoint, { status: apiStatus });
@@ -356,7 +390,7 @@ export async function updateContentStatus(
 // --- API 12. Cập nhật trạng thái Strike cho Account ---
 export async function updateAccountStrikeStatus(
     accountId: string,
-    level: 1 | 2 | 3 | 4 // Chỉ cho phép các mức strike hợp lệ 1-4
+    level: 1 | 2 | 3 | 4 
 ) {
     try {
         if (level < 1 || level > 4) {
@@ -374,31 +408,26 @@ export async function updateAccountStrikeStatus(
     }
 }
 
-
-// --- APIs khác giữ nguyên ---
+// --- API: Lấy nội dung chương (Text) ---
 export async function getChapterContent(reviewId: string) {
     try {
-        // Gọi đúng endpoint như trong hướng dẫn trên UI của bạn
         const response = await apiClient.get(`/api/moderation/chapters/${reviewId}`);
         return response.data; 
-        // Kỳ vọng data trả về sẽ có trường kiểu như { content: "Nội dung chương..." }
     } catch (error: any) {
         throw new Error(error.response?.data?.message || "Lỗi khi tải nội dung chương");
     }
 }
 
+// --- API: Download từ R2 ---
 export async function downloadChapterText(contentPath: string): Promise<string> {
     try {
         let fullUrl = contentPath;
 
-        // Nếu path chưa có http (tức là path tương đối: stories/...), thì ghép với R2 Base URL
         if (!contentPath.startsWith("http")) {
-            // Xử lý trường hợp contentPath có dấu / ở đầu hay không
             const cleanPath = contentPath.startsWith("/") ? contentPath.slice(1) : contentPath;
             fullUrl = `${R2_BASE_URL}/${cleanPath}`;
         }
 
-        // Thêm timestamp để tránh cache (tùy chọn, nhưng tốt cho việc test)
         if (fullUrl.includes("?")) {
             fullUrl += `&_t=${new Date().getTime()}`;
         } else {
@@ -407,11 +436,8 @@ export async function downloadChapterText(contentPath: string): Promise<string> 
 
         console.log("📥 Downloading content from:", fullUrl);
 
-        // Dùng fetch thay vì apiClient để tránh bị dính BaseURL của API Server
         const response = await fetch(fullUrl, {
             method: "GET",
-            // R2 là public bucket nên thường không cần Authorization header
-            // Nếu cần, hãy thêm vào đây. Nhưng link pub-xxx thường là public.
         });
 
         if (!response.ok) {
