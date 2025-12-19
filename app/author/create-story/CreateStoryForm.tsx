@@ -27,6 +27,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -72,6 +79,7 @@ interface CreateStoryFormProps {
     hasUsedAICover?: boolean;
     createdStoryId?: string | null;
     currentCoverUrl?: string;
+    languageCode?: "vi-VN" | "en-US" | "zh-CN" | "ja-JP"; // Thêm
   };
   isEditMode?: boolean;
   storyId?: string;
@@ -117,7 +125,9 @@ export default function CreateStoryForm({
   const [titleLength, setTitleLength] = useState(0);
   const [outlineLength, setOutlineLength] = useState(0);
   const [promptLength, setPromptLength] = useState(0);
-
+  const [languageCode, setLanguageCode] = useState<
+    "vi-VN" | "en-US" | "zh-CN" | "ja-JP"
+  >("vi-VN");
   const LIMITS = {
     TITLE_MIN: 20,
     TITLE_MAX: 50,
@@ -155,6 +165,7 @@ export default function CreateStoryForm({
       setOutline(initialData.outline || "");
       setLengthPlan(initialData.lengthPlan || "short");
       setSelectedTagIds(initialData.selectedTagIds || []);
+      setLanguageCode(initialData.languageCode || "vi-VN");
 
       // Trong edit mode, luôn dùng upload và khóa AI
       if (isEditMode) {
@@ -329,180 +340,251 @@ export default function CreateStoryForm({
       return;
     }
 
-    //  KIỂM TRA THAY ĐỔI: Nếu là edit mode và không có thay đổi gì, không gọi API
-    if (isEditMode && initialDataRef.current) {
-      const initial = initialDataRef.current;
+    setIsSubmitting(true);
 
-      // So sánh các field (trim để loại bỏ whitespace thừa)
-      const hasTitleChanged = title.trim() !== (initial.title || "").trim();
-      const hasDescriptionChanged =
-        (description || "").trim() !== (initial.description || "").trim();
-      const hasOutlineChanged =
-        outline.trim() !== (initial.outline || "").trim();
-      const hasLengthPlanChanged =
-        lengthPlan !== (initial.lengthPlan || "short");
+    //   try {
+    //     //  FIX LỖI 400 & LỖI TYPESCRIPT:
+    //     // Trong edit mode, nếu không có coverFile mới, gửi coverFile là undefined
+    //     // Đảm bảo kiểu dữ liệu phù hợp với CreateStoryRequest
+    //     const finalCoverFile =
+    //       isEditMode && !coverFile ? undefined : coverFile || undefined;
 
-      // So sánh tags (so sánh mảng - normalize và sort)
-      const initialTagIds = (initial.selectedTagIds || [])
-        .slice()
-        .sort()
-        .join(",");
-      const currentTagIds = [...selectedTagIds].slice().sort().join(",");
-      const hasTagsChanged = initialTagIds !== currentTagIds;
+    //     // Trong edit mode, chỉ gửi những field đã thay đổi
+    //     let requestData: Partial<CreateStoryRequest>;
 
-      // Kiểm tra có coverFile mới không (chỉ coi là thay đổi nếu thực sự có file mới)
-      const hasNewCoverFile = coverFile instanceof File;
+    //     if (isEditMode && initialDataRef.current) {
+    //       const initial = initialDataRef.current;
+    //       requestData = {}; // Khởi tạo object rỗng
 
-      // Nếu không có thay đổi gì
-      if (
-        !hasTitleChanged &&
-        !hasDescriptionChanged &&
-        !hasOutlineChanged &&
-        !hasLengthPlanChanged &&
-        !hasTagsChanged &&
-        !hasNewCoverFile
-      ) {
-        toast.info("Không có thay đổi nào để cập nhật");
-        return;
-      }
-    }
+    //       // Chỉ thêm field nếu có thay đổi
+    //       if (title.trim() !== (initial.title || "").trim()) {
+    //         requestData.title = title;
+    //       }
+    //       if ((description || "").trim() !== (initial.description || "").trim()) {
+    //         requestData.description = description || "";
+    //       }
+    //       if (outline.trim() !== (initial.outline || "").trim()) {
+    //         requestData.outline = outline;
+    //       }
+    //       if (lengthPlan !== (initial.lengthPlan || "short")) {
+    //         requestData.lengthPlan = lengthPlan;
+    //       }
+
+    //       // So sánh tags
+    //       const initialTagIds = (initial.selectedTagIds || [])
+    //         .slice()
+    //         .sort()
+    //         .join(",");
+    //       const currentTagIds = [...selectedTagIds].slice().sort().join(",");
+    //       if (initialTagIds !== currentTagIds) {
+    //         requestData.tagIds = selectedTagIds;
+    //       }
+
+    //       // Chỉ gửi coverMode và coverFile nếu có file mới
+    //       if (coverFile instanceof File) {
+    //         requestData.coverMode = coverMode;
+    //         requestData.coverFile = coverFile;
+    //       }
+    //     } else {
+    //       // CREATE MODE: Gửi tất cả field
+    //       requestData = {
+    //         title,
+    //         description: description || "",
+    //         outline,
+    //         lengthPlan,
+    //         languageCode, // Thêm
+    //         tagIds: selectedTagIds,
+    //         coverMode,
+    //         coverFile: coverMode === "upload" ? finalCoverFile : undefined,
+    //         coverPrompt: coverMode === "generate" ? coverPrompt : undefined,
+    //       };
+    //     }
+    //     if (isEditMode && storyId) {
+    //       // 1. Lấy dữ liệu cũ từ Ref để so sánh chính xác
+    //       const initial = initialDataRef.current;
+
+    //       // 2. Khởi tạo DUY NHẤT một object chứa các thay đổi
+    //       let updateFields: Partial<CreateStoryRequest> = {};
+
+    //       // Kiểm tra từng trường và add vào updateFields
+    //       if (languageCode !== initial?.languageCode) {
+    //         updateFields.languageCode = languageCode;
+    //       }
+
+    //       // 4. Bổ sung kiểm tra các trường khác để không bị mất dữ liệu khi lưu
+    //       if (title.trim() !== (initial?.title || "").trim())
+    //         updateFields.title = title;
+    //       if (outline.trim() !== (initial?.outline || "").trim())
+    //         updateFields.outline = outline;
+    //       if (
+    //         (description || "").trim() !== (initial?.description || "").trim()
+    //       ) {
+    //         updateFields.description = description || "";
+    //       }
+
+    //       // 5. Kiểm tra xem có thực sự có thay đổi nào không
+    //       if (Object.keys(updateFields).length > 0 || coverFile instanceof File) {
+    //         // Truyền ĐÚNG biến updateFields vào hàm updateDraft
+    //         await storyService.updateDraft(storyId, updateFields);
+
+    //         // QUAN TRỌNG: Cập nhật lại Ref sau khi lưu thành công để lần edit tiếp theo
+    //         // không bị coi là "có thay đổi" nếu người dùng bấm lưu 2 lần liên tiếp.
+    //         if (initialDataRef.current) {
+    //           initialDataRef.current = {
+    //             ...initialDataRef.current,
+    //             ...updateFields,
+    //           };
+    //         }
+
+    //         toast.success("Cập nhật truyện thành công!");
+    //         onSuccess?.();
+    //       } else {
+    //         toast.info("Không có thay đổi nào để cập nhật");
+    //       }
+    //     }
+    //   } catch (error: any) {
+    //     console.error("Submit error:", error);
+
+    //     // --- LOGIC BẮT HẾT LỖI TỪ BACKEND ---
+    //     if (error.response && error.response.data && error.response.data.error) {
+    //       const { message, details } = error.response.data.error;
+
+    //       // 1. Nếu có 'details' (Lỗi validation như: Tiêu đề, Mô tả, Dàn ý...)
+    //       if (details) {
+    //         // Lấy tất cả các key bị lỗi (Title, Description, Outline...)
+    //         const errorKeys = Object.keys(details);
+
+    //         errorKeys.forEach((key) => {
+    //           // Duyệt qua mảng các câu thông báo lỗi của từng key và hiện toast
+    //           details[key].forEach((msg: string) => {
+    //             toast.error(msg);
+    //           });
+    //         });
+    //         return; // Dừng lại sau khi đã hiện hết lỗi chi tiết
+    //       }
+
+    //       // 2. Nếu không có details nhưng có message chung (Lỗi logic)
+    //       if (message) {
+    //         toast.error(message);
+    //         return;
+    //       }
+    //     }
+
+    //     // 3. Fallback cho các lỗi khác (lỗi mạng, server sập...)
+    //     const fallbackMessage =
+    //       error.response?.data?.message || error.message || "Có lỗi xảy ra";
+    //     toast.error(fallbackMessage);
+    //     // --------------------------------------
+    //   } finally {
+    //     setIsSubmitting(false);
+    //   }
+    // };
 
     setIsSubmitting(true);
 
     try {
-      //  FIX LỖI 400 & LỖI TYPESCRIPT:
-      // Trong edit mode, nếu không có coverFile mới, gửi coverFile là undefined
-      // Đảm bảo kiểu dữ liệu phù hợp với CreateStoryRequest
+      // GIỮ NGUYÊN LOGIC CỦA BẠN: Xử lý file ảnh bìa để tránh lỗi 400
       const finalCoverFile =
         isEditMode && !coverFile ? undefined : coverFile || undefined;
 
-      // Trong edit mode, chỉ gửi những field đã thay đổi
-      let requestData: Partial<CreateStoryRequest>;
-
-      if (isEditMode && initialDataRef.current) {
+      if (isEditMode && storyId) {
         const initial = initialDataRef.current;
-        requestData = {}; // Khởi tạo object rỗng
 
-        // Chỉ thêm field nếu có thay đổi
-        if (title.trim() !== (initial.title || "").trim()) {
-          requestData.title = title;
-        }
-        if ((description || "").trim() !== (initial.description || "").trim()) {
-          requestData.description = description || "";
-        }
-        if (outline.trim() !== (initial.outline || "").trim()) {
-          requestData.outline = outline;
-        }
-        if (lengthPlan !== (initial.lengthPlan || "short")) {
-          requestData.lengthPlan = lengthPlan;
+        // CHỈ DÙNG 1 OBJECT DUY NHẤT để gom tất cả thay đổi
+        let updateFields: Partial<CreateStoryRequest> = {};
+
+        // 1. Kiểm tra Ngôn ngữ (Dòng này giúp cập nhật en-US thành công)
+        if (languageCode !== initial?.languageCode) {
+          updateFields.languageCode = languageCode;
         }
 
-        // So sánh tags
-        const initialTagIds = (initial.selectedTagIds || [])
-          .slice()
+        // 2. Kiểm tra các trường văn bản
+        if (title.trim() !== (initial?.title || "").trim())
+          updateFields.title = title.trim();
+        if (outline.trim() !== (initial?.outline || "").trim())
+          updateFields.outline = outline.trim();
+        if (
+          (description || "").trim() !== (initial?.description || "").trim()
+        ) {
+          updateFields.description = description?.trim() || "";
+        }
+        if (lengthPlan !== initial?.lengthPlan)
+          updateFields.lengthPlan = lengthPlan;
+
+        // 3. Kiểm tra Thể loại (Tags)
+        const initialTags = [...(initial?.selectedTagIds || [])]
           .sort()
           .join(",");
-        const currentTagIds = [...selectedTagIds].slice().sort().join(",");
-        if (initialTagIds !== currentTagIds) {
-          requestData.tagIds = selectedTagIds;
+        const currentTags = [...selectedTagIds].sort().join(",");
+        if (initialTags !== currentTags) {
+          updateFields.tagIds = selectedTagIds;
         }
 
-        // Chỉ gửi coverMode và coverFile nếu có file mới
+        // 4. Kiểm tra Ảnh bìa mới (Sử dụng finalCoverFile bạn yêu cầu)
         if (coverFile instanceof File) {
-          requestData.coverMode = coverMode;
-          requestData.coverFile = coverFile;
+          updateFields.coverMode = "upload";
+          updateFields.coverFile = finalCoverFile;
+        }
+
+        // 5. Chỉ gọi API nếu thực sự có thay đổi
+        if (Object.keys(updateFields).length > 0) {
+          await storyService.updateDraft(storyId, updateFields);
+
+          // Cập nhật lại Ref để đồng bộ dữ liệu cho lần bấm tiếp theo
+          if (initialDataRef.current) {
+            initialDataRef.current = {
+              ...initialDataRef.current,
+              ...updateFields,
+            };
+          }
+
+          toast.success("Cập nhật truyện thành công!");
+          onSuccess?.();
+        } else {
+          toast.info("Không có thay đổi nào để cập nhật");
         }
       } else {
-        // CREATE MODE: Gửi tất cả field
-        requestData = {
-          title,
-          description: description || "",
-          outline,
+        // LOGIC CHO CHẾ ĐỘ TẠO MỚI (CREATE MODE)
+        const createData: CreateStoryRequest = {
+          title: title.trim(),
+          description: description?.trim() || "",
+          outline: outline.trim(),
           lengthPlan,
+          languageCode,
           tagIds: selectedTagIds,
           coverMode,
           coverFile: coverMode === "upload" ? finalCoverFile : undefined,
           coverPrompt: coverMode === "generate" ? coverPrompt : undefined,
         };
-      }
 
-      if (isEditMode && storyId) {
-        // EDIT MODE: Update draft (chỉ gửi những field đã thay đổi)
-        await storyService.updateDraft(storyId, requestData);
-        // localStorage.removeItem(LOCAL_STORAGE_KEY);
-        toast.success("Cập nhật truyện thành công!");
-        onSuccess?.();
-      } else {
-        // CREATE MODE
-        const result = await storyService.createStory(
-          requestData as CreateStoryRequest
-        );
-        setCreatedStoryId(result.storyId);
-
-        if (coverMode === "generate" && result.coverUrl) {
-          setGeneratedAICover(result.coverUrl);
-          setHasUsedAICover(true);
-          setShowAIPreview(true);
-        } else {
-          // localStorage.removeItem(LOCAL_STORAGE_KEY);
-          toast.success("Tạo truyện thành công!");
-          router.push(`/author/story/${result.storyId}`);
-        }
+        const newStory = await storyService.createStory(createData);
+        toast.success("Tạo truyện thành công!");
+        router.push(`/author/story/${newStory.storyId}`);
       }
     } catch (error: any) {
       console.error("Submit error:", error);
-      //   toast.error(error.message || "Có lỗi xảy ra");
-      // } finally {
-      //   setIsSubmitting(false);
-      // }
-      // Kiểm tra cấu trúc lỗi { error: { message: "..." } }
-      //   const serverMessage = error.response?.data?.error?.message;
 
-      //   // Nếu không có cấu trúc trên, thử lấy message chung (fallback)
-      //   const fallbackMessage =
-      //     error.response?.data?.message || error.message || "Có lỗi xảy ra";
-
-      //   // Hiển thị toast
-      //   toast.error(serverMessage || fallbackMessage);
-      //   // -----------------------------------------------
-      // } finally {
-      //   setIsSubmitting(false);
-      // }
-      // --- LOGIC BẮT HẾT LỖI TỪ BACKEND ---
-      if (error.response && error.response.data && error.response.data.error) {
+      // --- GIỮ NGUYÊN LOGIC BẮT LỖI BACKEND CỦA BẠN ---
+      if (error.response?.data?.error) {
         const { message, details } = error.response.data.error;
-
-        // 1. Nếu có 'details' (Lỗi validation như: Tiêu đề, Mô tả, Dàn ý...)
         if (details) {
-          // Lấy tất cả các key bị lỗi (Title, Description, Outline...)
-          const errorKeys = Object.keys(details);
-
-          errorKeys.forEach((key) => {
-            // Duyệt qua mảng các câu thông báo lỗi của từng key và hiện toast
-            details[key].forEach((msg: string) => {
-              toast.error(msg);
-            });
+          Object.keys(details).forEach((key) => {
+            details[key].forEach((msg: string) => toast.error(msg));
           });
-          return; // Dừng lại sau khi đã hiện hết lỗi chi tiết
+          return;
         }
-
-        // 2. Nếu không có details nhưng có message chung (Lỗi logic)
         if (message) {
           toast.error(message);
           return;
         }
       }
-
-      // 3. Fallback cho các lỗi khác (lỗi mạng, server sập...)
-      const fallbackMessage =
-        error.response?.data?.message || error.message || "Có lỗi xảy ra";
-      toast.error(fallbackMessage);
-      // --------------------------------------
+      toast.error(
+        error.response?.data?.message || error.message || "Có lỗi xảy ra"
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
-
   const handleAcceptAICover = () => {
     setShowAIPreview(false);
     setHasUsedAICover(true);
@@ -758,7 +840,29 @@ export default function CreateStoryForm({
               ))}
             </RadioGroup>
           </div>
-
+          {/* === Ngôn ngữ === */}
+          <div className="space-y-2">
+            <Label className="text-base font-bold">
+              Ngôn ngữ <span className="text-red-500 text-xl">*</span>
+            </Label>
+            <Select
+              value={languageCode}
+              onValueChange={(value: "vi-VN" | "en-US" | "zh-CN" | "ja-JP") =>
+                setLanguageCode(value)
+              }
+              disabled={isSubmitting}
+            >
+              <SelectTrigger className="w-full max-w-xs dark:border-[#f0ead6]">
+                <SelectValue placeholder="Chọn ngôn ngữ cho truyện" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="vi-VN">Tiếng Việt</SelectItem>
+                <SelectItem value="en-US">English</SelectItem>
+                <SelectItem value="zh-CN">中文</SelectItem>
+                <SelectItem value="ja-JP">日本語</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           {/* === Thể loại === */}
           <div className="space-y-2">
             <Label className="text-base font-bold">

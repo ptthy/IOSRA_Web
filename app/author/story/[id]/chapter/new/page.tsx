@@ -246,7 +246,7 @@ export default function CreateChapterPage() {
       await chapterService.createChapter(storyId, {
         title: formData.title,
         content: formData.content,
-        languageCode: formData.languageCode,
+        //languageCode: formData.languageCode,
         accessType: formData.accessType,
       });
 
@@ -388,7 +388,7 @@ export default function CreateChapterPage() {
               </div>
 
               {/* Language */}
-              <div className="space-y-2 ">
+              {/* <div className="space-y-2 ">
                 <Label htmlFor="languageCode">Ngôn ngữ</Label>
                 <Select
                   value={formData.languageCode}
@@ -407,7 +407,7 @@ export default function CreateChapterPage() {
                     <SelectItem value="ja-JP">日本語</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
+              </div> */}
             </CardContent>
           </Card>
 

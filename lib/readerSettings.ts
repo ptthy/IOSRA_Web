@@ -192,42 +192,77 @@ export const applyHighlightsToText = (
         pink: "#fbcfe8",
         purple: "#ddd6fe",
         orange: "#fed7aa",
+        none: "transparent",
       };
-      const bg = colorMap[h.color] || "#fef08a";
+      // const bg = colorMap[h.color] || "#fef08a";
+      const bg = colorMap[h.color] || "transparent";
 
-      const escapedNote = (h.note || "").replace(/"/g, "&quot;");
-      const formattedDate = (() => {
-        try {
-          return new Date(h.createdAt).toLocaleString("vi-VN", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-        } catch {
-          return h.createdAt;
-        }
-      })();
-      const marked = `<mark class="highlight-mark" style="background-color: ${bg}; padding: 0 4px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" data-highlight-id="${
-        h.id
-      }" data-note="${escapedNote || "Không có ghi chú"}" data-color="${
-        h.color
-      }" data-created="${formattedDate}" title="Ghi chú: ${
-        escapedNote || "Không có"
-      } | Màu: ${h.color} | Ngày: ${formattedDate}">${result.slice(
-        start,
-        end
-      )}</mark>`;
+      //       const escapedNote = (h.note || "").replace(/"/g, "&quot;");
+      //       const formattedDate = (() => {
+      //         try {
+      //           return new Date(h.createdAt).toLocaleString("vi-VN", {
+      //             day: "2-digit",
+      //             month: "2-digit",
+      //             year: "numeric",
+      //             hour: "2-digit",
+      //             minute: "2-digit",
+      //           });
+      //         } catch {
+      //           return h.createdAt;
+      //         }
+      //       })();
+      //       const marked = `<mark class="highlight-mark" style="background-color: ${bg}; padding: 0 4px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" data-highlight-id="${
+      //         h.id
+      //       }" data-note="${escapedNote || "Không có ghi chú"}" data-color="${
+      //         h.color
+      //       }" data-created="${formattedDate}" title="Ghi chú: ${
+      //         escapedNote || "Không có"
+      //       } | Màu: ${h.color} | Ngày: ${formattedDate}">${result.slice(
+      //         start,
+      //         end
+      //       )}</mark>`;
+
+      //       result = result.slice(0, start) + marked + result.slice(end);
+      //       appliedIndices.push(start);
+
+      //       // Cập nhật vị trí regex để tiếp tục tìm
+      //       regex.lastIndex = start + marked.length;
+      //     }
+      //   }
+
+      //   return result;
+      // };
+      // BIẾN MỚI: Thêm icon nếu có note
+      // const noteIcon = h.note
+      //   ? `<span class="ml-1 inline-flex items-center justify-center text-[10px]" title="Có ghi chú">📝</span>`
+      //   : "";
+      const noteIcon = h.note
+        ? `<span class="ml-1 inline-flex items-center opacity-70" style="vertical-align: middle;" title="Có ghi chú">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/><path d="m15 5 3 3"/>
+      </svg>
+     </span>`
+        : "";
+
+      // const marked = `<mark class="highlight-mark"
+      //   style="background-color: ${bg}; padding: 0 2px; border-radius: 4px; cursor: pointer;"
+      //   data-highlight-id="${h.id}"
+      // >${result.slice(start, end)}${noteIcon}</mark>`; // Chèn icon vào cuối mark
+      const markStyle =
+        h.color === "none"
+          ? `background-color: transparent; cursor: pointer;`
+          : `background-color: ${bg}; padding: 0 2px; border-radius: 4px; cursor: pointer;`;
+
+      const marked = `<mark class="highlight-mark" 
+  style="${markStyle}" 
+  data-highlight-id="${h.id}"
+>${result.slice(start, end)}${noteIcon}</mark>`;
 
       result = result.slice(0, start) + marked + result.slice(end);
       appliedIndices.push(start);
-
-      // Cập nhật vị trí regex để tiếp tục tìm
       regex.lastIndex = start + marked.length;
     }
   }
-
   return result;
 };
 //  QUAN TRỌNG: Sửa lỗi hàm deleteHighlight

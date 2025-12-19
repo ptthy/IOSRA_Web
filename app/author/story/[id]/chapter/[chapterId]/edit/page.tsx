@@ -236,7 +236,7 @@ export default function EditChapterPage() {
       await chapterService.updateChapter(storyId, chapterId, {
         title: formData.title,
         content: formData.content,
-        languageCode: formData.languageCode,
+        // languageCode: formData.languageCode,
       });
 
       // Xóa draft sau khi cập nhật thành công
@@ -334,7 +334,7 @@ export default function EditChapterPage() {
               </div>
 
               {/* Language */}
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <Label htmlFor="languageCode">Ngôn ngữ</Label>
                 <Select
                   value={formData.languageCode}
@@ -353,7 +353,7 @@ export default function EditChapterPage() {
                     <SelectItem value="ja-JP">日本語</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
+              </div> */}
             </CardContent>
           </Card>
 

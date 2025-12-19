@@ -686,6 +686,19 @@ export default function StoryDetailPage() {
                             : "---"}
                         </p>
                       </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Eye className="h-5 w-5 text-primary" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            Lượt đọc
+                          </p>
+                          <p className="font-semibold">
+                            {(story as any).totalViews?.toLocaleString(
+                              "vi-VN"
+                            ) || 0}
+                          </p>
+                        </div>
+                      </div>
 
                       {/* Badge Trạng thái nằm ngay bên phải ngày xuất bản */}
                       <Badge

@@ -960,7 +960,7 @@ export default function AuthorChapterDetailPage() {
               <p className="font-medium">{chapter.charCount} từ</p>
             </div>
             {/* Ngôn ngữ */}
-            <div>
+            {/* <div>
               <p className="text-sm text-slate-400 mb-1">Ngôn ngữ</p>
               {isEditing ? (
                 <Select
@@ -982,7 +982,7 @@ export default function AuthorChapterDetailPage() {
               ) : (
                 <p className="font-medium">{chapter.languageName}</p>
               )}
-            </div>
+            </div> */}
 
             {/* Loại truy cập */}
             <div>
