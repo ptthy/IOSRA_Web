@@ -662,32 +662,21 @@ export default function StoryDetailPage() {
                     <Badge className="px-3 py-1 bg-primary">Premium</Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-6 py-4 border-y border-border/50">
+                <div>
                   {/* Stats content... */}
-                  <div className="flex items-center gap-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1 rounded-md bg-primary/10">
-                        <span className="text-[10px] font-bold text-primary uppercase">
+                  <div className="flex flex-wrap md:flex-nowrap items-center gap-y-4 gap-x-4 md:gap-x-8 py-4 border-y border-border/50">
+                    {/* Ngôn ngữ */}
+                    <div className="flex items-center gap-2.5 min-w-fit">
+                      <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <span className="text-[11px] font-bold text-primary uppercase">
                           {story.languageCode?.split("-")[0] || "VN"}
                         </span>
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">
+                      <div className="min-w-0">
+                        <p className="text-[10px] leading-none text-muted-foreground mb-1 whitespace-nowrap">
                           Ngôn ngữ
                         </p>
-                        <p
-                          className={`font-semibold ${
-                            story.languageCode === "vi-VN"
-                              ? "text-red-600"
-                              : story.languageCode === "en-US"
-                              ? "text-blue-600"
-                              : story.languageCode === "zh-CN"
-                              ? "text-emerald-600"
-                              : story.languageCode === "ja-JP"
-                              ? "text-amber-600"
-                              : ""
-                          }`}
-                        >
+                        <p className="font-semibold text-sm truncate">
                           {story.languageCode === "vi-VN" && "Tiếng Việt"}
                           {story.languageCode === "en-US" && "English"}
                           {story.languageCode === "zh-CN" && "中文"}
@@ -698,22 +687,50 @@ export default function StoryDetailPage() {
                         </p>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <BookOpen className="h-5 w-5 text-primary" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Số chương</p>
-                      <p className="font-semibold">{story.totalChapters}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="h-5 w-5 text-primary" />
-                    <div className="flex items-center gap-3">
+
+                    {/* Số chương */}
+                    <div className="flex items-center gap-2.5 min-w-fit">
+                      <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <BookOpen className="h-4 w-4 text-primary" />
+                      </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-[10px] leading-none text-muted-foreground mb-1">
+                          Số chương
+                        </p>
+                        <p className="font-semibold text-sm">
+                          {story.totalChapters}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Độ dài dự kiến */}
+                    <div className="flex items-center gap-2.5 min-w-fit">
+                      <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <FileText className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] leading-none text-muted-foreground mb-1">
+                          Độ dài
+                        </p>
+                        <p className="font-semibold text-sm">
+                          {story.lengthPlan === "super_short" && "Siêu ngắn"}
+                          {story.lengthPlan === "short" && "Ngắn"}
+                          {story.lengthPlan === "novel" && "Dài"}
+                          {!story.lengthPlan && "---"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Xuất bản */}
+                    <div className="flex items-center gap-2.5 min-w-fit">
+                      <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <Clock className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] leading-none text-muted-foreground mb-1">
                           Xuất bản
                         </p>
-                        <p className="font-semibold">
+                        <p className="font-semibold text-sm">
                           {story.publishedAt
                             ? new Date(story.publishedAt).toLocaleDateString(
                                 "vi-VN"
@@ -721,50 +738,52 @@ export default function StoryDetailPage() {
                             : "---"}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Eye className="h-5 w-5 text-primary" />
-                        <div>
-                          <p className="text-xs text-muted-foreground">
-                            Lượt đọc
-                          </p>
-                          <p className="font-semibold">
-                            {(story as any).totalViews?.toLocaleString(
-                              "vi-VN"
-                            ) || 0}
-                          </p>
-                        </div>
-                      </div>
+                    </div>
 
-                      {/* Badge Trạng thái nằm ngay bên phải ngày xuất bản */}
+                    {/* Lượt đọc */}
+                    <div className="flex items-center gap-2.5 min-w-fit">
+                      <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <Eye className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] leading-none text-muted-foreground mb-1">
+                          Lượt đọc
+                        </p>
+                        <p className="font-semibold text-sm">
+                          {(story as any).totalViews?.toLocaleString("vi-VN") ||
+                            0}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Trạng thái */}
+                    <div className="md:ml-auto flex items-center">
                       <Badge
                         variant="outline"
-                        className={`
-    ml-3 px-4 py-1 text-[13px] md:text-[14px] font-bold border-none shadow-md flex items-center gap-2.5 transition-all
-    ${
-      story.status === "completed"
-        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
-        : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-    }
-  `}
+                        className={`px-3 py-1 text-[11px] font-bold border-none shadow-sm flex items-center gap-2 transition-all
+        ${
+          story.status === "completed"
+            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+            : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+        }
+      `}
                       >
-                        {/* Dot Indicator lớn hơn */}
-                        <span className="relative flex h-3 w-3">
+                        <span className="relative flex h-2 w-2">
                           {story.status !== "completed" && (
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75"></span>
                           )}
                           <span
-                            className={`relative inline-flex rounded-full h-3 w-3 ${
+                            className={`relative inline-flex rounded-full h-2 w-2 ${
                               story.status === "completed"
                                 ? "bg-emerald-600"
                                 : "bg-amber-600"
                             }`}
                           ></span>
                         </span>
-
-                        <span className="tracking-wide">
+                        <span className="tracking-wider uppercase whitespace-nowrap">
                           {story.status === "completed"
-                            ? "ĐÃ HOÀN THÀNH"
-                            : "ĐANG CẬP NHẬT"}
+                            ? "Hoàn thành"
+                            : "Đang cập nhật"}
                         </span>
                       </Badge>
                     </div>
