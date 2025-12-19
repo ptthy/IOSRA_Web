@@ -54,7 +54,14 @@ export const LockedOverlay: React.FC<LockedOverlayProps> = ({
     if (currentBalance < priceDias) {
       setInsufficientBalance(true);
       toast.error("Số dư không đủ", {
-        description: `Bạn cần ${priceDias} Dias nhưng chỉ có ${currentBalance} Dias.`,
+        description: (
+          <span className="flex items-center gap-1">
+            Bạn cần {priceDias}{" "}
+            <Gem className="h-3 w-3 fill-blue-500 text-blue-600" />
+            nhưng chỉ có {currentBalance}{" "}
+            <Gem className="h-3 w-3 fill-blue-500 text-blue-600" />
+          </span>
+        ),
       });
       return;
     }
@@ -147,10 +154,12 @@ export const LockedOverlay: React.FC<LockedOverlayProps> = ({
           Chương Trả Phí
         </h3>
 
-        <p className="text-gray-600 dark:text-gray-400 mb-6 text-center max-w-md leading-relaxed">
+        <p className="text-gray-600 dark:text-gray-400 mb-6 text-center max-w-md leading-relaxed mx-auto">
           Nội dung chương này được khóa để ủng hộ tác giả.
           <br />
-          Hãy sử dụng Dias để tiếp tục theo dõi câu chuyện hấp dẫn này nhé!
+          Hãy sử dụng{" "}
+          <Gem className="h-4 w-4 fill-blue-500 text-blue-600 inline-block align-text-bottom mx-1" />{" "}
+          để tiếp tục theo dõi câu chuyện hấp dẫn này nhé!
         </p>
 
         {/* Hiển thị thông báo số dư không đủ */}
@@ -162,10 +171,18 @@ export const LockedOverlay: React.FC<LockedOverlayProps> = ({
                 <p className="font-semibold text-red-800 dark:text-red-300">
                   Số dư không đủ
                 </p>
-                <p className="text-red-600 dark:text-red-400 mt-1">
-                  Bạn cần <strong>{priceDias} Dias</strong> nhưng chỉ có{" "}
-                  <strong>{currentBalance} Dias</strong>
-                </p>
+                <div className="text-red-600 dark:text-red-400 mt-1 flex items-center flex-wrap gap-1">
+                  <span>Bạn cần</span>
+                  <strong className="flex items-center gap-1">
+                    {priceDias}{" "}
+                    <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+                  </strong>
+                  <span>nhưng chỉ có</span>
+                  <strong className="flex items-center gap-1">
+                    {currentBalance}{" "}
+                    <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+                  </strong>
+                </div>
               </div>
             </div>
           </div>
