@@ -665,6 +665,41 @@ export default function StoryDetailPage() {
                 <div className="flex items-center gap-6 py-4 border-y border-border/50">
                   {/* Stats content... */}
                   <div className="flex items-center gap-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 rounded-md bg-primary/10">
+                        <span className="text-[10px] font-bold text-primary uppercase">
+                          {story.languageCode?.split("-")[0] || "VN"}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">
+                          Ngôn ngữ
+                        </p>
+                        <p
+                          className={`font-semibold ${
+                            story.languageCode === "vi-VN"
+                              ? "text-red-600"
+                              : story.languageCode === "en-US"
+                              ? "text-blue-600"
+                              : story.languageCode === "zh-CN"
+                              ? "text-emerald-600"
+                              : story.languageCode === "ja-JP"
+                              ? "text-amber-600"
+                              : ""
+                          }`}
+                        >
+                          {story.languageCode === "vi-VN" && "Tiếng Việt"}
+                          {story.languageCode === "en-US" && "English"}
+                          {story.languageCode === "zh-CN" && "中文"}
+                          {story.languageCode === "ja-JP" && "日本語"}
+                          {!["vi-VN", "en-US", "zh-CN", "ja-JP"].includes(
+                            story.languageCode
+                          ) && (story as any).languageName}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
                     <BookOpen className="h-5 w-5 text-primary" />
                     <div>
                       <p className="text-xs text-muted-foreground">Số chương</p>
