@@ -524,7 +524,7 @@ export default function StoryDetailPage() {
                     <CardContent className="pt-4 text-sm text-muted-foreground max-h-60 overflow-y-auto whitespace-pre-line leading-relaxed">
                       {story.outline.length > 800
                         ? story.outline.substring(0, 800) +
-                          "\n\n... (xem tiếp ở trang dàn ý)"
+                          "\n\n... (xem tiếp ở ở nút Dàn ý chi tiêt)"
                         : story.outline}
                     </CardContent>
                   </Card>

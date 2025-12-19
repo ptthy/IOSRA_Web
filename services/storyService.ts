@@ -192,23 +192,28 @@ export const storyService = {
       console.log("Cập nhật bản nháp thành công!");
     } catch (error: any) {
       console.error("Error updating draft:", error);
-
-      if (error.response?.status === 403) {
-        throw new Error("Bạn không có quyền chỉnh sửa truyện này.");
-      }
-      if (error.response?.status === 400) {
-        //  HIỂN THỊ CHI TIẾT LỖI TỪ SERVER
-        const serverError = error.response?.data;
-        console.error("Chi tiết lỗi 400:", serverError);
-
-        throw new Error(
-          serverError?.message || "Dữ liệu cập nhật không hợp lệ."
-        );
-      }
-
-      throw new Error("Không thể cập nhật truyện. Vui lòng thử lại sau.");
+      // Ném nguyên cục error ra để bên ngoài xử lý toast
+      throw error;
     }
   },
+  // console.error("Error updating draft:", error);
+
+  //     if (error.response?.status === 403) {
+  //       throw new Error("Bạn không có quyền chỉnh sửa truyện này.");
+  //     }
+  //     if (error.response?.status === 400) {
+  //       //  HIỂN THỊ CHI TIẾT LỖI TỪ SERVER
+  //       const serverError = error.response?.data;
+  //       console.error("Chi tiết lỗi 400:", serverError);
+
+  //       throw new Error(
+  //         serverError?.message || "Dữ liệu cập nhật không hợp lệ."
+  //       );
+  //     }
+
+  //     throw new Error("Không thể cập nhật truyện. Vui lòng thử lại sau.");
+  //   }
+  // },
 
   // === Endpoint 3: PUT /api/AuthorStory/{storyId} (Chỉ đổi ảnh bìa) ===
   // async replaceDraftCover(storyId: string, coverFile: File): Promise<void> {

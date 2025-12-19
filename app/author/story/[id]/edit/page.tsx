@@ -109,7 +109,7 @@ export default function EditStoryPage() {
         isEditMode={true}
         storyId={storyId}
         onSuccess={() => {
-          toast.success("Cập nhật truyện thành công!");
+          //  toast.success("Cập nhật truyện thành công!");
           router.push(`/author/story/${storyId}`);
         }}
       />

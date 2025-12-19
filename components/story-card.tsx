@@ -2,12 +2,14 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "./ui/badge";
-import { StorySummary } from "../lib/types";
+//import { StorySummary } from "../lib/types";
+import { Story } from "@/services/apiTypes";
 import { ImageWithFallback } from "./ui/ImageWithFallback";
 import { Lock, User, BookOpen } from "lucide-react";
 
 interface StoryCardProps {
-  story: StorySummary;
+  // story: StorySummary;
+  story: Story;
   onClick: () => void;
 }
 
@@ -106,18 +108,21 @@ export function StoryCard({ story, onClick }: StoryCardProps) {
               {/* Tags List */}
               <div className="flex flex-wrap gap-1.5 justify-center h-[26px] overflow-hidden">
                 {/* 1. SỬA THÀNH slice(0, 2): Chỉ lấy 2 tag đầu tiên */}
-                {story.tags.slice(0, 2).map((tag) => (
-                  <Badge
-                    key={tag.tagId}
-                    variant="secondary"
-                    className="text-[10px] bg-primary/10 text-primary border border-primary/20 max-w-[120px] truncate px-1.5"
-                  >
-                    {tag.tagName}
-                  </Badge>
-                ))}
+                {/* //  {story.tags.slice(0, 2).map((tag) => ( */}
+                {story.tags &&
+                  story.tags.slice(0, 2).map((tag) => (
+                    <Badge
+                      key={tag.tagId}
+                      variant="secondary"
+                      className="text-[10px] bg-primary/10 text-primary border border-primary/20 max-w-[120px] truncate px-1.5"
+                    >
+                      {tag.tagName}
+                    </Badge>
+                  ))}
 
                 {/* 2. SỬA THÀNH length > 2: Nếu có từ 3 tag trở lên thì hiện dấu ... */}
-                {story.tags.length > 2 && (
+                {/* {story.tags.length > 2 && ( */}
+                {story.tags && story.tags.length > 2 && (
                   <Badge
                     variant="secondary"
                     className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1.5 align-middle"

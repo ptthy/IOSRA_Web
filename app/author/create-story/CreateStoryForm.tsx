@@ -118,8 +118,15 @@ export default function CreateStoryForm({
   const [outlineLength, setOutlineLength] = useState(0);
   const [promptLength, setPromptLength] = useState(0);
 
-  const LIMITS = { TITLE: 100, OUTLINE: 3000, PROMPT: 500 };
-
+  const LIMITS = {
+    TITLE_MIN: 20,
+    TITLE_MAX: 50,
+    DESC_MIN: 6,
+    DESC_MAX: 1000,
+    OUTLINE_MIN: 20,
+    OUTLINE_MAX: 1000,
+    PROMPT: 500,
+  };
   // Load tags
   useEffect(() => {
     loadTags();
@@ -276,6 +283,32 @@ export default function CreateStoryForm({
       toast.error("Vui lòng nhập dàn ý cốt truyện");
       return;
     }
+    if (title.length < LIMITS.TITLE_MIN || title.length > LIMITS.TITLE_MAX) {
+      toast.error(
+        `Tiêu đề phải từ ${LIMITS.TITLE_MIN} đến ${LIMITS.TITLE_MAX} ký tự`
+      );
+      return;
+    }
+    if (
+      outline.length < LIMITS.OUTLINE_MIN ||
+      outline.length > LIMITS.OUTLINE_MAX
+    ) {
+      toast.error(
+        `Dàn ý phải từ ${LIMITS.OUTLINE_MIN} đến ${LIMITS.OUTLINE_MAX} ký tự`
+      );
+      return;
+    }
+    // Mô tả không bắt buộc, nhưng nếu nhập thì phải đúng độ dài
+    if (
+      description &&
+      (description.length < LIMITS.DESC_MIN ||
+        description.length > LIMITS.DESC_MAX)
+    ) {
+      toast.error(
+        `Mô tả phải từ ${LIMITS.DESC_MIN} đến ${LIMITS.DESC_MAX} ký tự`
+      );
+      return;
+    }
     if (selectedTagIds.length === 0) {
       toast.error("Vui lòng chọn ít nhất 1 thể loại");
       return;
@@ -418,7 +451,53 @@ export default function CreateStoryForm({
       }
     } catch (error: any) {
       console.error("Submit error:", error);
-      toast.error(error.message || "Có lỗi xảy ra");
+      //   toast.error(error.message || "Có lỗi xảy ra");
+      // } finally {
+      //   setIsSubmitting(false);
+      // }
+      // Kiểm tra cấu trúc lỗi { error: { message: "..." } }
+      //   const serverMessage = error.response?.data?.error?.message;
+
+      //   // Nếu không có cấu trúc trên, thử lấy message chung (fallback)
+      //   const fallbackMessage =
+      //     error.response?.data?.message || error.message || "Có lỗi xảy ra";
+
+      //   // Hiển thị toast
+      //   toast.error(serverMessage || fallbackMessage);
+      //   // -----------------------------------------------
+      // } finally {
+      //   setIsSubmitting(false);
+      // }
+      // --- LOGIC BẮT HẾT LỖI TỪ BACKEND ---
+      if (error.response && error.response.data && error.response.data.error) {
+        const { message, details } = error.response.data.error;
+
+        // 1. Nếu có 'details' (Lỗi validation như: Tiêu đề, Mô tả, Dàn ý...)
+        if (details) {
+          // Lấy tất cả các key bị lỗi (Title, Description, Outline...)
+          const errorKeys = Object.keys(details);
+
+          errorKeys.forEach((key) => {
+            // Duyệt qua mảng các câu thông báo lỗi của từng key và hiện toast
+            details[key].forEach((msg: string) => {
+              toast.error(msg);
+            });
+          });
+          return; // Dừng lại sau khi đã hiện hết lỗi chi tiết
+        }
+
+        // 2. Nếu không có details nhưng có message chung (Lỗi logic)
+        if (message) {
+          toast.error(message);
+          return;
+        }
+      }
+
+      // 3. Fallback cho các lỗi khác (lỗi mạng, server sập...)
+      const fallbackMessage =
+        error.response?.data?.message || error.message || "Có lỗi xảy ra";
+      toast.error(fallbackMessage);
+      // --------------------------------------
     } finally {
       setIsSubmitting(false);
     }
@@ -483,7 +562,7 @@ export default function CreateStoryForm({
               <Label className="text-base font-bold ">
                 Tên truyện <span className="text-red-500 text-xl ">*</span>
               </Label>
-              <span
+              {/* <span
                 className={`text-xs ${
                   titleLength > LIMITS.TITLE
                     ? "text-red-500"
@@ -491,9 +570,21 @@ export default function CreateStoryForm({
                 }`}
               >
                 {titleLength}/{LIMITS.TITLE}
+              </span> */}
+              <span
+                className={`text-xs font-medium ${
+                  title.length < LIMITS.TITLE_MIN ||
+                  title.length > LIMITS.TITLE_MAX
+                    ? "text-red-500"
+                    : "text-emerald-600"
+                }`}
+              >
+                {title.length < LIMITS.TITLE_MIN
+                  ? `Tối thiểu ${LIMITS.TITLE_MIN}`
+                  : `${title.length}/${LIMITS.TITLE_MAX}`}
               </span>
             </div>
-            <Input
+            {/* <Input
               placeholder="Nhập tên truyện của bạn..."
               value={title}
               onChange={(e) => {
@@ -507,10 +598,25 @@ export default function CreateStoryForm({
                   : "dark:border-[#f0ead6]"
               }
             />
+          </div> */}
+            <Input
+              placeholder="Nhập tên truyện từ 20-50 ký tự..."
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className={`transition-all ${
+                title.length > 0 &&
+                (title.length < LIMITS.TITLE_MIN ||
+                  title.length > LIMITS.TITLE_MAX)
+                  ? "border-red-500 focus-visible:ring-red-500"
+                  : title.length >= LIMITS.TITLE_MIN
+                  ? "border-emerald-500 focus-visible:ring-emerald-500"
+                  : "dark:border-[#f0ead6]"
+              }`}
+            />
           </div>
 
           {/* === Mô tả === */}
-          <div className="space-y-2">
+          {/* <div className="space-y-2">
             <Label>Mô tả</Label>
             <Textarea
               placeholder="Giới thiệu nội dung truyện của bạn..."
@@ -519,10 +625,45 @@ export default function CreateStoryForm({
               rows={5}
               className="dark:border-[#f0ead6]"
             />
+          </div> */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label className="text-base font-bold">Mô tả</Label>
+              <span
+                className={`text-xs font-medium ${
+                  description.length > 0 &&
+                  (description.length < LIMITS.DESC_MIN ||
+                    description.length > LIMITS.DESC_MAX)
+                    ? "text-red-500"
+                    : description.length >= LIMITS.DESC_MIN
+                    ? "text-emerald-600"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {description.length > 0 && description.length < LIMITS.DESC_MIN
+                  ? `Tối thiểu ${LIMITS.DESC_MIN}`
+                  : `${description.length}/${LIMITS.DESC_MAX}`}
+              </span>
+            </div>
+            <Textarea
+              placeholder="Giới thiệu nội dung truyện (6-1000 ký tự)..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={5}
+              className={`transition-all ${
+                description.length > 0 &&
+                (description.length < LIMITS.DESC_MIN ||
+                  description.length > LIMITS.DESC_MAX)
+                  ? "border-red-500 focus-visible:ring-red-500"
+                  : description.length >= LIMITS.DESC_MIN
+                  ? "border-emerald-500 focus-visible:ring-emerald-500"
+                  : "dark:border-[#f0ead6]"
+              }`}
+            />
           </div>
 
           {/* === Dàn ý cốt truyện === */}
-          <div className="space-y-2">
+          {/* <div className="space-y-2">
             <div className="flex justify-between items-center">
               <Label className="text-base font-bold">
                 Dàn ý cốt truyện <span className="text-red-500 text-xl">*</span>
@@ -551,6 +692,40 @@ export default function CreateStoryForm({
                   ? "border-red-500"
                   : "dark:border-[#f0ead6]"
               }
+            />
+          </div> */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label className="text-base font-bold">
+                Dàn ý cốt truyện <span className="text-red-500 text-xl">*</span>
+              </Label>
+              <span
+                className={`text-xs font-medium ${
+                  outline.length < LIMITS.OUTLINE_MIN ||
+                  outline.length > LIMITS.OUTLINE_MAX
+                    ? "text-red-500"
+                    : "text-emerald-600"
+                }`}
+              >
+                {outline.length < LIMITS.OUTLINE_MIN
+                  ? `Tối thiểu ${LIMITS.OUTLINE_MIN}`
+                  : `${outline.length}/${LIMITS.OUTLINE_MAX}`}
+              </span>
+            </div>
+            <Textarea
+              placeholder="Viết dàn ý chi tiết (20-1000 ký tự)..."
+              value={outline}
+              onChange={(e) => setOutline(e.target.value)}
+              rows={8}
+              className={`transition-all ${
+                outline.length > 0 &&
+                (outline.length < LIMITS.OUTLINE_MIN ||
+                  outline.length > LIMITS.OUTLINE_MAX)
+                  ? "border-red-500 focus-visible:ring-red-500"
+                  : outline.length >= LIMITS.OUTLINE_MIN
+                  ? "border-emerald-500 focus-visible:ring-emerald-500"
+                  : "dark:border-[#f0ead6]"
+              }`}
             />
           </div>
 

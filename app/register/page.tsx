@@ -1,3 +1,4 @@
+//app/register/page.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -139,7 +140,7 @@ export default function RegisterRoute() {
       // 5. Xử lý lỗi
 
       // A. Xử lý lỗi 409 (hoặc 404 tùy logic backend) - User mới cần hoàn tất đăng ký
-      // (Giả sử BE trả 409 cho tài khoản chưa đăng ký, như code bạn cung cấp)
+      // (Giả sử BE trả 409 cho tài khoản chưa đăng ký)
       if (err.response?.status === 409 || err.response?.status === 404) {
         try {
           const currentUser = auth.currentUser;

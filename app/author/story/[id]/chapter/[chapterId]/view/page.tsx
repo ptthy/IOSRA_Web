@@ -443,11 +443,38 @@ export default function AuthorChapterViewPage() {
                   <span>{chapter?.title}</span>
                 </CardTitle>
                 {/* Dòng Số chương */}
-                <CardDescription className="flex items-center gap-2 text-base">
-                  <span className="text-slate-400">Số chương:</span>
-                  <span className="text-l flex items-center gap-2">
-                    {chapter?.chapterNo}
-                  </span>
+                <CardDescription className="flex items-center gap-6 text-base mt-1">
+                  {/* Cụm Số chương */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400">Số chương:</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-200">
+                      {chapter?.chapterNo}
+                    </span>
+                  </div>
+
+                  {/* Đường kẻ dọc ngăn cách */}
+                  <div className="w-[1px] h-4 bg-slate-200 dark:bg-slate-800" />
+
+                  {/* Cụm Cảm xúc chương */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400">Cảm xúc:</span>
+                    {!chapter?.mood ? (
+                      // CHỈ HIỆN CHỮ MÀU ĐỎ KHI CHƯA CÓ DỮ LIỆU
+                      <span className="font-bold text-red-600 uppercase tracking-tight">
+                        Chưa xác định
+                      </span>
+                    ) : (
+                      // HIỆN CHỮ BÌNH THƯỜNG  KHI ĐÃ CÓ
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">
+                          {chapter.mood.name}
+                        </span>
+                        <span className="text-xs text-slate-400 font-normal ">
+                          ({chapter.mood.code})
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </CardDescription>
               </div>
             </div>

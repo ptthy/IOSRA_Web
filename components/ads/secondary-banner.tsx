@@ -36,7 +36,7 @@ export function SecondaryBanner({ onClick }: SecondaryBannerProps) {
             <div className="flex items-center gap-1.5">
               <Gem className="w-3.5 h-3.5 text-blue-500 shrink-0" />
               <span className="text-[11px] font-medium text-foreground/80 whitespace-nowrap">
-                Nhận Dias mỗi ngày
+                Nhận mỗi ngày
               </span>
             </div>
 

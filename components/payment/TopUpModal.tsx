@@ -59,7 +59,7 @@ const THEME_MAPPING = [
     iconColor: "text-blue-600 dark:text-blue-400",
     btn: "bg-blue-600 hover:bg-blue-700 text-white",
     badge: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-    icon: Star,
+    icon: Gem,
     label: "Phổ biến",
   },
   {
@@ -70,7 +70,7 @@ const THEME_MAPPING = [
     iconColor: "text-amber-600 dark:text-amber-400",
     btn: "bg-amber-600 hover:bg-amber-700 text-white",
     badge: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
-    icon: Trophy,
+    icon: Gem,
     label: "Đại gia",
   },
 ];
@@ -229,8 +229,14 @@ export function TopUpModal({
 
                   <ul className="space-y-2 mb-5">
                     {[
-                      "1000 Dias chào mừng",
-                      "50 Dias mỗi ngày",
+                      <span
+                        key="dias-daily"
+                        className="flex items-center gap-1"
+                      >
+                        50{" "}
+                        <Gem className="h-4 w-4 fill-blue-500 text-blue-600 inline" />{" "}
+                        mỗi ngày
+                      </span>,
                       "Không quảng cáo",
                       "Truyện VIP miễn phí",
                       "Giọng đọc AI Premium",
