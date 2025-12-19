@@ -375,41 +375,77 @@ export default function StoryDetailPage() {
                 </p>
               </div>
 
-              {/* Độ dài dự kiến – THEO HÌNH BẠN GỬI */}
-              {story.lengthPlan && (
-                <div>
+              {/* Độ dài dự kiến  */}
+              <div className="flex flex-wrap items-start gap-x-12 gap-y-4">
+                {story.lengthPlan && (
+                  <div className="flex flex-col">
+                    <p className="text-xs text-muted-foreground mb-1.5 font-bold">
+                      Độ dài dự kiến
+                    </p>
+                    <div className="h-7 flex items-center">
+                      {" "}
+                      {/* Cố định chiều cao để ngang hàng */}
+                      {story.lengthPlan === "super_short" && (
+                        <Badge
+                          variant="secondary"
+                          className="bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300 border-none"
+                        >
+                          Siêu ngắn (từ 1-5 chương)
+                        </Badge>
+                      )}
+                      {story.lengthPlan === "short" && (
+                        <Badge
+                          variant="secondary"
+                          className="bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 border-none"
+                        >
+                          Ngắn (từ 6-20 chương)
+                        </Badge>
+                      )}
+                      {story.lengthPlan === "novel" && (
+                        <Badge
+                          variant="secondary"
+                          className="bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border-none"
+                        >
+                          Dài (trên 20 chương)
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-col">
                   <p className="text-xs text-muted-foreground mb-1.5 font-bold">
-                    Độ dài dự kiến
+                    Ngôn ngữ
                   </p>
-                  <div className="flex items-center gap-3">
-                    {story.lengthPlan === "super_short" && (
-                      <Badge
-                        variant="secondary"
-                        className="bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300"
-                      >
-                        Siêu ngắn (từ 1-5 chương)
+                  <div className="h-7 flex items-center">
+                    {" "}
+                    {/* Cố định chiều cao h-7 khớp với bên trái */}
+                    {story.languageCode === "vi-VN" && (
+                      <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-red-200 dark:bg-red-900/30 dark:text-red-400">
+                        Tiếng Việt
                       </Badge>
                     )}
-                    {story.lengthPlan === "short" && (
-                      <Badge
-                        variant="secondary"
-                        className="bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
-                      >
-                        Ngắn (từ 6-20 chương)
+                    {story.languageCode === "en-US" && (
+                      <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400">
+                        English
                       </Badge>
                     )}
-                    {story.lengthPlan === "novel" && (
-                      <Badge
-                        variant="secondary"
-                        className="bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300"
-                      >
-                        Dài (trên 20 chương)
+                    {story.languageCode === "zh-CN" && (
+                      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400">
+                        中文 (Chinese)
                       </Badge>
                     )}
+                    {story.languageCode === "ja-JP" && (
+                      <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400">
+                        日本語 (Japanese)
+                      </Badge>
+                    )}
+                    {!["vi-VN", "en-US", "zh-CN", "ja-JP"].includes(
+                      story.languageCode
+                    ) && <Badge variant="outline">{story.languageCode}</Badge>}
                   </div>
                 </div>
-              )}
-
+              </div>
               {/* Metadata Grid – thêm aiResult, moderatorStatus, moderatorNote */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t">
                 <div>

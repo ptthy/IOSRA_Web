@@ -59,8 +59,9 @@ export default function EditStoryPage() {
           description: story.description,
           outline: story.outline || "",
           lengthPlan: story.lengthPlan || "short",
+          languageCode: story.languageCode,
           selectedTagIds: story.tags?.map((t) => t.tagId) || [],
-          CoverMode: "upload", // Luôn là upload trong edit mode
+          coverMode: "upload", // Luôn là upload trong edit mode
           hasUsedAICover: true, // không cho tạo lại AI
           createdStoryId: storyId,
           currentCoverUrl: story.coverUrl, //  QUAN TRỌNG: Lấy URL ảnh từ API

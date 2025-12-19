@@ -35,6 +35,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Loader2,
@@ -90,6 +97,10 @@ export default function CreateStoryPage() {
   const [titleLength, setTitleLength] = useState(0);
   const [outlineLength, setOutlineLength] = useState(0);
   const [promptLength, setPromptLength] = useState(0);
+
+  const [languageCode, setLanguageCode] = useState<
+    "vi-VN" | "en-US" | "zh-CN" | "ja-JP"
+  >("vi-VN");
 
   //const LIMITS = { TITLE: 100, OUTLINE: 3000, PROMPT: 500 };
   // const handleApiError = (error: any, defaultMessage: string) => {
@@ -479,6 +490,7 @@ export default function CreateStoryPage() {
           description: description || "",
           outline,
           lengthPlan,
+          languageCode,
           tagIds: selectedTagIds,
           coverMode,
           coverFile: coverMode === "upload" ? coverFile! : undefined,
@@ -789,6 +801,29 @@ export default function CreateStoryPage() {
                 </div>
               ))}
             </RadioGroup>
+          </div>
+          {/* === Ngôn ngữ === */}
+          <div className="space-y-2">
+            <Label className="text-base font-bold">
+              Ngôn ngữ <span className="text-red-500 text-xl">*</span>
+            </Label>
+            <Select
+              value={languageCode}
+              onValueChange={(value: "vi-VN" | "en-US" | "zh-CN" | "ja-JP") =>
+                setLanguageCode(value)
+              }
+              disabled={isSubmitting}
+            >
+              <SelectTrigger className="w-full max-w-xs dark:border-[#f0ead6]">
+                <SelectValue placeholder="Chọn ngôn ngữ cho truyện" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="vi-VN">Tiếng Việt</SelectItem>
+                <SelectItem value="en-US">English</SelectItem>
+                <SelectItem value="zh-CN">中文</SelectItem>
+                <SelectItem value="ja-JP">日本語</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Thể loại */}

@@ -786,6 +786,19 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                   <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/30">
                     Mood: {mood?.name || "Tâm trạng"}
                   </div>
+                  <div className="px-3 py-3 border-b space-y-2">
+                    <div className="flex justify-between text-[10px] font-bold uppercase opacity-70">
+                      <span>Âm lượng nhạc</span>
+                      <span>{musicVolume}%</span>
+                    </div>
+                    <Slider
+                      value={[musicVolume]}
+                      max={100}
+                      step={1}
+                      onValueChange={(val) => setMusicVolume(val[0])}
+                      className="cursor-pointer"
+                    />
+                  </div>
                   <SelectItem value="turn_off">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <VolumeX className="w-3 h-3" />
@@ -856,7 +869,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                 variant="ghost"
                 size="icon"
                 className={cn(
-                  "hidden lg:flex h-9 w-9",
+                  "flex h-9 w-9",
                   themeClasses.textMuted,
                   themeClasses.hover
                 )}

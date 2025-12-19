@@ -1,11 +1,16 @@
 "use client";
 import React, { useEffect, useRef } from "react";
-import { Highlight } from "../../lib/readerSettings";
-
+//import { Highlight } from "../../lib/readerSettings";
+import { Trash2, X, Pencil } from "lucide-react"; // Import thêm icon
+import { deleteHighlight, Highlight } from "../../lib/readerSettings";
+import { motion } from "framer-motion"; // 1. Import motion
 interface HighlightTooltipProps {
   highlight: Highlight | null;
   position: { x: number; y: number } | null;
+  chapterId: string; // Thêm prop này để xóa đúng chapter
   onClose?: () => void;
+  onRefresh: () => void; // Callback để load lại UI sau khi xóa
+  onEdit: (highlight: Highlight) => void; // THÊM
 }
 
 // Simple utility to format date consistently
@@ -26,7 +31,10 @@ const formatDate = (iso: string) => {
 export const HighlightTooltip: React.FC<HighlightTooltipProps> = ({
   highlight,
   position,
+  chapterId,
   onClose,
+  onRefresh,
+  onEdit,
 }) => {
   const tooltipRef = useRef<HTMLDivElement>(null);
 
@@ -58,6 +66,13 @@ export const HighlightTooltip: React.FC<HighlightTooltipProps> = ({
   }, [highlight, onClose]);
 
   if (!highlight || !position) return null;
+  const handleDelete = () => {
+    if (window.confirm("Bạn có chắc chắn muốn xóa highlight này?")) {
+      deleteHighlight(chapterId, highlight.id); // Gọi hàm xóa từ lib
+      onRefresh(); // Cập nhật lại state ở component cha
+      onClose?.(); // Sửa lỗi ở đây: Thêm dấu ? để gọi hàm an toàn
+    }
+  };
 
   const colorMap: Record<string, string> = {
     yellow: "#fef08a",
@@ -77,49 +92,91 @@ export const HighlightTooltip: React.FC<HighlightTooltipProps> = ({
   };
 
   return (
-    <div
+    <motion.div
+      drag // Kích hoạt tính năng kéo
+      dragMomentum={false} // Dừng lại ngay khi thả chuột
       ref={tooltipRef}
       style={style}
-      className="animate-fade-in p-4 w-80 shadow-2xl border-2 bg-background rounded-lg pointer-events-auto"
+      // Thêm cursor-move để người dùng biết có thể kéo, z-index cao để không bị che
+      className="animate-fade-in p-4 w-80 shadow-2xl border-2 bg-background rounded-lg pointer-events-auto cursor-move z-[9999]"
     >
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-3 border-b pb-2">
         <div className="flex items-center gap-2">
           <div
-            className="h-4 w-4 rounded-full border"
-            style={{ backgroundColor: bg, borderColor: "rgba(0,0,0,0.15)" }}
+            className="h-3.5 w-3.5 rounded-full border shadow-sm"
+            style={{ backgroundColor: bg, borderColor: "rgba(0,0,0,0.1)" }}
           />
-          <p className="text-sm font-semibold">Highlight Info</p>
+          <p className="text-sm font-bold text-primary">Thông tin Highlight</p>
         </div>
-        {onClose && (
+        <div className="flex items-center gap-1">
+          {/* NÚT EDIT  */}
           <button
-            onClick={onClose}
-            className="text-xs px-2 py-1 rounded border bg-muted hover:bg-muted/70 pointer-events-auto"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => {
+              if (highlight) onEdit(highlight);
+            }}
+            className="p-1.5 hover:bg-blue-50 text-blue-500 rounded-md border border-blue-100 transition-colors shadow-sm"
+            title="Chỉnh sửa highlight"
           >
-            Đóng
+            <Pencil className="h-3.5 w-3.5" />
           </button>
-        )}
+          {/* Nút Xóa */}
+          <button
+            onPointerDown={(e) => e.stopPropagation()} // Chặn sự kiện kéo khi click nút
+            onClick={handleDelete}
+            className="p-1.5 hover:bg-red-50 text-red-500 rounded-md border border-red-100 transition-colors shadow-sm"
+            title="Xóa highlight"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+
+          {onClose && (
+            <button
+              onPointerDown={(e) => e.stopPropagation()} // Chặn sự kiện kéo khi click nút
+              onClick={onClose}
+              className="p-1.5 hover:bg-muted rounded-md border bg-background transition-colors shadow-sm"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
-      <div className="text-xs space-y-2">
-        <div className="bg-muted p-2 rounded border max-h-24 overflow-y-auto">
-          <span className="font-medium">Đoạn văn:</span> “
-          {highlight.text.substring(0, 150)}
-          {highlight.text.length > 150 ? "..." : ""}”
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="text-[11px]">
-            <span className="font-medium">Màu:</span> {highlight.color}
+
+      {/* Vùng nội dung bên dưới: Chặn sự kiện kéo để có thể bôi đen text bên trong tooltip nếu cần */}
+      <div
+        onPointerDown={(e) => e.stopPropagation()}
+        className="cursor-default mt-3"
+      >
+        <div className="space-y-3">
+          {highlight.note ? (
+            <div className="text-xs p-2.5 bg-blue-50/50 border-l-2 border-blue-400 italic text-blue-900 rounded-r-md">
+              <span className="font-bold not-italic block mb-1 text-[10px] text-blue-500 uppercase tracking-wider">
+                Ghi chú của bạn:
+              </span>
+              "{highlight.note}"
+            </div>
+          ) : (
+            <div className="text-[11px] text-muted-foreground italic px-1">
+              Không có ghi chú nào.
+            </div>
+          )}
+
+          <div className="text-[11px] text-muted-foreground bg-muted/40 p-2 rounded border border-dashed leading-relaxed">
+            <span className="font-semibold text-primary/80">Nội dung:</span> “
+            {highlight.text.substring(0, 120)}
+            {highlight.text.length > 120 ? "..." : ""}”
           </div>
-          <div className="text-[11px]">
-            <span className="font-medium">Ngày:</span>{" "}
-            {formatDate(highlight.createdAt)}
+
+          <div className="flex justify-between items-center pt-2 border-t border-muted text-[10px] text-muted-foreground/70">
+            <span className="flex items-center gap-1">
+              Màu:{" "}
+              <span className="capitalize font-medium">{highlight.color}</span>
+            </span>
+            <span>{formatDate(highlight.createdAt)}</span>
           </div>
-        </div>
-        <div className="text-[11px]">
-          <span className="font-medium">Ghi chú:</span>{" "}
-          {highlight.note ? highlight.note : <em>Không có</em>}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

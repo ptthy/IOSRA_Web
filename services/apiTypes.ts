@@ -32,6 +32,7 @@ export interface Story {
   outline?: string;
   createdAt: string;
   updatedAt: string;
+  languageCode: "vi-VN" | "en-US" | "zh-CN" | "ja-JP";
 }
 
 export interface CreateStoryRequest {
@@ -41,6 +42,7 @@ export interface CreateStoryRequest {
   outline: string;
   lengthPlan: "super_short" | "short" | "novel";
   coverMode: "upload" | "generate";
+  languageCode: "vi-VN" | "en-US" | "zh-CN" | "ja-JP";
   coverFile?: File;
   coverPrompt?: string;
 }
@@ -95,7 +97,7 @@ export interface ChapterDetails extends Chapter {
 
 export interface CreateChapterRequest {
   title: string;
-  languageCode: "vi-VN" | "en-US" | "zh-CN" | "ja-JP";
+  //languageCode: "vi-VN" | "en-US" | "zh-CN" | "ja-JP";
   content: string;
   accessType?: "free" | "dias";
 }

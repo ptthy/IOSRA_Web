@@ -69,6 +69,7 @@ export const storyService = {
       formData.append("Description", data.description || "");
       formData.append("Outline", data.outline);
       formData.append("LengthPlan", data.lengthPlan);
+      formData.append("LanguageCode", data.languageCode); // Thêm
 
       // TagIds
       data.tagIds.forEach((tagId) => formData.append("TagIds", tagId));
@@ -156,6 +157,7 @@ export const storyService = {
       if (data.description) formData.append("Description", data.description);
       if (data.outline) formData.append("Outline", data.outline);
       if (data.lengthPlan) formData.append("LengthPlan", data.lengthPlan);
+      if (data.languageCode) formData.append("LanguageCode", data.languageCode); // Thêm
 
       // TagIds
       if (data.tagIds && data.tagIds.length > 0) {

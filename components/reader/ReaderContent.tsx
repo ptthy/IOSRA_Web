@@ -259,40 +259,78 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({
   }, [showHighlightPopover]);
 
   // Handle Highlight Hover (Tooltip)
+  // 1. Cập nhật logic Click vào highlight cũ để Edit
   useEffect(() => {
+    const handleMarkClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const mark = target.closest(".highlight-mark") as HTMLElement | null;
+
+      // Nếu click vào vùng highlight và KHÔNG phải click vào icon "i"
+      if (mark && !target.closest(".highlight-info-icon")) {
+        const id = mark.getAttribute("data-highlight-id");
+        const hl = highlights.find((h) => h.id === id);
+        if (hl) {
+          setSelectedText(hl.text);
+          const rect = mark.getBoundingClientRect();
+          setSelectionPosition({
+            x: rect.left + rect.width / 2,
+            y: rect.top - 10,
+          });
+          setShowHighlightPopover(true); // Mở Popover để sửa
+        }
+      }
+    };
+
+    document.addEventListener("click", handleMarkClick);
+    return () => document.removeEventListener("click", handleMarkClick);
+  }, [highlights]);
+
+  // 2. Cập nhật logic Hover để icon "i" ổn định (Thêm timer trễ)
+  useEffect(() => {
+    let hideTimer: NodeJS.Timeout;
+
     const handleMouseOver = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       const mark = target.closest(".highlight-mark") as HTMLElement | null;
-      if (mark) {
-        const id = mark.getAttribute("data-highlight-id");
-        if (id) {
-          const rect = mark.getBoundingClientRect();
-          setHoveredHighlight({
-            id,
-            position: { x: rect.right + 4, y: rect.top + rect.height / 2 },
-          });
-          return;
+      const icon = target.closest(".highlight-info-icon") as HTMLElement | null;
+
+      if (mark || icon) {
+        clearTimeout(hideTimer); // Nếu đang hover vào mark/icon thì không ẩn
+        const activeMark =
+          mark ||
+          (icon
+            ? document.querySelector(
+                `[data-highlight-id="${hoveredHighlight?.id}"]`
+              )
+            : null);
+
+        if (activeMark) {
+          const id = activeMark.getAttribute("data-highlight-id");
+          if (id) {
+            const rect = activeMark.getBoundingClientRect();
+            setHoveredHighlight({
+              id,
+              position: { x: rect.right + 4, y: rect.top + rect.height / 2 },
+            });
+          }
         }
       }
-      if (!target.closest(".highlight-info-icon")) {
-        setHoveredHighlight(null);
-      }
     };
+
     const handleMouseOut = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      const relatedTarget = e.relatedTarget as HTMLElement;
-      if (relatedTarget?.closest(".highlight-info-icon")) return;
-      if (target.classList.contains("highlight-mark")) {
-        setTimeout(() => setHoveredHighlight(null), 100);
-      }
+      // Thêm delay 300ms trước khi ẩn để người dùng kịp di chuyển chuột sang icon
+      hideTimer = setTimeout(() => {
+        setHoveredHighlight(null);
+      }, 300);
     };
+
     document.addEventListener("mouseover", handleMouseOver);
     document.addEventListener("mouseout", handleMouseOut);
     return () => {
       document.removeEventListener("mouseover", handleMouseOver);
       document.removeEventListener("mouseout", handleMouseOut);
     };
-  }, [highlights]);
+  }, [hoveredHighlight?.id]);
 
   // Logic phân trang cho Book Mode
   const wordsPerPage = 500;
@@ -383,7 +421,23 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({
       <HighlightTooltip
         highlight={tooltipHighlight}
         position={tooltipPosition}
+        chapterId={chapterId} // Truyền chapterId
         onClose={() => {
+          setTooltipHighlight(null);
+          setTooltipPosition(null);
+        }}
+        onRefresh={() => {
+          // Cập nhật lại danh sách highlight ngay lập tức
+          const updated = getHighlights(chapterId);
+          setHighlights(updated);
+        }}
+        // THÊM LOGIC XỬ LÝ EDIT TẠI ĐÂY
+        onEdit={(hl) => {
+          setSelectedText(hl.text);
+          // Đặt vị trí popover ngay tại nơi đang mở tooltip hoặc vị trí của highlight
+          setSelectionPosition(tooltipPosition);
+          setShowHighlightPopover(true);
+          // Đóng tooltip hiện tại
           setTooltipHighlight(null);
           setTooltipPosition(null);
         }}
