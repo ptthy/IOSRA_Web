@@ -87,6 +87,10 @@ export interface ChapterDetails extends Chapter {
   contentPath?: string;
 
   rankName?: "Casual" | "Bronze" | "Gold" | "Diamond" | string;
+  mood?: {
+    code: string;
+    name: string;
+  } | null;
 }
 
 export interface CreateChapterRequest {

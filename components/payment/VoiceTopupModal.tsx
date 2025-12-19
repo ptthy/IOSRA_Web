@@ -159,7 +159,12 @@ export function VoiceTopupModal({ isOpen, onClose }: VoiceTopupModalProps) {
                 </p>
                 <div className="text-xl font-bold text-blue-600 flex items-center gap-2">
                   {balance.toLocaleString()}
-                  <Gem className="h-5 w-5 fill-blue-600" />
+                  <div className="relative">
+                    <Gem className="h-5 w-5 fill-blue-600" />
+                    <span className="absolute -bottom-2 -right-2 text-yellow-500 text-lg font-bold leading-none">
+                      *
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -207,13 +212,23 @@ export function VoiceTopupModal({ isOpen, onClose }: VoiceTopupModalProps) {
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1.5 text-sm font-semibold">
                                 {rule.generationCostDias}
-                                <Gem className="h-4 w-4 text-blue-500 fill-blue-500 opacity-80" />
+                                <div className="relative">
+                                  <Gem className="h-4 w-4 text-blue-500 fill-blue-500 opacity-80" />
+                                  <span className="absolute -bottom-2 -right-2 text-yellow-500 text-lg font-bold leading-none">
+                                    *
+                                  </span>
+                                </div>
                               </div>
                             </TableCell>
                             <TableCell className="text-right pr-6">
                               <div className="flex items-center justify-end gap-1.5 text-sm font-semibold">
                                 {rule.sellingPriceDias}
-                                <Gem className="h-4 w-4 text-blue-500 fill-blue-500 opacity-80" />
+                                <div className="relative">
+                                  <Gem className="h-4 w-4 text-blue-500 fill-blue-500 opacity-80" />
+                                  <span className="absolute -bottom-2 -right-2 text-yellow-500 text-lg font-bold leading-none">
+                                    *
+                                  </span>
+                                </div>
                               </div>
                             </TableCell>
                           </TableRow>

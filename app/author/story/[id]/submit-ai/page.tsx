@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, Sparkles, Info } from "lucide-react";
+import { Loader2, ArrowLeft, Sparkles, Info, BookOpen } from "lucide-react";
 import { storyService } from "@/services/storyService"; // Chỉ import service
 import type { Story } from "@/services/apiTypes"; // Import Story từ apiTypes
 import { Badge } from "@/components/ui/badge";
@@ -133,31 +133,74 @@ export default function SubmitAIPage() {
       </div>
 
       {/* Story Info - Read Only */}
-      <Card className="bg-muted/50">
-        <CardHeader>
-          <CardTitle className="text-lg">Thông tin truyện</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">Tên truyện</p>
-            <p>{story.title}</p>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">Mô tả</p>
-            <p className="text-sm">{story.description}</p>
-          </div>
-          {story.tags && story.tags.length > 0 && (
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">Thể loại</p>
-              <div className="flex gap-2">
-                {story.tags.map((tag) => (
-                  <Badge key={tag.tagId} variant="secondary">
-                    {tag.tagName}
-                  </Badge>
-                ))}
-              </div>
+      <Card className="bg-card border-2 shadow-sm overflow-hidden">
+        {/* CardHeader mới với Icon được thiết kế lại */}
+        <CardHeader className="bg-muted/30 border-b py-5 px-6">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 shadow-sm border border-primary/20">
+              <Info className="h-5 w-5 text-primary" />
             </div>
-          )}
+
+            <div className="flex flex-col">
+              <CardTitle className="text-xl font-bold leading-none text-primary">
+                Thông tin truyện
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1.5 font-medium uppercase tracking-wider">
+                Xem lại nội dung lần cuối trước khi phân tích
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-1">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Tên truyện
+              </p>
+              <p className="font-semibold text-lg text-primary">
+                {story.title}
+              </p>
+            </div>
+
+            {story.tags && story.tags.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Thể loại
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {story.tags.map((tag) => (
+                    <Badge
+                      key={tag.tagId}
+                      variant="outline"
+                      className="bg-primary/5 border-primary/20"
+                    >
+                      {tag.tagName}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-4 border-t border-dashed">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+              Mô tả ngắn
+            </p>
+            <p className="text-sm leading-relaxed text-foreground/90  whitespace-pre-wrap">
+              "{story.description}"
+            </p>
+          </div>
+
+          <div className="pt-4 border-t border-dashed">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+              Dàn ý cốt truyện
+            </p>
+            <div className="bg-muted/30 p-4 rounded-lg border border-border">
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                {story.outline}
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

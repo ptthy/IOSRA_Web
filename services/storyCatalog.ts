@@ -1,23 +1,23 @@
 // services/storyCatalog.ts
 import apiClient from "./apiClient";
-
-export interface Story {
-  storyId: string;
-  title: string;
-  authorId: string;
-  authorUsername: string;
-  coverUrl: string;
-  isPremium: boolean;
-  totalChapters: number;
-  publishedAt: string;
-  shortDescription: string;
-  description: string;
-  lengthPlan: string;
-  tags: Array<{
-    tagId: string;
-    tagName: string;
-  }>;
-}
+import { Story, Tag } from "./apiTypes";
+// export interface Story {
+//   storyId: string;
+//   title: string;
+//   authorId: string;
+//   authorUsername: string;
+//   coverUrl: string;
+//   isPremium: boolean;
+//   totalChapters: number;
+//   publishedAt: string;
+//   shortDescription: string;
+//   description: string;
+//   lengthPlan: string;
+//   tags: Array<{
+//     tagId: string;
+//     tagName: string;
+//   }>;
+// }
 
 export interface PaginatedResponse<T> {
   items: T[];

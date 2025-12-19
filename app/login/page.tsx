@@ -60,30 +60,48 @@ export default function LoginRoute() {
     } catch (err: any) {
       setIsLoading(false);
 
-      if (err.response && err.response.data && err.response.data.error) {
-        const { code, message, details } = err.response.data.error;
+      //   if (err.response && err.response.data && err.response.data.error) {
+      //     const { code, message, details } = err.response.data.error;
 
-        // 1. Ưu tiên xử lý Validation (details) -> Lấy lỗi đầu tiên tìm thấy
-        if (details) {
-          const firstKey = Object.keys(details)[0];
-          if (firstKey && details[firstKey].length > 0) {
-            toast.error(details[firstKey].join(" ")); // VD: "Email không đúng định dạng"
-            return;
-          }
-        }
+      //     // 1. Ưu tiên xử lý Validation (details) -> Lấy lỗi đầu tiên tìm thấy
+      //     if (details) {
+      //       const firstKey = Object.keys(details)[0];
+      //       if (firstKey && details[firstKey].length > 0) {
+      //         toast.error(details[firstKey].join(" ")); // VD: "Email không đúng định dạng"
+      //         return;
+      //       }
+      //     }
 
-        // . Fallback: Hiển thị message từ Backend nếu không rơi vào các case trên
-        if (message) {
-          toast.error(message);
-          return;
-        }
+      //     // . Fallback: Hiển thị message từ Backend nếu không rơi vào các case trên
+      //     if (message) {
+      //       toast.error(message);
+      //       return;
+      //     }
+      //   }
+
+      //   // Case 4: Lỗi không xác định (mạng, server down...)
+      //   const fallbackMsg =
+      //     err.response?.data?.message ||
+      //     "Đăng nhập thất bại. Vui lòng thử lại sau.";
+      //   toast.error(fallbackMsg);
+      //   console.error("Login Error:", err);
+      // }
+      // Lấy message trực tiếp từ cấu trúc server trả về
+      // Ưu tiên: error.message -> message -> Fallback mặc định
+      const serverMsg =
+        err.response?.data?.error?.message ||
+        err.response?.data?.message ||
+        "Đăng nhập thất bại. Vui lòng thử lại.";
+
+      // Nếu có lỗi validation chi tiết (details) thì hiện cái đó, không thì hiện message chung
+      const details = err.response?.data?.error?.details;
+      if (details) {
+        const firstKey = Object.keys(details)[0];
+        toast.error(details[firstKey][0]);
+      } else {
+        //toast.error(serverMsg); // Sẽ hiện "Tài khoản chưa đăng ký..."
       }
 
-      // Case 4: Lỗi không xác định (mạng, server down...)
-      const fallbackMsg =
-        err.response?.data?.message ||
-        "Đăng nhập thất bại. Vui lòng thử lại sau.";
-      toast.error(fallbackMsg);
       console.error("Login Error:", err);
     }
   };
@@ -129,30 +147,54 @@ export default function LoginRoute() {
         setIsLoading(false);
       }
     } catch (err: any) {
-      if (err.response?.status === 404) {
-        try {
-          const currentUser = auth.currentUser;
-          if (currentUser) {
-            const idToken = await currentUser.getIdToken();
-            const googleEmail = currentUser.email;
-            if (idToken && googleEmail) {
-              toast.info("Tài khoản Google mới, vui lòng hoàn tất đăng ký.");
-              router.push(
-                `/google-complete?idToken=${idToken}&email=${googleEmail}`
-              );
-            }
-          }
-        } catch (innerError) {
-          setIsLoading(false);
-        }
-      } else if (err.code === "auth/popup-closed-by-user") {
+      //   if (err.response?.status === 404) {
+      //     try {
+      //       const currentUser = auth.currentUser;
+      //       if (currentUser) {
+      //         const idToken = await currentUser.getIdToken();
+      //         const googleEmail = currentUser.email;
+      //         if (idToken && googleEmail) {
+      //           toast.info("Tài khoản Google mới, vui lòng hoàn tất đăng ký.");
+      //           router.push(
+      //             `/google-complete?idToken=${idToken}&email=${googleEmail}`
+      //           );
+      //         }
+      //       }
+      //     } catch (innerError) {
+      //       setIsLoading(false);
+      //     }
+      //   } else if (err.code === "auth/popup-closed-by-user") {
+      //     toast.info("Bạn đã đóng cửa sổ đăng nhập Google.");
+      //     setIsLoading(false);
+      //   } else {
+      //     const errMsg =
+      //       err.response?.data?.message || err.message || "Đăng nhập thất bại.";
+      //     toast.error(errMsg);
+      //     setIsLoading(false);
+      //   }
+      // }
+      setIsLoading(false);
+
+      // 1. Lấy message lỗi từ server (Bất kể lỗi gì: 404, 409, 500...)
+      const serverMsg =
+        err.response?.data?.error?.message ||
+        err.response?.data?.message ||
+        "Đăng nhập thất bại.";
+
+      // 2. Hiện toast lỗi đó ra luôn
+      toast.error(serverMsg);
+
+      // Nếu là lỗi 409 (Tài khoản chưa đăng ký/Xung đột) -> đá sang trang register
+      if (err.response?.status === 409) {
+        router.push("/register");
+      }
+      // Nếu là lỗi 404 (Không tìm thấy) ->
+      else if (err.response?.status === 404) {
+        router.push("/register");
+      }
+      // Các lỗi khác như đóng popup Google
+      else if (err.code === "auth/popup-closed-by-user") {
         toast.info("Bạn đã đóng cửa sổ đăng nhập Google.");
-        setIsLoading(false);
-      } else {
-        const errMsg =
-          err.response?.data?.message || err.message || "Đăng nhập thất bại.";
-        toast.error(errMsg);
-        setIsLoading(false);
       }
     }
   };

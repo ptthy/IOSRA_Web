@@ -53,30 +53,42 @@ export function NotificationTicker() {
   // --- HÀM HELPER: LẤY TOKEN VÀ TỰ REFRESH NẾU SẮP HẾT HẠN ---
   const getValidAccessToken = async (): Promise<string> => {
     let token = localStorage.getItem("authToken");
-    if (!token) return "";
+    // if (!token) return "";
+    if (!token) throw new Error("No token available"); // Không trả về ""
 
+    //   try {
+    //     const decoded: any = jwtDecode(token);
+    //     const currentTime = Date.now() / 1000;
+
+    //     // Nếu token còn sống dưới 60 giây nữa -> Gọi Refresh ngay lập tức
+    //     if (decoded.exp < currentTime + 60) {
+    //       console.log("🔄 SignalR: Token sắp hết hạn, đang gọi refresh...");
+    //       try {
+    //         // Gọi hàm refresh từ apiClient (nó sẽ tự lưu vào localStorage)
+    //         token = await refreshToken();
+    //         console.log("✅ SignalR: Đã refresh token thành công");
+    //       } catch (refreshErr) {
+    //         console.error("❌ SignalR: Refresh thất bại", refreshErr);
+    //         return ""; // Trả về rỗng để connection fail, kích hoạt retry sau
+    //       }
+    //     }
+    //   } catch (error) {
+    //     console.error("SignalR: Lỗi decode token", error);
+    //   }
+    //   return token || "";
+    // };
     try {
       const decoded: any = jwtDecode(token);
       const currentTime = Date.now() / 1000;
 
-      // Nếu token còn sống dưới 60 giây nữa -> Gọi Refresh ngay lập tức
       if (decoded.exp < currentTime + 60) {
-        console.log("🔄 SignalR: Token sắp hết hạn, đang gọi refresh...");
-        try {
-          // Gọi hàm refresh từ apiClient (nó sẽ tự lưu vào localStorage)
-          token = await refreshToken();
-          console.log("✅ SignalR: Đã refresh token thành công");
-        } catch (refreshErr) {
-          console.error("❌ SignalR: Refresh thất bại", refreshErr);
-          return ""; // Trả về rỗng để connection fail, kích hoạt retry sau
-        }
+        token = await refreshToken(); // Tự động refresh token
       }
+      return token || "";
     } catch (error) {
-      console.error("SignalR: Lỗi decode token", error);
+      throw new Error("Token invalid or expired");
     }
-    return token || "";
   };
-
   // --- 2. KẾT NỐI REALTIME ---
   useEffect(() => {
     if (!isAuthenticated) {
@@ -120,13 +132,33 @@ export function NotificationTicker() {
       }
     );
 
+    // const startConnection = async () => {
+    //   try {
+    //     await newConnection.start();
+    //     console.log(`✅ SignalR Connected (${user?.username})`);
+    //   } catch (err) {
+    //     console.warn("⚠️ SignalR đang đợi server sẵn sàng để kết nối...");
+    //     // console.error("❌ SignalR Connection Error: ", err);
+    //     // Không cần retry thủ công ở đây vì đã có withAutomaticReconnect
+    //   }
+    // };
     const startConnection = async () => {
+      // Tránh tạo nhiều kết nối chồng chéo
+      if (newConnection.state !== "Disconnected") return;
+
       try {
         await newConnection.start();
-        console.log(`✅ SignalR Connected (${user?.username})`);
+        console.log(`✅ SignalR Connected`);
       } catch (err) {
-        console.error("❌ SignalR Connection Error: ", err);
-        // Không cần retry thủ công ở đây vì đã có withAutomaticReconnect
+        // Thay vì console.error, hãy kiểm tra xem có phải lỗi mạng không
+        if (!window.navigator.onLine) {
+          console.warn(
+            "⚠️ Mất kết nối mạng, SignalR sẽ tự kết nối lại khi có mạng."
+          );
+        } else {
+          // Chỉ log warn nhẹ nhàng thay vì báo đỏ cả console
+          console.warn("⚠️ Server chưa sẵn sàng, đang đợi kết nối lại...");
+        }
       }
     };
 

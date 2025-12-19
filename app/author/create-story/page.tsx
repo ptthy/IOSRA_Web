@@ -91,64 +91,176 @@ export default function CreateStoryPage() {
   const [outlineLength, setOutlineLength] = useState(0);
   const [promptLength, setPromptLength] = useState(0);
 
-  const LIMITS = { TITLE: 100, OUTLINE: 3000, PROMPT: 500 };
+  //const LIMITS = { TITLE: 100, OUTLINE: 3000, PROMPT: 500 };
+  // const handleApiError = (error: any, defaultMessage: string) => {
+  //   if (error.response?.data?.error) {
+  //     const { code, message, details } = error.response.data.error;
+  //     // 1. Check lỗi Validation/Logic từ Backend
+  //     // --- A. Xử lý riêng cho AccountRestricted (để format ngày cho đẹp) ---
+  //     if (code === "AccountRestricted") {
+  //       // Backend trả: "Your account is restricted from posting until 2025-12-19T08:25:29..."
+  //       // Ta format lại tiếng Việt cho thân thiện
+  //       const dateMatch = message.match(
+  //         /(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/
+  //       );
+  //       if (dateMatch) {
+  //         const date = new Date(dateMatch[0]);
+  //         const dateStr = date.toLocaleString("vi-VN"); // Ra dạng: 08:25:29 19/12/2025
+  //         toast.error(`Tài khoản bị hạn chế đăng bài đến: ${dateStr}`);
+  //         return;
+  //       }
+  //       // Nếu không parse được ngày thì hiển thị luôn message gốc
+  //       toast.error(message);
+  //       return;
+  //     }
+
+  //     // --- B. Nếu có message từ Backend -> HIỂN THỊ LUÔN ---
+  //     // Đây là chỗ giúp "lỗi gì cũng trả ra được message"
+  //     if (message) {
+  //       toast.error(message);
+  //       return;
+  //     }
+
+  //     // --- C. Nếu là lỗi Validation (có details) ---
+  //     if (details) {
+  //       // --- Bắt riêng lỗi Dàn ý (Outline) để việt hóa ---
+  //       if (details.Outline) {
+  //         toast.error("Dàn ý cốt truyện phải có ít nhất 20 ký tự.");
+  //         return;
+  //       }
+  //       const firstKey = Object.keys(details)[0];
+  //       if (firstKey && details[firstKey].length > 0) {
+  //         toast.error(details[firstKey].join(" "));
+  //         return;
+  //       }
+  //     }
+  //     // 3. Sau đó mới hiển thị message chung (nếu không có details)
+  //     if (message) {
+  //       // Nếu message là "Validation failed." mà không có details thì mới hiện
+  //       // hoặc các lỗi logic khác từ backend
+  //       if (message !== "Validation failed.") {
+  //         toast.error(message);
+  //       } else {
+  //         toast.error("Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.");
+  //       }
+  //       return;
+  //     }
+  //   }
+
+  //   // 2. Các lỗi khác (Mất mạng, Server sập, 401 không có body...)
+  //   const fallbackMsg = error.message || defaultMessage;
+  //   toast.error(fallbackMsg);
+  // };
+  const LIMITS = {
+    TITLE_MIN: 20,
+    TITLE_MAX: 50,
+    DESC_MIN: 6,
+    DESC_MAX: 1000,
+    OUTLINE_MIN: 20,
+    OUTLINE_MAX: 1000,
+    PROMPT: 500,
+  };
+  // const handleApiError = (error: any, defaultMessage: string) => {
+  //   if (error.response?.data?.error) {
+  //     const { code, message, details } = error.response.data.error;
+
+  //     // 1. ƯU TIÊN KIỂM TRA DETAILS TRƯỚC (Bắt các lỗi như Title, Outline ít hơn 20 ký tự)
+  //     if (details) {
+  //       // Duyệt qua tất cả các field bị lỗi (ví dụ: Title, Outline)
+  //       const errorEntries = Object.entries(details);
+
+  //       if (errorEntries.length > 0) {
+  //         errorEntries.forEach(([field, messages]) => {
+  //           if (Array.isArray(messages)) {
+  //             messages.forEach((msg) => {
+  //               // Việt hóa thông báo dựa trên field và nội dung lỗi từ server
+  //               if (
+  //                 field === "Title" &&
+  //                 msg.includes("minimum length of '20'")
+  //               ) {
+  //                 toast.error("Tên truyện phải có ít nhất 20 ký tự.");
+  //               } else if (
+  //                 field === "Outline" &&
+  //                 msg.includes("minimum length of '20'")
+  //               ) {
+  //                 toast.error("Dàn ý cốt truyện phải có ít nhất 20 ký tự.");
+  //               } else {
+  //                 toast.error(msg); // Hiện các thông báo chi tiết khác từ server
+  //               }
+  //             });
+  //           }
+  //         });
+  //         return; // Dừng lại sau khi đã hiện xong các lỗi chi tiết, không chạy xuống phần message chung
+  //       }
+  //     }
+
+  //     // 2. Xử lý AccountRestricted
+  //     if (code === "AccountRestricted") {
+  //       const dateMatch = message.match(
+  //         /(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/
+  //       );
+  //       if (dateMatch) {
+  //         const date = new Date(dateMatch[0]);
+  //         const dateStr = date.toLocaleString("vi-VN");
+  //         toast.error(`Tài khoản bị hạn chế đăng bài đến: ${dateStr}`);
+  //         return;
+  //       }
+  //       toast.error(message);
+  //       return;
+  //     }
+
+  //     // 3. Nếu không có details thì mới hiển thị message chung
+  //     // Bỏ qua nếu message là "Validation failed." vì đã xử lý ở phần details phía trên
+  //     if (message && message !== "Validation failed.") {
+  //       toast.error(message);
+  //       return;
+  //     }
+  //   }
+
+  //   // 4. Fallback cho các lỗi khác (Mạng, Server lỗi...)
+  //   const fallbackMsg = error.message || defaultMessage;
+  //   toast.error(fallbackMsg);
+  // };
+
   const handleApiError = (error: any, defaultMessage: string) => {
-    if (error.response?.data?.error) {
+    // 1. Kiểm tra cấu trúc lỗi từ Backend
+    if (error.response && error.response.data && error.response.data.error) {
       const { code, message, details } = error.response.data.error;
-      // 1. Check lỗi Validation/Logic từ Backend
-      // --- A. Xử lý riêng cho AccountRestricted (để format ngày cho đẹp) ---
+
+      // --- A. GIỮ LẠI: Xử lý AccountRestricted (Format ngày tiếng Việt) ---
       if (code === "AccountRestricted") {
-        // Backend trả: "Your account is restricted from posting until 2025-12-19T08:25:29..."
-        // Ta format lại tiếng Việt cho thân thiện
         const dateMatch = message.match(
           /(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/
         );
         if (dateMatch) {
           const date = new Date(dateMatch[0]);
-          const dateStr = date.toLocaleString("vi-VN"); // Ra dạng: 08:25:29 19/12/2025
+          const dateStr = date.toLocaleString("vi-VN");
           toast.error(`Tài khoản bị hạn chế đăng bài đến: ${dateStr}`);
           return;
         }
-        // Nếu không parse được ngày thì hiển thị luôn message gốc
         toast.error(message);
         return;
       }
 
-      // --- B. Nếu có message từ Backend -> HIỂN THỊ LUÔN ---
-      // Đây là chỗ giúp "lỗi gì cũng trả ra được message"
-      if (message) {
-        toast.error(message);
-        return;
-      }
-
-      // --- C. Nếu là lỗi Validation (có details) ---
+      // --- B. Ưu tiên Validation chi tiết (details) ---
       if (details) {
-        // --- Bắt riêng lỗi Dàn ý (Outline) để việt hóa ---
-        if (details.Outline) {
-          toast.error("Dàn ý cốt truyện phải có ít nhất 20 ký tự.");
-          return;
-        }
         const firstKey = Object.keys(details)[0];
         if (firstKey && details[firstKey].length > 0) {
-          toast.error(details[firstKey].join(" "));
+          const msg = details[firstKey].join(" ");
+          toast.error(msg);
           return;
         }
       }
-      // 3. Sau đó mới hiển thị message chung (nếu không có details)
+
+      // --- C. Message chung từ Backend ---
       if (message) {
-        // Nếu message là "Validation failed." mà không có details thì mới hiện
-        // hoặc các lỗi logic khác từ backend
-        if (message !== "Validation failed.") {
-          toast.error(message);
-        } else {
-          toast.error("Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.");
-        }
+        toast.error(message);
         return;
       }
     }
 
-    // 2. Các lỗi khác (Mất mạng, Server sập, 401 không có body...)
-    const fallbackMsg = error.message || defaultMessage;
+    // 2. Fallback cho các lỗi mạng hoặc server không phản hồi
+    const fallbackMsg = error.response?.data?.message || defaultMessage;
     toast.error(fallbackMsg);
   };
   // -------------------
@@ -328,6 +440,28 @@ export default function CreateStoryPage() {
     // Validation cơ bản
     if (!title.trim()) return toast.error("Vui lòng nhập tên truyện");
     if (!outline.trim()) return toast.error("Vui lòng nhập dàn ý cốt truyện");
+    if (title.length < LIMITS.TITLE_MIN || title.length > LIMITS.TITLE_MAX) {
+      return toast.error(
+        `Tên truyện phải từ ${LIMITS.TITLE_MIN} đến ${LIMITS.TITLE_MAX} ký tự`
+      );
+    }
+    if (
+      outline.length < LIMITS.OUTLINE_MIN ||
+      outline.length > LIMITS.OUTLINE_MAX
+    ) {
+      return toast.error(
+        `Dàn ý phải từ ${LIMITS.OUTLINE_MIN} đến ${LIMITS.OUTLINE_MAX} ký tự`
+      );
+    }
+    if (
+      description &&
+      (description.length < LIMITS.DESC_MIN ||
+        description.length > LIMITS.DESC_MAX)
+    ) {
+      return toast.error(
+        `Mô tả phải từ ${LIMITS.DESC_MIN} đến ${LIMITS.DESC_MAX} ký tự`
+      );
+    }
     if (selectedTagIds.length === 0)
       return toast.error("Vui lòng chọn ít nhất 1 thể loại");
     if (coverMode === "upload" && !coverFile && !createdStoryId)
@@ -457,7 +591,7 @@ export default function CreateStoryPage() {
         <CardContent className="space-y-6">
           {/* Tên truyện */}
           <div className="space-y-2 ">
-            <div className="flex justify-between items-center ">
+            {/* <div className="flex justify-between items-center ">
               <Label className="text-base font-bold">
                 Tên truyện <span className="text-red-500 text-xl">*</span>
               </Label>
@@ -485,11 +619,43 @@ export default function CreateStoryPage() {
                   : "dark:border-[#f0ead6]"
               }
             />
+          </div> */}
+            <div className="flex justify-between items-center">
+              <Label className="text-base font-bold">
+                Tên truyện <span className="text-red-500 text-xl">*</span>
+              </Label>
+              <span
+                className={`text-xs font-medium ${
+                  title.length < LIMITS.TITLE_MIN ||
+                  title.length > LIMITS.TITLE_MAX
+                    ? "text-red-500"
+                    : "text-emerald-600"
+                }`}
+              >
+                {title.length < LIMITS.TITLE_MIN
+                  ? `Tối thiểu ${LIMITS.TITLE_MIN}`
+                  : `${title.length}/${LIMITS.TITLE_MAX}`}
+              </span>
+            </div>
+            <Input
+              placeholder="Nhập tên truyện từ 20-50 ký tự..."
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className={`transition-all ${
+                title.length > 0 &&
+                (title.length < LIMITS.TITLE_MIN ||
+                  title.length > LIMITS.TITLE_MAX)
+                  ? "border-red-500 focus-visible:ring-red-500"
+                  : title.length >= LIMITS.TITLE_MIN
+                  ? "border-emerald-500 focus-visible:ring-emerald-500"
+                  : "dark:border-[#f0ead6]"
+              }`}
+            />
           </div>
 
           {/* Mô tả */}
           <div className="space-y-2">
-            <Label>Mô tả</Label>
+            {/* <Label>Mô tả</Label>
             <Textarea
               placeholder="Giới thiệu nội dung truyện của bạn..."
               value={description}
@@ -497,11 +663,45 @@ export default function CreateStoryPage() {
               rows={5}
               className="dark:border-[#f0ead6]"
             />
+          </div> */}
+            <div className="flex justify-between items-center">
+              <Label className="text-base font-bold">Mô tả</Label>
+              <span
+                className={`text-xs font-medium ${
+                  description.length > 0 &&
+                  (description.length < LIMITS.DESC_MIN ||
+                    description.length > LIMITS.DESC_MAX)
+                    ? "text-red-500"
+                    : description.length >= LIMITS.DESC_MIN
+                    ? "text-emerald-600"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {description.length > 0 && description.length < LIMITS.DESC_MIN
+                  ? `Tối thiểu ${LIMITS.DESC_MIN}`
+                  : `${description.length}/${LIMITS.DESC_MAX}`}
+              </span>
+            </div>
+            <Textarea
+              placeholder="Giới thiệu nội dung truyện (6-1000 ký tự)..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={5}
+              className={`transition-all ${
+                description.length > 0 &&
+                (description.length < LIMITS.DESC_MIN ||
+                  description.length > LIMITS.DESC_MAX)
+                  ? "border-red-500 focus-visible:ring-red-500"
+                  : description.length >= LIMITS.DESC_MIN
+                  ? "border-emerald-500 focus-visible:ring-emerald-500"
+                  : "dark:border-[#f0ead6]"
+              }`}
+            />
           </div>
 
           {/* Dàn ý cốt truyện */}
           <div className="space-y-2">
-            <div className="flex justify-between items-center">
+            {/* <div className="flex justify-between items-center">
               <Label className="text-base font-bold">
                 Dàn ý cốt truyện<span className="text-red-500 text-xl">*</span>
               </Label>
@@ -525,6 +725,39 @@ export default function CreateStoryPage() {
               rows={8}
               maxLength={LIMITS.OUTLINE}
               className="dark:border-[#f0ead6]"
+            />
+          </div> */}
+            <div className="flex justify-between items-center">
+              <Label className="text-base font-bold">
+                Dàn ý cốt truyện <span className="text-red-500 text-xl">*</span>
+              </Label>
+              <span
+                className={`text-xs font-medium ${
+                  outline.length < LIMITS.OUTLINE_MIN ||
+                  outline.length > LIMITS.OUTLINE_MAX
+                    ? "text-red-500"
+                    : "text-emerald-600"
+                }`}
+              >
+                {outline.length < LIMITS.OUTLINE_MIN
+                  ? `Tối thiểu ${LIMITS.OUTLINE_MIN}`
+                  : `${outline.length}/${LIMITS.OUTLINE_MAX}`}
+              </span>
+            </div>
+            <Textarea
+              placeholder="Viết dàn ý chi tiết (20-1000 ký tự)..."
+              value={outline}
+              onChange={(e) => setOutline(e.target.value)}
+              rows={8}
+              className={`transition-all ${
+                outline.length > 0 &&
+                (outline.length < LIMITS.OUTLINE_MIN ||
+                  outline.length > LIMITS.OUTLINE_MAX)
+                  ? "border-red-500 focus-visible:ring-red-500"
+                  : outline.length >= LIMITS.OUTLINE_MIN
+                  ? "border-emerald-500 focus-visible:ring-emerald-500"
+                  : "dark:border-[#f0ead6]"
+              }`}
             />
           </div>
 

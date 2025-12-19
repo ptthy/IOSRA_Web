@@ -29,7 +29,8 @@ import {
   Unlock,
   Gem,
 } from "lucide-react";
-import { storyCatalogApi, Story } from "@/services/storyCatalog";
+import { storyCatalogApi } from "@/services/storyCatalog";
+import { Story } from "@/services/apiTypes";
 import {
   chapterCatalogApi,
   ChapterSummary,
@@ -648,7 +649,7 @@ export default function StoryDetailPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {story.tags?.map((tag) => (
+                  {story.tags?.map((tag: any) => (
                     <Badge
                       key={tag.tagId}
                       variant="secondary"
@@ -672,16 +673,54 @@ export default function StoryDetailPage() {
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <Clock className="h-5 w-5 text-primary" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Xuất bản</p>
-                      <p className="font-semibold">
-                        {new Date(story.publishedAt).toLocaleDateString(
-                          "vi-VN"
-                        )}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground">
+                          Xuất bản
+                        </p>
+                        <p className="font-semibold">
+                          {story.publishedAt
+                            ? new Date(story.publishedAt).toLocaleDateString(
+                                "vi-VN"
+                              )
+                            : "---"}
+                        </p>
+                      </div>
+
+                      {/* Badge Trạng thái nằm ngay bên phải ngày xuất bản */}
+                      <Badge
+                        variant="outline"
+                        className={`
+    ml-3 px-4 py-1 text-[13px] md:text-[14px] font-bold border-none shadow-md flex items-center gap-2.5 transition-all
+    ${
+      story.status === "completed"
+        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+        : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+    }
+  `}
+                      >
+                        {/* Dot Indicator lớn hơn */}
+                        <span className="relative flex h-3 w-3">
+                          {story.status !== "completed" && (
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75"></span>
+                          )}
+                          <span
+                            className={`relative inline-flex rounded-full h-3 w-3 ${
+                              story.status === "completed"
+                                ? "bg-emerald-600"
+                                : "bg-amber-600"
+                            }`}
+                          ></span>
+                        </span>
+
+                        <span className="tracking-wide">
+                          {story.status === "completed"
+                            ? "ĐÃ HOÀN THÀNH"
+                            : "ĐANG CẬP NHẬT"}
+                        </span>
+                      </Badge>
                     </div>
                   </div>
-
                   {/* ... more stats ... */}
                 </div>
                 <div>

@@ -106,7 +106,8 @@ export default function CreateChapterPage() {
   };
   // -------------------
   const LIMITS = {
-    TITLE: 200,
+    TITLE_MIN: 20, // Thêm giới hạn tối thiểu
+    TITLE_MAX: 255,
     CONTENT: 10000,
   };
 
@@ -217,11 +218,19 @@ export default function CreateChapterPage() {
       return;
     }
 
-    if (formData.title.length > LIMITS.TITLE) {
-      toast.error(`Tiêu đề không được vượt quá ${LIMITS.TITLE} ký tự`);
+    // if (formData.title.length > LIMITS.TITLE) {
+    //   toast.error(`Tiêu đề không được vượt quá ${LIMITS.TITLE} ký tự`);
+    //   return;
+    // }
+    if (formData.title.trim().length < LIMITS.TITLE_MIN) {
+      toast.error(`Tiêu đề chương phải có ít nhất ${LIMITS.TITLE_MIN} ký tự`);
       return;
     }
 
+    if (formData.title.length > LIMITS.TITLE_MAX) {
+      toast.error(`Tiêu đề không được vượt quá ${LIMITS.TITLE_MAX} ký tự`);
+      return;
+    }
     if (!formData.content.trim()) {
       toast.error("Vui lòng nhập nội dung chương");
       return;
@@ -262,9 +271,13 @@ export default function CreateChapterPage() {
   };
 
   const isFormValid =
-    formData.title.trim() &&
+    // formData.title.trim() &&
+    // formData.content.trim() &&
+    // formData.title.length <= LIMITS.TITLE &&
+    // formData.content.length <= LIMITS.CONTENT;
+    formData.title.trim().length >= LIMITS.TITLE_MIN && //
     formData.content.trim() &&
-    formData.title.length <= LIMITS.TITLE &&
+    formData.title.length <= LIMITS.TITLE_MAX && //
     formData.content.length <= LIMITS.CONTENT;
 
   return (
@@ -296,7 +309,7 @@ export default function CreateChapterPage() {
             <CardContent className="space-y-4">
               {/* Title với bộ đếm */}
               <div className="space-y-2">
-                <div className="flex justify-between items-center">
+                {/* <div className="flex justify-between items-center">
                   <Label htmlFor="title">Tiêu đề chương *</Label>
                   <span
                     className={`text-xs ${
@@ -328,6 +341,50 @@ export default function CreateChapterPage() {
                     Tiêu đề không được vượt quá {LIMITS.TITLE} ký tự
                   </p>
                 )}
+              </div> */}
+                <div className="flex justify-between items-center">
+                  <Label htmlFor="title">Tiêu đề chương *</Label>
+                  <span
+                    className={`text-xs ${
+                      characterCounts.title > 0 &&
+                      (characterCounts.title < LIMITS.TITLE_MIN ||
+                        characterCounts.title > LIMITS.TITLE_MAX)
+                        ? "text-red-500"
+                        : characterCounts.title >= LIMITS.TITLE_MIN
+                        ? "text-emerald-600"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {characterCounts.title < LIMITS.TITLE_MIN
+                      ? `Tối thiểu ${LIMITS.TITLE_MIN}`
+                      : `${characterCounts.title}/${LIMITS.TITLE_MAX}`}
+                  </span>
+                </div>
+                <Input
+                  id="title"
+                  name="title"
+                  value={formData.title}
+                  onChange={handleInputChange}
+                  placeholder="Ví dụ: Chương 1: Cuộc hành trình bắt đầu (tối thiểu 20 ký tự)"
+                  required
+                  disabled={isSubmitting}
+                  className={`border-2 transition-all ${
+                    characterCounts.title > 0 &&
+                    (characterCounts.title < LIMITS.TITLE_MIN ||
+                      characterCounts.title > LIMITS.TITLE_MAX)
+                      ? "border-red-500 focus-visible:border-red-500"
+                      : characterCounts.title >= LIMITS.TITLE_MIN
+                      ? "border-emerald-500 focus-visible:border-emerald-500"
+                      : "border-primary/30 focus-visible:border-primary"
+                  }`}
+                  maxLength={LIMITS.TITLE_MAX}
+                />
+                {characterCounts.title > 0 &&
+                  characterCounts.title < LIMITS.TITLE_MIN && (
+                    <p className="text-xs text-red-500">
+                      Tiêu đề phải có ít nhất {LIMITS.TITLE_MIN} ký tự.
+                    </p>
+                  )}
               </div>
 
               {/* Language */}

@@ -30,7 +30,7 @@ import type {
   Story,
   PaginatedResponse,
   AdvanceFilterParams,
-} from "@/services/storyCatalog";
+} from "@/services/apiTypes";
 
 export default function SearchPage() {
   const router = useRouter();
