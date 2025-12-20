@@ -13,7 +13,7 @@ function PaymentCancelContent() {
   const [mounted, setMounted] = useState(false);
   const hasCalledApi = useRef(false);
 
-  // Lấy ID từ URL (PayOS thường dùng tham số 'id')
+  // Lấy cả 2 mã từ URL
   const paymentId = searchParams.get("id");
   const orderCode = searchParams.get("orderCode");
 
@@ -22,54 +22,37 @@ function PaymentCancelContent() {
   }, []);
 
   useEffect(() => {
-    // Chỉ chạy khi đã mount thành công ở Client để tránh lỗi #418
-    if (mounted && (paymentId || orderCode) && !hasCalledApi.current) {
-      const finalId = paymentId || orderCode;
+    // THAY ĐỔI QUAN TRỌNG: Ưu tiên dùng orderCode (dãy số) thay vì id (chuỗi hex)
+    // vì Backend thường dùng orderCode để quản lý giao dịch nạp tiền.
+    const finalId = orderCode || paymentId;
+
+    if (mounted && finalId && !hasCalledApi.current) {
       hasCalledApi.current = true;
-
-      console.log("🚀 Đang thực hiện báo hủy đơn hàng:", finalId);
-
-      // Kiểm tra Token trước khi gọi
-      const token = localStorage.getItem("authToken");
-      if (!token) {
-        console.warn(
-          "⚠️ Không tìm thấy Token. Vui lòng đăng nhập trên trang này để báo hủy thành công."
-        );
-        return;
-      }
+      console.log("🚀 Đang gửi lệnh hủy với mã đơn:", finalId);
 
       paymentService
         .cancelPaymentLink({
-          transactionId: finalId as string,
-          cancellationReason: "User cancelled on payment page",
+          transactionId: finalId, // Gửi dãy số 1766... lên đây
+          cancellationReason: "User cancelled from payment gateway",
         })
         .then((res) => {
-          console.log("✅ Backend đã chuyển trạng thái sang CANCELLED:", res);
-          toast.success("Đã hủy đơn hàng thành công");
+          console.log("✅ Backend báo OK:", res);
           localStorage.removeItem("pendingTransactionId");
         })
         .catch((err) => {
-          console.error(
-            "❌ Lỗi API cancel-link:",
-            err.response?.data || err.message
-          );
-          // Cho phép thử lại nếu lỗi mạng
-          hasCalledApi.current = false;
+          console.error("❌ Lỗi API:", err.response?.data || err.message);
+          // Nếu vẫn lỗi 400, hãy thử đổi ngược lại dùng paymentId
         });
     }
   }, [mounted, paymentId, orderCode]);
 
-  // Render loading để tránh Hydration Mismatch #418
-  if (!mounted) {
+  // Phần render giữ nguyên
+  if (!mounted)
     return (
-      <div className="h-screen flex items-center justify-center bg-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
-          <p className="text-gray-500">Đang xác nhận hủy giao dịch...</p>
-        </div>
+      <div className="h-screen flex items-center justify-center">
+        Đang khởi tạo...
       </div>
     );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-red-50 via-white to-rose-50">
