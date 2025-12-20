@@ -151,8 +151,11 @@ export default function SubmitAIPage() {
             </div>
           </div>
         </CardHeader>
+
         <CardContent className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Thay đổi grid-cols từ 2 thành 3 trên màn hình desktop */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Cột 1: Tên truyện */}
             <div className="space-y-1">
               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Tên truyện
@@ -162,6 +165,7 @@ export default function SubmitAIPage() {
               </p>
             </div>
 
+            {/* Cột 2: Thể loại */}
             {story.tags && story.tags.length > 0 && (
               <div className="space-y-1">
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -180,6 +184,28 @@ export default function SubmitAIPage() {
                 </div>
               </div>
             )}
+
+            {/* Cột 3: Ngôn ngữ & Mã Code */}
+            <div className="space-y-1">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Ngôn ngữ
+              </p>
+              <div className="flex items-center gap-2 pt-1">
+                <Badge variant="secondary" className="font-medium">
+                  {story.languageCode === "vi-VN" && "Tiếng Việt"}
+                  {story.languageCode === "en-US" && "English"}
+                  {story.languageCode === "zh-CN" && "中文 (Chinese)"}
+                  {story.languageCode === "ja-JP" && "日本語 (Japanese)"}
+                  {/* Fallback nếu không khớp các mã trên */}
+                  {!["vi-VN", "en-US", "zh-CN", "ja-JP"].includes(
+                    story.languageCode
+                  ) && story.languageCode}
+                </Badge>
+                <span className="text-xs text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">
+                  {story.languageCode}
+                </span>
+              </div>
+            </div>
           </div>
 
           <div className="pt-4 border-t border-dashed">
