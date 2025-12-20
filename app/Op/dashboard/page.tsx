@@ -31,7 +31,6 @@ import {
   Star,
   Wallet,
   Calendar,
-  Gem,
   Download, // Import icon Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button"; // Import Button
@@ -44,7 +43,7 @@ import {
 
 export default function DashboardAnalytics() {
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState("month");
+  const [period, setPeriod] = useState("day");
   
   // State để disable nút khi đang tải file
   const [isExporting, setIsExporting] = useState(false);
@@ -202,12 +201,11 @@ export default function DashboardAnalytics() {
           </div>
         </div>
 
-        {/* ... (Phần Card và Chart giữ nguyên như cũ) ... */}
-        
         {/* 1. Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-           {/* Copy lại nội dung Card từ code cũ của bạn vào đây */}
-             <Card className="shadow-sm border-l-4 border-l-green-500">
+           
+           {/* Card 1: Doanh thu */}
+           <Card className="shadow-sm border-l-4 border-l-green-500">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Doanh thu</CardTitle>
               <div className="p-2 bg-green-100 rounded-full text-green-600">
@@ -217,7 +215,8 @@ export default function DashboardAnalytics() {
             <CardContent>
               <div className="text-2xl font-bold flex items-center gap-1">
                 {loading ? "..." : stats.currentRevenue.toLocaleString()} 
-                <Gem className="h-5 w-5 text-blue-500 fill-blue-500" />
+                {/* Đã đổi Gem thành VNĐ */}
+                <span className="text-lg font-medium text-muted-foreground">VNĐ</span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Tổng thu nhập {getRevenueLabel()}
