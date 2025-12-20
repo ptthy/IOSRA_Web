@@ -63,7 +63,13 @@ import { chapterPurchaseApi } from "@/services/chapterPurchaseService";
 import { toast } from "sonner";
 import { TopUpModal } from "@/components/payment/TopUpModal";
 const AUDIO_BASE_URL = "https://pub-15618311c0ec468282718f80c66bcc13.r2.dev/";
-
+const languageNames: Record<string, string> = {
+  "vi-VN": "Tiếng Việt",
+  "ja-JP": "日本語 (Tiếng Nhật)",
+  "en-US": "English (Tiếng Anh)",
+  "zh-CN": "中文 (Tiếng Trung)",
+  
+};
 interface ReaderToolbarProps {
   chapterNo: number;
   chapterTitle: string;
@@ -81,6 +87,7 @@ interface ReaderToolbarProps {
   mood?: { code: string; name: string };
   moodMusicPaths?: string[];
   hasActiveSubscription?: boolean;
+  languageCode?: string;
 }
 
 export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
@@ -100,6 +107,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
   mood,
   moodMusicPaths = [],
   hasActiveSubscription = false,
+  languageCode,
 }) => {
   const [openChapterList, setOpenChapterList] = useState(false);
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(

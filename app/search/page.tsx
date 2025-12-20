@@ -31,7 +31,7 @@ import type {
   PaginatedResponse,
   AdvanceFilterParams,
 } from "@/services/apiTypes";
-
+import { StorySummary } from "@/lib/types";
 export default function SearchPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -40,6 +40,7 @@ export default function SearchPage() {
   const [sortDir, setSortDir] = useState<string | null>(null);
   const [isPremium, setIsPremium] = useState<string>("all");
   const [minAvgRating, setMinAvgRating] = useState<string>("0");
+  const [languageCode, setLanguageCode] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<PaginatedResponse<Story> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -100,7 +101,15 @@ export default function SearchPage() {
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [query, selectedTag, sortBy, sortDir, isPremium, minAvgRating]);
+  }, [
+    query,
+    selectedTag,
+    sortBy,
+    sortDir,
+    isPremium,
+    minAvgRating,
+    languageCode,
+  ]);
 
   useEffect(() => {
     loadStories();
@@ -116,6 +125,7 @@ export default function SearchPage() {
         PageSize: 20,
         Query: query || undefined,
         TagId: selectedTag !== "all" ? selectedTag : undefined,
+        LanguageCode: languageCode !== "all" ? languageCode : undefined,
         SortBy: sortBy as
           | "Newest"
           | "WeeklyViews"
@@ -194,6 +204,7 @@ export default function SearchPage() {
     setSortDir(null);
     setIsPremium("all");
     setMinAvgRating("0");
+    setLanguageCode("all");
     setPage(1);
   };
 
@@ -257,15 +268,47 @@ export default function SearchPage() {
         return `${minAvgRating}★ trở lên`;
     }
   };
-
+  const getLanguageDisplayName = () => {
+    switch (languageCode) {
+      case "vi-VN":
+        return "Tiếng Việt";
+      case "en-US":
+        return "Tiếng Anh";
+      case "ja-JP":
+        return "Tiếng Nhật";
+      case "zh-CN":
+        return "Tiếng Trung";
+      default:
+        return languageCode;
+    }
+  };
   const hasActiveFilters =
     query ||
     selectedTag !== "all" ||
+    languageCode !== "all" ||
     sortBy !== "Newest" ||
     sortDir !== null ||
     isPremium !== "all" ||
     minAvgRating !== "0";
-
+  const convertToStorySummary = (story: any): StorySummary => {
+    return {
+      storyId: story.storyId || "",
+      title: story.title || "",
+      coverUrl: story.coverUrl || "",
+      shortDescription: story.shortDescription || story.description || "",
+      authorUsername: story.authorUsername || "Tác giả",
+      authorId: story.authorId,
+      totalChapters: story.totalChapters || 0,
+      isPremium: !!story.isPremium,
+      languageCode: story.languageCode || "vi-VN",
+      tags: Array.isArray(story.tags)
+        ? story.tags.map((t: any) => ({
+            tagId: t.tagId || "",
+            tagName: t.tagName || t.name || "",
+          }))
+        : [],
+    };
+  };
   const totalPages = data ? Math.ceil(data.total / data.pageSize) : 1;
 
   return (
@@ -367,6 +410,18 @@ export default function SearchPage() {
                 <SelectItem value="false">Miễn phí</SelectItem>
               </SelectContent>
             </Select> */}
+            <Select value={languageCode} onValueChange={setLanguageCode}>
+              <SelectTrigger className="w-[150px] bg-background/50">
+                <SelectValue placeholder="Ngôn ngữ" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Mọi ngôn ngữ</SelectItem>
+                <SelectItem value="vi-VN">Tiếng Việt</SelectItem>
+                <SelectItem value="en-US">Tiếng Anh</SelectItem>
+                <SelectItem value="ja-JP">Tiếng Nhật</SelectItem>
+                <SelectItem value="zh-CN">Tiếng Trung</SelectItem>
+              </SelectContent>
+            </Select>
 
             {/* Rating Filter - ĐÃ XÓA NÚT X */}
             <Select value={minAvgRating} onValueChange={setMinAvgRating}>
@@ -485,6 +540,20 @@ export default function SearchPage() {
                   </button>
                 </Badge>
               )}
+              {languageCode !== "all" && (
+                <Badge variant="secondary" className="gap-1 pl-2 pr-1 py-1">
+                  {getLanguageDisplayName()}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLanguageCode("all");
+                    }}
+                    className="hover:text-destructive"
+                  >
+                    <X className="h-3 w-3 cursor-pointer" />
+                  </button>
+                </Badge>
+              )}
 
               {/* Xóa tất cả */}
               <Button
@@ -544,7 +613,8 @@ export default function SearchPage() {
                 {data.items.map((story) => (
                   <StoryCard
                     key={story.storyId}
-                    story={story}
+                    //story={story}
+                    story={convertToStorySummary(story)}
                     onClick={() => handleStoryClick(story.storyId)}
                   />
                 ))}

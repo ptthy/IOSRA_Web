@@ -60,6 +60,7 @@ export const publicProfileService = {
       MinAvgRating?: number;
       SortBy?: "Newest" | "WeeklyViews" | "TopRated" | "MostChapters";
       SortDir?: "Asc" | "Desc";
+      LanguageCode?: string; // <--- THÊM
     }
   ) => {
     const queryParams = new URLSearchParams();
