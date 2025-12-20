@@ -2,14 +2,14 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "./ui/badge";
-//import { StorySummary } from "../lib/types";
-import { Story } from "@/services/apiTypes";
+import { StorySummary } from "../lib/types";
+//import { Story } from "@/services/apiTypes";
 import { ImageWithFallback } from "./ui/ImageWithFallback";
 import { Lock, User, BookOpen } from "lucide-react";
 
 interface StoryCardProps {
-  // story: StorySummary;
-  story: Story;
+  story: StorySummary;
+  //story: Story;
   onClick: () => void;
 }
 

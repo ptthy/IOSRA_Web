@@ -114,6 +114,7 @@ export default function PublicProfilePage() {
   const [sortBy, setSortBy] = useState<string>("Newest");
   const [sortDir, setSortDir] = useState<string | null>(null);
   const [isPremium, setIsPremium] = useState<string>("all");
+  const [languageCode, setLanguageCode] = useState<string>("all"); // <--- THÊM
   const [minAvgRating, setMinAvgRating] = useState<string>("0");
 
   // Tag options
@@ -248,6 +249,7 @@ export default function PublicProfilePage() {
           PageSize: PAGE_SIZE, // <--- SỬA: Dùng pageSize
           Query: query || undefined,
           TagId: selectedTag !== "all" ? selectedTag : undefined,
+          LanguageCode: languageCode !== "all" ? languageCode : undefined, // <--- THÊM
           SortBy: sortBy as
             | "Newest"
             | "WeeklyViews"
@@ -302,7 +304,15 @@ export default function PublicProfilePage() {
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [query, selectedTag, sortBy, sortDir, isPremium, minAvgRating]);
+  }, [
+    query,
+    selectedTag,
+    sortBy,
+    sortDir,
+    isPremium,
+    minAvgRating,
+    languageCode,
+  ]);
 
   // Refresh followers khi activeTab thay đổi
   useEffect(() => {
@@ -665,6 +675,7 @@ export default function PublicProfilePage() {
   const handleClearFilters = () => {
     setQuery("");
     setSelectedTag("all");
+    setLanguageCode("all"); // <--- THÊM
     setSortBy("Newest");
     setSortDir(null);
     setIsPremium("all");
@@ -741,17 +752,23 @@ export default function PublicProfilePage() {
     minAvgRating !== "0";
 
   // Convert Story to StorySummary for StoryCard component
-  const convertToStorySummary = (story: Story): StorySummary => {
+  const convertToStorySummary = (story: any): StorySummary => {
     return {
-      storyId: story.storyId,
-      title: story.title,
+      storyId: story.storyId || "",
+      title: story.title || "Không tiêu đề",
       coverUrl: story.coverUrl || "",
-      shortDescription: story.shortDescription || "",
-      authorUsername: story.authorUsername || "Unknown",
+      shortDescription: story.shortDescription || story.description || "",
+      authorUsername: story.authorUsername || "Tác giả",
       authorId: story.authorId,
       totalChapters: story.totalChapters || 0,
-      isPremium: story.isPremium || false,
-      tags: story.tags || [],
+      isPremium: !!story.isPremium,
+      languageCode: story.languageCode || "vi-VN", // Đảm bảo luôn có string
+      tags: Array.isArray(story.tags)
+        ? story.tags.map((t: any) => ({
+            tagId: t.tagId || "",
+            tagName: t.tagName || t.name || "",
+          }))
+        : [],
     };
   };
 
@@ -1137,7 +1154,7 @@ export default function PublicProfilePage() {
                       </Select>
 
                       {/* Premium Filter */}
-                      <Select value={isPremium} onValueChange={setIsPremium}>
+                      {/* <Select value={isPremium} onValueChange={setIsPremium}>
                         <SelectTrigger className="w-[120px] bg-background">
                           <SelectValue placeholder="Trạng thái" />
                         </SelectTrigger>
@@ -1145,6 +1162,21 @@ export default function PublicProfilePage() {
                           <SelectItem value="all">Tất cả</SelectItem>
                           <SelectItem value="true">Premium</SelectItem>
                           <SelectItem value="false">Miễn phí</SelectItem>
+                        </SelectContent>
+                      </Select> */}
+                      <Select
+                        value={languageCode}
+                        onValueChange={setLanguageCode}
+                      >
+                        <SelectTrigger className="w-[150px] bg-background">
+                          <SelectValue placeholder="Ngôn ngữ" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Mọi ngôn ngữ</SelectItem>
+                          <SelectItem value="vi-VN">Tiếng Việt</SelectItem>
+                          <SelectItem value="en-US">Tiếng Anh</SelectItem>
+                          <SelectItem value="ja-JP">Tiếng Nhật</SelectItem>
+                          <SelectItem value="zh-CN">Tiếng Trung</SelectItem>
                         </SelectContent>
                       </Select>
 

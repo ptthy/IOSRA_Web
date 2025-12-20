@@ -40,6 +40,7 @@ export interface AdvanceFilterParams {
   Query?: string; // SỬA: Viết hoa Query
   TagId?: string; // SỬA: Viết hoa TagId
   AuthorId?: string; // SỬA: Viết hoa AuthorId
+  LanguageCode?: string;
   IsPremium?: boolean;
   MinAvgRating?: number;
   SortBy?: "Newest" | "WeeklyViews" | "TopRated" | "MostChapters";
@@ -81,7 +82,8 @@ export const storyCatalogApi = {
       formattedParams.MinAvgRating = params.MinAvgRating;
     if (params.SortBy) formattedParams.SortBy = params.SortBy;
     if (params.SortDir) formattedParams.SortDir = params.SortDir;
-
+    // bổ sung ánh xạ:
+    if (params.LanguageCode) formattedParams.LanguageCode = params.LanguageCode;
     console.log("🎯 Advance filter formatted params:", formattedParams);
 
     return apiClient

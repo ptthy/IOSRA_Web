@@ -516,6 +516,7 @@ export default function ReaderPage() {
         setShowTopUpModal={setShowTopUpModal}
         mood={chapter.mood}
         moodMusicPaths={chapter.moodMusicPaths}
+        languageCode={chapter.languageCode}
         hasActiveSubscription={hasActiveSubscription}
       >
         {!shouldShowLockedOverlay() && (
@@ -524,6 +525,7 @@ export default function ReaderPage() {
             originalContentUrl={originalContentUrl}
             onContentChange={setContent}
             setShowTopUpModal={setShowTopUpModal}
+            languageCode={chapter.languageCode}
           />
         )}
       </ReaderToolbar>

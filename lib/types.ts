@@ -9,6 +9,7 @@ export interface StorySummary {
   totalChapters: number;
   isPremium: boolean;
   tags: Tag[];
+  languageCode: string;
 }
 
 export interface Tag {

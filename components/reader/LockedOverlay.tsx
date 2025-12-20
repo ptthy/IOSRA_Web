@@ -76,8 +76,14 @@ export const LockedOverlay: React.FC<LockedOverlayProps> = ({
 
       setShowConfirm(false); // Đóng modal
       toast.success("Mở khóa thành công!", {
-        description: `Số dư còn lại: ${result.walletBalanceAfter} Dias`,
+        description: (
+          <span className="flex items-center gap-1">
+            Số dư còn lại: {result.walletBalanceAfter.toLocaleString()}
+            <Gem className="h-3 w-3 fill-blue-500 text-blue-600" />
+          </span>
+        ),
       });
+
       onUnlockSuccess();
     } catch (error: any) {
       // Logic xử lý lỗi cũ của bạn
