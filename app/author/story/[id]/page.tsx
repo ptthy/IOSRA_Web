@@ -25,6 +25,15 @@ import {
   Lightbulb,
   AlertTriangle,
   EyeOff,
+  ShieldAlert,
+  AlertCircle,
+  Fingerprint,
+  Languages,
+  FileWarning,
+  SearchCode,
+  PenTool,
+  Link,
+  Skull,
 } from "lucide-react";
 import { storyService } from "@/services/storyService";
 import { chapterService } from "@/services/chapterService";
@@ -32,19 +41,82 @@ import type { Story, Chapter } from "@/services/apiTypes";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ImageWithFallback } from "@/components/ui/ImageWithFallback";
 import { toast } from "sonner";
+import { AiModerationReport } from "@/components/AiModerationReport";
 const extractVietnameseFeedback = (
   feedback: string | null | undefined
 ): string | null => {
   if (!feedback) return null;
 
-  const vietnameseIndex = feedback.indexOf("Tiếng Việt:");
-  if (vietnameseIndex !== -1) {
-    return feedback.substring(vietnameseIndex + "Tiếng Việt:".length).trim();
+  // Sử dụng Regex để tìm cụm "Tiếng Việt:" hoặc "Tiếng việt:" (không phân biệt hoa thường)
+  const regex = /Tiếng\s+việt\s*:/i;
+  const match = feedback.match(regex);
+
+  if (match && match.index !== undefined) {
+    // Lấy toàn bộ nội dung sau cụm từ khớp
+    return feedback.substring(match.index + match[0].length).trim();
   }
 
-  return feedback;
+  // Nếu không tìm thấy nhãn "Tiếng Việt", kiểm tra xem có đoạn văn tiếng Nhật/Anh không.
+  // Nếu feedback quá dài và chứa cả 2 ngôn ngữ mà không có nhãn,
+  // ta ưu tiên trả về chính nó nhưng đây là phương án dự phòng.
+  return feedback.trim();
 };
-
+const getViolationStyle = (label: string) => {
+  const styles: Record<string, { labelVn: string; icon: any; color: string }> =
+    {
+      wrong_language: {
+        labelVn: "Ngôn ngữ không hợp lệ",
+        icon: Languages,
+        color: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20",
+      },
+      sexual_explicit: {
+        labelVn: "Nội dung nhạy cảm/NSFW",
+        icon: AlertTriangle,
+        color: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20",
+      },
+      violent_gore: {
+        labelVn: "Bạo lực & Máu me",
+        icon: Skull,
+        color: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20",
+      },
+      spam_repetition: {
+        labelVn: "Spam & Lặp từ ngữ",
+        icon: Fingerprint,
+        color:
+          "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20",
+      },
+      url_redirect: {
+        labelVn: "Liên kết ngoài/Quảng cáo",
+        icon: Link,
+        color:
+          "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/20",
+      },
+      grammar_spelling: {
+        labelVn: "Lỗi trình bày/Chính tả",
+        icon: PenTool,
+        color: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20",
+      },
+      weak_prose: {
+        labelVn: "Văn phong cần cải thiện",
+        icon: BookOpen,
+        color:
+          "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-950/20",
+      },
+      inconsistent_content: {
+        labelVn: "Nội dung không đồng nhất",
+        icon: FileWarning,
+        color:
+          "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/20",
+      },
+    };
+  return (
+    styles[label] || {
+      labelVn: "Vi phạm khác",
+      icon: ShieldAlert,
+      color: "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40",
+    }
+  );
+};
 export default function StoryDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -257,15 +329,20 @@ export default function StoryDetailPage() {
           </Alert>
         );
       case "rejected":
-        const feedbackText = story.aiFeedback
-          ? extractVietnameseFeedback(story.aiFeedback)
-          : "Không đạt yêu cầu của hệ thống AI";
+        // Gọi hàm extract đã cập nhật ở trên
+        const rawFeedback = extractVietnameseFeedback(story.aiFeedback);
+
+        // Logic hiển thị: Nếu có feedback thì hiện, không thì hiện thông báo mặc định
+        const feedbackDisplay =
+          rawFeedback ||
+          "Nội dung không đạt yêu cầu kiểm duyệt của hệ thống AI.";
 
         return (
           <Alert className="mb-6 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800">
             <AlertTriangle className="h-4 w-4 text-red-600" />
-            <AlertDescription>
-              <strong>Truyện đã bị từ chối:</strong> {feedbackText}
+            <AlertDescription className="leading-relaxed">
+              <strong className="block mb-1">Truyện đã bị từ chối:</strong>
+              <span className="text-sm">{feedbackDisplay}</span>
             </AlertDescription>
           </Alert>
         );
@@ -523,7 +600,7 @@ export default function StoryDetailPage() {
               )}
 
               {/* AI Feedback */}
-              {story.aiFeedback && (
+              {/* {story.aiFeedback && (
                 <div className="pt-2">
                   <p className="text-xs text-muted-foreground mb-1 font-bold">
                     Phản hồi AI:
@@ -535,7 +612,13 @@ export default function StoryDetailPage() {
                     </AlertDescription>
                   </Alert>
                 </div>
-              )}
+              )} */}
+              {/* Section: Kết quả kiểm duyệt AI chi tiết */}
+              <AiModerationReport
+                aiFeedback={story.aiFeedback}
+                aiViolations={story.aiViolations}
+                contentType="truyện"
+              />
 
               {/* Dàn ý chi tiết – rút gọn + nút xem đầy đủ */}
               {story.outline && (

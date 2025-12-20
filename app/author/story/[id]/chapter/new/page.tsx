@@ -107,7 +107,7 @@ export default function CreateChapterPage() {
   // -------------------
   const LIMITS = {
     TITLE_MIN: 20, // Thêm giới hạn tối thiểu
-    TITLE_MAX: 255,
+    TITLE_MAX: 50,
     CONTENT: 10000,
   };
 

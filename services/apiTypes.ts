@@ -1,5 +1,9 @@
 // services/apiTypes.ts
-
+export interface AiViolation {
+  label: string;
+  evidence: string[]; // Khớp với mảng evidence từ OpenAiService.cs
+  penalty?: number;
+}
 export interface Story {
   storyId: string;
   title: string;
@@ -33,6 +37,8 @@ export interface Story {
   createdAt: string;
   updatedAt: string;
   languageCode: "vi-VN" | "en-US" | "zh-CN" | "ja-JP";
+  languageName?: string;
+  aiViolations?: AiViolation[] | null;
 }
 
 export interface CreateStoryRequest {
@@ -93,6 +99,7 @@ export interface ChapterDetails extends Chapter {
     code: string;
     name: string;
   } | null;
+  aiViolations?: AiViolation[] | null;
 }
 
 export interface CreateChapterRequest {

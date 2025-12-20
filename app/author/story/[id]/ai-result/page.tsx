@@ -22,6 +22,7 @@ import {
 import { storyService } from "@/services/storyService";
 import type { Story } from "@/services/apiTypes";
 import { toast } from "sonner";
+import { AiModerationReport } from "@/components/AiModerationReport";
 // --- HELPER FUNCTION ---
 const extractVietnameseFeedback = (
   feedback: string | null | undefined
@@ -342,6 +343,15 @@ export default function AIResultPage() {
           </CardContent>
         </Card>
       )}
+      {/* Hiển thị chi tiết vi phạm nếu có */}
+      <div className="mt-8">
+        <AiModerationReport
+          aiFeedback={null} // Truyền null vì feedback tổng quát đã hiện ở trên
+          aiViolations={story.aiViolations}
+          contentType="truyện"
+        />
+      </div>
+      {/* ------------------- */}
     </div>
   );
 }
