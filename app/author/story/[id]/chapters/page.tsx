@@ -338,32 +338,57 @@ export default function ManageChaptersPage() {
         <div className="w-full h-[1px]  bg-[#00416a] dark:bg-[#f0ead6] mt-0" />
 
         {/* Nội dung Card */}
-        <CardContent className="space-y-4 pt-0">
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Cột trái */}
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Tên truyện</p>
-                <p className="font-medium">{story.title}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Thể loại</p>
-                <div className="flex flex-wrap gap-2">
-                  {story.tags?.map((tag) => (
-                    <Badge
-                      key={tag.tagId}
-                      variant="secondary"
-                      className="px-2 py-1 font-normal"
-                    >
-                      {tag.tagName}
-                    </Badge>
-                  ))}
-                </div>
+        <CardContent className="space-y-4 pt-4">
+          {" "}
+          {/* Tăng pt-4 để cân đối hơn */}
+          <div className="grid md:grid-cols-3 gap-6">
+            {" "}
+            {/* Đổi md:grid-cols-2 thành 3 */}
+            {/* Cột 1: Tên truyện */}
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Tên truyện</p>
+              <p className="font-semibold text-lg text-primary">
+                {story.title}
+              </p>
+            </div>
+            {/* Cột 2: Thể loại  */}
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Thể loại</p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {story.tags?.map((tag) => (
+                  <Badge
+                    key={tag.tagId}
+                    variant="secondary"
+                    className="px-2 py-1 font-normal"
+                  >
+                    {tag.tagName}
+                  </Badge>
+                ))}
               </div>
             </div>
-
-            {/* Cột phải (Mô tả) */}
-            <div className="md:col-span-2">
+            {/* Cột 3: Ngôn ngữ & Mã Code */}
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Ngôn ngữ</p>
+              <div className="flex items-center gap-2 pt-1">
+                <Badge
+                  variant="outline"
+                  className="font-medium bg-primary/5 border-primary/20"
+                >
+                  {story.languageCode === "vi-VN" && "Tiếng Việt"}
+                  {story.languageCode === "en-US" && "English"}
+                  {story.languageCode === "zh-CN" && "中文 (Chinese)"}
+                  {story.languageCode === "ja-JP" && "日本語 (Japanese)"}
+                  {!["vi-VN", "en-US", "zh-CN", "ja-JP"].includes(
+                    story.languageCode
+                  ) && story.languageCode}
+                </Badge>
+                <span className="text-xs text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">
+                  {story.languageCode}
+                </span>
+              </div>
+            </div>
+            {/* Cột phải (Mô tả) - Chiếm hết 3 cột ở hàng dưới */}
+            <div className="md:col-span-3 pt-2 border-t border-dashed">
               <p className="text-sm text-muted-foreground mb-1">Mô tả</p>
               <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
                 {story.description}
