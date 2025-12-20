@@ -78,8 +78,7 @@ interface Transaction {
 }
 
 export default function ManageRevenuePage() {
-  // --- SỬA LỖI Ở ĐÂY: Đổi "month" thành "monthly" để khớp với SelectItem ---
-  const [period, setPeriod] = useState("monthly");
+  const [period, setPeriod] = useState("daily");
   
   const [loading, setLoading] = useState(true);
   const [revenueData, setRevenueData] = useState<any>(null);
@@ -209,7 +208,6 @@ export default function ManageRevenuePage() {
           <div className="flex gap-2">
             <Select value={period} onValueChange={setPeriod}>
               <SelectTrigger className="w-[140px]">
-                {/* Thêm placeholder để tránh bị trống nếu chưa load */}
                 <SelectValue placeholder="Chọn thời gian" />
               </SelectTrigger>
               <SelectContent>
@@ -248,7 +246,8 @@ export default function ManageRevenuePage() {
                 <CardTitle>Biến động Doanh thu</CardTitle>
                 <CardDescription className="flex items-center gap-1">
                   Tổng thu: {totalRevenue.toLocaleString()}
-                  <Gem className="w-4 h-4 text-blue-500 fill-blue-500" />
+                  {/* Cập nhật 1: Đổi icon Gem thành VNĐ */}
+                  <span className="font-medium text-muted-foreground">VNĐ</span>
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -327,7 +326,8 @@ export default function ManageRevenuePage() {
                         <div className="text-right">
                           <div className="text-sm font-bold flex items-center justify-end gap-1">
                             {item.value.toLocaleString()}
-                            <Gem className="w-3 h-3 text-blue-500" />
+                            {/* Cập nhật 2: Đổi icon Gem thành VNĐ ở phần chi tiết nguồn thu */}
+                            <span className="text-xs font-normal text-muted-foreground">VNĐ</span>
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {percent}%
@@ -351,7 +351,7 @@ export default function ManageRevenuePage() {
         {/* TABLE */}
         <Card>
           <CardHeader>
-            <CardTitle>Lịch sử giao dịch rút tiền</CardTitle>
+            <CardTitle>Lịch sử đối soát doanh thu tác giả</CardTitle>
             <CardDescription>
               Các yêu cầu rút tiền đã xử lý
             </CardDescription>
@@ -367,7 +367,12 @@ export default function ManageRevenuePage() {
                   <TableRow>
                     <TableHead>Mã GD</TableHead>
                     <TableHead>Ngân hàng</TableHead>
-                    <TableHead>Số tiền</TableHead>
+                    {/* Cập nhật 3: Header "Số tiền" đổi thành Icon Kim Cương */}
+                    <TableHead>
+                      <div className="flex items-center">
+                        <Gem className="w-3 h-3 text-blue-500" />
+                      </div>
+                    </TableHead>
                     <TableHead>Trạng thái</TableHead>
                     <TableHead>Ngày xử lý</TableHead>
                     <TableHead>Chi tiết</TableHead>
@@ -383,9 +388,9 @@ export default function ManageRevenuePage() {
                       <TableCell>
                         {tx.bankName}
                       </TableCell>
-                      <TableCell className="font-bold flex items-center gap-1">
+                      {/* Cập nhật 4: Số tiền bỏ icon kim cương (chỉ hiện số) */}
+                      <TableCell className="font-bold">
                         {tx.amount.toLocaleString()}
-                        <Gem className="w-3 h-3 text-blue-500" />
                       </TableCell>
                       <TableCell>
                         {renderStatusBadge(tx.status)}

@@ -15,7 +15,17 @@ import {
   Info,
   BookOpen,
   FileType,
-  Bot // <--- Thêm icon Bot
+  Bot,
+  Calendar,
+  Globe,
+  Tag,
+  AlignLeft,
+  Image as ImageIcon,
+  Hash,
+  Coins,
+  Type,
+  Mail,
+  Gem
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -50,17 +60,41 @@ import { getModerationStories, getModerationChapters } from "@/services/moderati
 
 moment.locale("vi");
 
-// Interface chung để hiển thị lên bảng
+// Interface tổng hợp tất cả fields từ cả Story và Chapter
 interface HistoryItem {
-  id: string; 
+  id: string; // reviewId
   type: "story" | "chapter";
-  title: string; 
-  subTitle?: string; 
-  author: string;
+  
+  // Common Fields
+  title: string;       // Story: title | Chapter: chapterTitle
+  subTitle?: string;   // Story: null  | Chapter: storyTitle
+  author: string;      // authorUsername
+  authorId: string;
   status: "pending" | "published" | "rejected";
-  date: string;
-  note?: string; 
-  aiScore?: number; // <--- MỚI: Thêm trường điểm AI
+  submittedAt: string;
+  language: string;    // languageName
+  
+  // AI Fields
+  aiScore?: number;
+  aiResult?: string;
+  aiFeedback?: string;
+  
+  // Story Specific Fields
+  storyId?: string;
+  description?: string;
+  outline?: string;
+  coverUrl?: string;
+  lengthPlan?: string;
+  tags?: { tagId: string; tagName: string }[];
+  pendingNote?: string; // Lý do từ chối (thường ở story)
+
+  // Chapter Specific Fields
+  chapterId?: string;
+  authorEmail?: string;
+  chapterNo?: number;
+  wordCount?: number;
+  priceDias?: number;
+  contentPath?: string;
 }
 
 export function HistoryPage() {
@@ -93,51 +127,82 @@ export function HistoryPage() {
         let combined: HistoryItem[] = [];
 
         if (activeTab === "story") {
-          // Gọi API Truyện
+          // --- FETCH STORY ---
           const [published, rejected] = await Promise.all([
             getModerationStories("published"),
             getModerationStories("rejected"),
           ]);
 
-          const mapStory = (list: any[], status: any) =>
+          const mapStory = (list: any[]) =>
             list.map((item: any) => ({
               id: item.reviewId,
               type: "story" as const,
+              
+              // Common
               title: item.title,
               author: item.authorUsername,
+              authorId: item.authorId,
               status: item.status,
-              date: item.submittedAt,
-              note: item.pendingNote,
-              aiScore: item.aiScore, // <--- Map dữ liệu aiScore
+              submittedAt: item.submittedAt,
+              language: item.languageName,
+              
+              // Story Specific
+              storyId: item.storyId,
+              description: item.description,
+              outline: item.outline,
+              lengthPlan: item.lengthPlan,
+              coverUrl: item.coverUrl,
+              tags: item.tags,
+              pendingNote: item.pendingNote,
+
+              // AI
+              aiScore: item.aiScore,
+              aiResult: item.aiResult,
+              aiFeedback: item.aiFeedback,
             }));
 
-          combined = [...mapStory(published, "published"), ...mapStory(rejected, "rejected")];
+          combined = [...mapStory(published), ...mapStory(rejected)];
 
         } else {
-          // Gọi API Chương
+          // --- FETCH CHAPTER ---
           const [published, rejected] = await Promise.all([
             getModerationChapters("published"),
             getModerationChapters("rejected"),
           ]);
 
-          const mapChapter = (list: any[], status: any) =>
+          const mapChapter = (list: any[]) =>
             list.map((item: any) => ({
               id: item.reviewId,
               type: "chapter" as const,
-              title: item.chapterTitle,
-              subTitle: item.storyTitle,
+              
+              // Common
+              title: item.chapterTitle, // Chapter title là chính
+              subTitle: item.storyTitle, // Story title là phụ
               author: item.authorUsername,
+              authorId: item.authorId,
               status: item.status,
-              date: item.submittedAt,
-              note: item.aiFeedback,
-              aiScore: item.aiScore, // <--- Map dữ liệu aiScore
+              submittedAt: item.submittedAt,
+              language: item.languageName,
+
+              // Chapter Specific
+              chapterId: item.chapterId,
+              authorEmail: item.authorEmail,
+              chapterNo: item.chapterNo,
+              wordCount: item.wordCount,
+              priceDias: item.priceDias,
+              contentPath: item.contentPath,
+
+              // AI
+              aiScore: item.aiScore,
+              aiResult: item.aiResult,
+              aiFeedback: item.aiFeedback,
             }));
 
-          combined = [...mapChapter(published, "published"), ...mapChapter(rejected, "rejected")];
+          combined = [...mapChapter(published), ...mapChapter(rejected)];
         }
 
-        // Sort mặc định theo thời gian mới nhất
-        combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        // Sort: Mới nhất lên đầu
+        combined.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
         setData(combined);
 
       } catch (err: any) {
@@ -150,24 +215,22 @@ export function HistoryPage() {
     fetchData();
   }, [activeTab]);
 
-  // --- 2. Filter Logic (Client-side) ---
+  // --- 2. Filter Logic ---
   const filteredData = useMemo(() => {
     return data.filter((item) => {
-      // Lọc theo Status
+      // Filter Status
       if (filterStatus !== "all") {
         if (filterStatus === "published" && item.status !== "published") return false;
         if (filterStatus === "rejected" && item.status !== "rejected") return false;
       }
-
-      // Lọc theo Time
+      // Filter Time
       if (filterTime !== "all") {
-        const itemDate = moment(item.date);
+        const itemDate = moment(item.submittedAt);
         const now = moment();
         if (filterTime === "today" && !itemDate.isSame(now, "day")) return false;
         if (filterTime === "7days" && itemDate.isBefore(now.subtract(7, "days"))) return false;
         if (filterTime === "30days" && itemDate.isBefore(now.subtract(30, "days"))) return false;
       }
-
       return true;
     });
   }, [data, filterStatus, filterTime]);
@@ -203,8 +266,7 @@ export function HistoryPage() {
         className="mb-6 flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center"
       >
         <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
-          
-          {/* 1. Filter Loại Nội Dung */}
+          {/* Toggle Type */}
           <div className="bg-[var(--card)] p-1 rounded-lg border border-[var(--border)] flex">
             <button
               onClick={() => setActiveTab("story")}
@@ -230,7 +292,7 @@ export function HistoryPage() {
             </button>
           </div>
 
-          {/* 2. Filter Trạng Thái */}
+          {/* Status Filter */}
           <Select value={filterStatus} onValueChange={setFilterStatus}>
             <SelectTrigger className="w-[180px] bg-[var(--card)] border-[var(--border)] h-11">
               <div className="flex items-center gap-2">
@@ -245,7 +307,7 @@ export function HistoryPage() {
             </SelectContent>
           </Select>
 
-          {/* 3. Filter Thời Gian */}
+          {/* Time Filter */}
           <Select value={filterTime} onValueChange={setFilterTime}>
             <SelectTrigger className="w-[180px] bg-[var(--card)] border-[var(--border)] h-11">
               <div className="flex items-center gap-2">
@@ -288,7 +350,7 @@ export function HistoryPage() {
                 {activeTab === "story" ? "Tên Truyện" : "Thông tin Chương"}
               </TableHead>
               <TableHead className="py-4 px-6">Tác giả</TableHead>
-              <TableHead className="py-4 px-6 w-[150px]">Trạng thái</TableHead>
+              <TableHead className="py-4 px-6 w-[160px]">Trạng thái / AI</TableHead>
               <TableHead className="py-4 px-6 text-right">Chi tiết</TableHead>
             </TableRow>
           </TableHeader>
@@ -319,19 +381,22 @@ export function HistoryPage() {
                 <TableRow key={item.id} className="border-b hover:bg-[var(--muted)]/20 transition">
                   <TableCell className="py-4 px-6 text-[var(--muted-foreground)]">
                     <div className="flex flex-col">
-                      <span className="font-medium text-[var(--foreground)]">{moment(item.date).format("HH:mm")}</span>
-                      <span className="text-xs">{moment(item.date).format("DD/MM/YYYY")}</span>
+                      <span className="font-medium text-[var(--foreground)]">{moment(item.submittedAt).format("HH:mm")}</span>
+                      <span className="text-xs">{moment(item.submittedAt).format("DD/MM/YYYY")}</span>
                     </div>
                   </TableCell>
 
                   <TableCell className="py-4 px-6">
                     <div className="flex flex-col gap-1">
-                      <span className="font-medium text-base">{item.title}</span>
+                      <span className="font-medium text-base line-clamp-1">{item.title}</span>
                       {item.type === "chapter" && (
                         <span className="text-xs text-[var(--muted-foreground)] flex items-center gap-1">
                           <BookOpen className="w-3 h-3" /> Truyện: {item.subTitle}
                         </span>
                       )}
+                      <span className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-1">
+                        <Globe className="w-3 h-3" /> {item.language}
+                      </span>
                     </div>
                   </TableCell>
 
@@ -343,16 +408,23 @@ export function HistoryPage() {
                   </TableCell>
 
                   <TableCell className="py-4 px-6">
-                    <Badge
-                      className={cn(
-                        "gap-2 border-0 px-3 py-1.5 w-fit",
-                        item.status === "published" && "bg-green-100 text-green-700 hover:bg-green-200",
-                        item.status === "rejected" && "bg-red-100 text-red-600 hover:bg-red-200"
+                    <div className="flex flex-col items-start gap-1.5">
+                      <Badge
+                        className={cn(
+                          "gap-2 border-0 px-3 py-1.5 w-fit",
+                          item.status === "published" && "bg-green-100 text-green-700 hover:bg-green-200",
+                          item.status === "rejected" && "bg-red-100 text-red-600 hover:bg-red-200"
+                        )}
+                      >
+                        {item.status === "published" ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                        {item.status === "published" ? "Đã duyệt" : "Từ chối"}
+                      </Badge>
+                      {item.aiScore !== undefined && (
+                        <span className={cn("text-[10px] font-medium flex items-center gap-1", getScoreColor(item.aiScore))}>
+                          <Bot className="w-3 h-3" /> AI: {item.aiScore}/10
+                        </span>
                       )}
-                    >
-                      {item.status === "published" ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                      {item.status === "published" ? "Đã duyệt" : "Từ chối"}
-                    </Badge>
+                    </div>
                   </TableCell>
 
                   <TableCell className="py-4 px-6 text-right">
@@ -372,74 +444,188 @@ export function HistoryPage() {
         </Table>
       </Card>
 
-      {/* Modal Detail */}
+      {/* --- MODAL CHI TIẾT (FULL FIELDS & CONDITIONAL RENDERING) --- */}
       <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
-        <DialogContent className="bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)] sm:max-w-[600px]">
-          <DialogHeader>
+        <DialogContent className="bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)] sm:max-w-[700px] p-0 overflow-hidden gap-0 flex flex-col max-h-[90vh]">
+          
+          <DialogHeader className="px-6 py-4 border-b border-[var(--border)] bg-[var(--muted)]/10 shrink-0">
             <DialogTitle className={cn("flex items-center gap-2 text-xl", selectedItem?.status === 'rejected' ? "text-red-600" : "text-green-600")}>
               {selectedItem?.status === 'rejected' ? <XCircle className="w-6 h-6"/> : <CheckCircle2 className="w-6 h-6"/>}
-              {selectedItem?.status === 'rejected' ? "Chi tiết từ chối" : "Thông tin đã duyệt"}
+              {selectedItem?.status === 'rejected' ? "Quyết định: Từ chối" : "Quyết định: Đã xuất bản"}
             </DialogTitle>
-            <DialogDescription>
-              ID: <span className="font-mono text-xs">{selectedItem?.id}</span>
+            <DialogDescription className="text-xs mt-1 font-mono flex gap-3">
+              <span>ReviewID: {selectedItem?.id.slice(0, 8)}...</span>
+              <span>•</span>
+              <span className="uppercase">{selectedItem?.type}</span>
             </DialogDescription>
           </DialogHeader>
           
           {selectedItem && (
-            <div className="space-y-4 pt-2">
-                <div className="grid grid-cols-3 gap-3 text-sm bg-[var(--muted)]/50 p-4 rounded-lg border border-[var(--border)]">
-                    <span className="text-[var(--muted-foreground)]">Loại:</span>
-                    <span className="col-span-2 font-medium capitalize">{selectedItem.type === 'story' ? 'Truyện' : 'Chương'}</span>
-
-                    <span className="text-[var(--muted-foreground)]">Tiêu đề:</span>
-                    <span className="col-span-2 font-medium">{selectedItem.title}</span>
-                    
-                    {selectedItem.type === 'chapter' && (
-                      <>
-                        <span className="text-[var(--muted-foreground)]">Thuộc truyện:</span>
-                        <span className="col-span-2">{selectedItem.subTitle}</span>
-                      </>
+            <div className="overflow-y-auto p-6 space-y-6">
+                
+                {/* 1. Phần Info Cơ bản */}
+                <div className="flex flex-col sm:flex-row gap-6">
+                    {/* Ảnh Bìa (CHỈ HIỂN THỊ CHO STORY) */}
+                    {selectedItem.type === 'story' && (
+                        selectedItem.coverUrl ? (
+                          <div className="w-32 h-48 shrink-0 rounded-lg overflow-hidden border border-[var(--border)] shadow-sm bg-gray-100">
+                            <img src={selectedItem.coverUrl} alt="Cover" className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="w-32 h-48 shrink-0 rounded-lg border border-[var(--border)] flex items-center justify-center bg-[var(--muted)] text-[var(--muted-foreground)]">
+                            <ImageIcon className="w-8 h-8 opacity-50" />
+                          </div>
+                        )
                     )}
 
-                    <span className="text-[var(--muted-foreground)]">Tác giả:</span>
-                    <span className="col-span-2 font-medium text-[var(--primary)]">{selectedItem.author}</span>
-                    
-                    {/* --- HIỂN THỊ AI SCORE --- */}
-                    <span className="text-[var(--muted-foreground)] flex items-center gap-2">
-                       <Bot className="w-4 h-4"/> Điểm AI:
-                    </span>
-                    <span className={cn("col-span-2 font-bold text-base", getScoreColor(selectedItem.aiScore))}>
-                       {selectedItem.aiScore !== undefined ? `${selectedItem.aiScore} / 10` : "Chưa có đánh giá"}
-                    </span>
-                    {/* ------------------------- */}
+                    {/* Info Text Grid */}
+                    <div className="flex-1 space-y-3 text-sm">
+                        {/* Title */}
+                        <div className="grid grid-cols-[110px_1fr] gap-2 items-baseline">
+                            <span className="text-[var(--muted-foreground)] text-xs uppercase tracking-wider">Tiêu đề</span>
+                            <span className="font-semibold text-base text-[var(--primary)]">{selectedItem.title}</span>
+                        </div>
 
-                    <span className="text-[var(--muted-foreground)]">Thời gian xử lý:</span>
-                    <span className="col-span-2">{new Date(selectedItem.date).toLocaleString('vi-VN')}</span>
+                        {/* SubTitle (Chapter) */}
+                        {selectedItem.type === 'chapter' && (
+                          <div className="grid grid-cols-[110px_1fr] gap-2 items-baseline">
+                              <span className="text-[var(--muted-foreground)] text-xs uppercase tracking-wider">Truyện gốc</span>
+                              <span className="flex items-center gap-1"><BookOpen className="w-3.5 h-3.5"/> {selectedItem.subTitle}</span>
+                          </div>
+                        )}
+
+                        {/* Author */}
+                        <div className="grid grid-cols-[110px_1fr] gap-2 items-baseline">
+                            <span className="text-[var(--muted-foreground)] text-xs uppercase tracking-wider">Tác giả</span>
+                            <div className="flex flex-col">
+                                <span className="font-medium">@{selectedItem.author}</span>
+                                {selectedItem.authorEmail && (
+                                  <span className="text-xs text-[var(--muted-foreground)] flex items-center gap-1 mt-0.5">
+                                    <Mail className="w-3 h-3"/> {selectedItem.authorEmail}
+                                  </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Language */}
+                        <div className="grid grid-cols-[110px_1fr] gap-2 items-baseline">
+                            <span className="text-[var(--muted-foreground)] text-xs uppercase tracking-wider">Ngôn ngữ</span>
+                            <span className="flex items-center gap-1"><Globe className="w-3.5 h-3.5"/> {selectedItem.language || "N/A"}</span>
+                        </div>
+
+                        {/* STORY SPECIFIC: Length Plan */}
+                        {selectedItem.type === 'story' && selectedItem.lengthPlan && (
+                          <div className="grid grid-cols-[110px_1fr] gap-2 items-baseline">
+                              <span className="text-[var(--muted-foreground)] text-xs uppercase tracking-wider">Độ dài</span>
+                              <Badge variant="outline" className="w-fit capitalize">{selectedItem.lengthPlan.replace('_', ' ')}</Badge>
+                          </div>
+                        )}
+
+                        {/* CHAPTER SPECIFIC: Stats (No, WordCount, Price) */}
+                        {selectedItem.type === 'chapter' && (
+                          <>
+                            <div className="grid grid-cols-[110px_1fr] gap-2 items-baseline">
+                                <span className="text-[var(--muted-foreground)] text-xs uppercase tracking-wider">Chương số</span>
+                                <span className="flex items-center gap-1"><Hash className="w-3.5 h-3.5"/> {selectedItem.chapterNo}</span>
+                            </div>
+                            <div className="grid grid-cols-[110px_1fr] gap-2 items-baseline">
+                                <span className="text-[var(--muted-foreground)] text-xs uppercase tracking-wider">Số từ</span>
+                                <span className="flex items-center gap-1"><Type className="w-3.5 h-3.5"/> {selectedItem.wordCount} từ</span>
+                            </div>
+                            <div className="grid grid-cols-[110px_1fr] gap-2 items-baseline">
+                                <span className="text-[var(--muted-foreground)] text-xs uppercase tracking-wider">Giá chương</span>
+                                <span className="flex items-center gap-1 text-yellow-600 font-medium">{selectedItem.priceDias} <Gem className="h-4 w-4 fill-blue-500 text-blue-600" /></span>
+                            </div>
+                          </>
+                        )}
+
+                        <div className="grid grid-cols-[110px_1fr] gap-2 items-baseline">
+                            <span className="text-[var(--muted-foreground)] text-xs uppercase tracking-wider">Ngày xử lý</span>
+                            <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5"/> {moment(selectedItem.submittedAt).format("HH:mm - DD/MM/YYYY")}</span>
+                        </div>
+                        
+                        {/* STORY SPECIFIC: Tags */}
+                        {selectedItem.type === 'story' && selectedItem.tags && selectedItem.tags.length > 0 && (
+                          <div className="grid grid-cols-[110px_1fr] gap-2 items-start mt-1">
+                              <span className="text-[var(--muted-foreground)] text-xs uppercase tracking-wider pt-1">Thể loại</span>
+                              <div className="flex flex-wrap gap-1">
+                                {selectedItem.tags.map((t, idx) => (
+                                  <Badge key={idx} variant="secondary" className="text-xs px-1.5 py-0">
+                                    <Tag className="w-2.5 h-2.5 mr-1"/> {t.tagName}
+                                  </Badge>
+                                ))}
+                              </div>
+                          </div>
+                        )}
+                    </div>
                 </div>
 
-                <div className={cn(
-                  "p-4 rounded-lg border",
-                  selectedItem.status === 'rejected' 
-                    ? "bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30"
-                    : "bg-green-50 dark:bg-green-900/10 border-green-100 dark:border-green-900/30"
-                )}>
-                    <h4 className={cn(
-                      "font-semibold mb-2 text-sm flex items-center gap-2",
-                      selectedItem.status === 'rejected' ? "text-red-700 dark:text-red-400" : "text-green-700 dark:text-green-400"
-                    )}>
-                        <FileText className="w-4 h-4"/> 
-                        {selectedItem.status === 'rejected' ? "Lý do từ chối:" : "Ghi chú / Feedback:"}
-                    </h4>
-                    <p className="text-sm text-[var(--foreground)] whitespace-pre-line leading-relaxed max-h-[200px] overflow-y-auto">
-                        {selectedItem.note || "Không có nội dung chi tiết."}
-                    </p>
+                {/* 2. Phần AI Analysis (Chung cho cả 2) */}
+                <div className="rounded-lg border border-[var(--border)] overflow-hidden">
+                    <div className="bg-[var(--muted)]/30 px-4 py-2 border-b border-[var(--border)] flex justify-between items-center">
+                        <span className="font-semibold text-sm flex items-center gap-2">
+                           <Bot className="w-4 h-4 text-purple-500"/> Phân tích AI
+                        </span>
+                        <div className="flex items-center gap-3">
+                           {selectedItem.aiResult && (
+                             <span className="text-xs text-[var(--muted-foreground)]">
+                               Result: <span className="font-medium text-[var(--foreground)] uppercase">{selectedItem.aiResult}</span>
+                             </span>
+                           )}
+                           <Badge variant="outline" className={cn("border-0 font-bold", getScoreColor(selectedItem.aiScore))}>
+                              Score: {selectedItem.aiScore !== undefined ? selectedItem.aiScore : "N/A"}/10
+                           </Badge>
+                        </div>
+                    </div>
+                    <div className="p-4 bg-[var(--card)] text-sm whitespace-pre-line leading-relaxed max-h-[200px] overflow-y-auto">
+                        {selectedItem.aiFeedback || "Không có phản hồi từ AI."}
+                    </div>
                 </div>
-                
-                <div className="flex justify-end pt-2">
-                    <Button variant="outline" onClick={() => setSelectedItem(null)}>Đóng</Button>
-                </div>
+
+                {/* 3. Phần Nội dung chi tiết (STORY ONLY) */}
+                {selectedItem.type === 'story' && (selectedItem.description || selectedItem.outline) && (
+                  <div className="space-y-4">
+                      {selectedItem.description && (
+                        <div className="space-y-1">
+                           <h4 className="text-xs uppercase text-[var(--muted-foreground)] font-semibold flex items-center gap-1">
+                             <AlignLeft className="w-3 h-3"/> Mô tả (Description)
+                           </h4>
+                           <p className="text-sm bg-[var(--muted)]/10 p-3 rounded border border-[var(--border)] leading-relaxed">
+                             {selectedItem.description}
+                           </p>
+                        </div>
+                      )}
+                      
+                      {selectedItem.outline && (
+                        <div className="space-y-1">
+                           <h4 className="text-xs uppercase text-[var(--muted-foreground)] font-semibold flex items-center gap-1">
+                             <FileText className="w-3 h-3"/> Dàn ý (Outline)
+                           </h4>
+                           <p className="text-sm bg-[var(--muted)]/10 p-3 rounded border border-[var(--border)] leading-relaxed whitespace-pre-line">
+                             {selectedItem.outline}
+                           </p>
+                        </div>
+                      )}
+                  </div>
+                )}
+
+                {/* 4. Lý do từ chối thủ công (Nếu có) */}
+                {selectedItem.pendingNote && (
+                  <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 text-red-800 dark:text-red-300 text-sm">
+                      <div className="font-semibold mb-1 flex items-center gap-1.5">
+                          <XCircle className="w-4 h-4"/> Ghi chú kiểm duyệt:
+                      </div>
+                      <p className="pl-5.5">{selectedItem.pendingNote}</p>
+                  </div>
+                )}
+
             </div>
           )}
+          
+          {/* Footer */}
+          <div className="p-4 border-t border-[var(--border)] bg-[var(--card)] shrink-0 flex justify-end">
+              <Button variant="outline" onClick={() => setSelectedItem(null)}>Đóng cửa sổ</Button>
+          </div>
         </DialogContent>
       </Dialog>
 
