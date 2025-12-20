@@ -50,6 +50,7 @@ import TiptapEditor from "@/components/editor/TiptapEditor";
 import VoiceChapterPlayer from "@/components/author/VoiceChapterPlayer";
 import { profileService } from "@/services/profileService";
 import { voiceChapterService } from "@/services/voiceChapterService";
+import { AiModerationReport } from "@/components/AiModerationReport";
 // Hàm trích xuất phần tiếng Việt từ AI Feedback
 const extractVietnameseFeedback = (feedback: string | null): string | null => {
   if (!feedback) return null;
@@ -262,7 +263,8 @@ export default function AuthorChapterDetailPage() {
     languageCode: "vi-VN" as "vi-VN" | "en-US" | "zh-CN" | "ja-JP",
     accessType: "free" as "free" | "dias",
   });
-
+  const TITLE_MIN_LENGTH = 20;
+  const TITLE_MAX_LENGTH = 50;
   // State theo dõi thay đổi chưa lưu
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const handleApiError = (error: any, defaultMessage: string) => {
@@ -634,11 +636,22 @@ export default function AuthorChapterDetailPage() {
     if (!chapter) return;
 
     // Validation
-    if (!editFormData.title.trim()) {
+    const titleTrimmed = editFormData.title.trim();
+
+    if (!titleTrimmed) {
       toast.error("Vui lòng nhập tiêu đề chương");
       return;
     }
 
+    if (titleTrimmed.length < TITLE_MIN_LENGTH) {
+      toast.error(`Tiêu đề quá ngắn (tối thiểu ${TITLE_MIN_LENGTH} ký tự)`);
+      return;
+    }
+
+    if (titleTrimmed.length > TITLE_MAX_LENGTH) {
+      toast.error(`Tiêu đề vượt quá giới hạn (${TITLE_MAX_LENGTH} ký tự)`);
+      return;
+    }
     if (!editFormData.content.trim() || editFormData.content === "<p></p>") {
       toast.error("Vui lòng nhập nội dung chương");
       return;
@@ -810,16 +823,59 @@ export default function AuthorChapterDetailPage() {
             <div className="w-full pr-24">
               {isEditing ? (
                 <div className="space-y-2">
-                  <Label htmlFor="title">Tiêu đề chương *</Label>
-                  <Input
-                    id="title"
-                    name="title"
-                    value={editFormData.title}
-                    onChange={handleInputChange}
-                    placeholder="Nhập tiêu đề chương"
-                    required
-                    className="w-full"
-                  />
+                  <div className="flex justify-between items-end">
+                    <Label
+                      htmlFor="title"
+                      className="flex items-center gap-1 font-semibold"
+                    >
+                      Tiêu đề chương <span className="text-red-500">*</span>
+                    </Label>
+                    {/* Bộ đếm số ký tự: Chuyển sang màu đỏ nếu không hợp lệ */}
+                    <span
+                      className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full border transition-colors ${
+                        editFormData.title.length < TITLE_MIN_LENGTH ||
+                        editFormData.title.length > TITLE_MAX_LENGTH
+                          ? "bg-red-50 text-red-600 border-red-200"
+                          : "bg-emerald-50 text-emerald-600 border-emerald-200"
+                      }`}
+                    >
+                      {editFormData.title.length}/{TITLE_MAX_LENGTH} ký tự
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      id="title"
+                      name="title"
+                      value={editFormData.title}
+                      onChange={handleInputChange}
+                      placeholder="Nhập tiêu đề chương..."
+                      required
+                      maxLength={TITLE_MAX_LENGTH} // Ngăn nhập quá giới hạn vật lý
+                      className={`w-full pr-10 transition-all ${
+                        editFormData.title.length > 0 &&
+                        editFormData.title.length < TITLE_MIN_LENGTH
+                          ? "border-orange-400 focus-visible:ring-orange-400 bg-orange-50/30"
+                          : ""
+                      }`}
+                    />
+                    {/* Icon trạng thái nhanh: Tích xanh khi đạt độ dài tối thiểu */}
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      {editFormData.title.length >= TITLE_MIN_LENGTH ? (
+                        <CheckCircle className="h-4 w-4 text-emerald-500 animate-in zoom-in" />
+                      ) : (
+                        <AlertCircle className="h-4 w-4 text-slate-300" />
+                      )}
+                    </div>
+                  </div>
+                  {/* Thông báo nhắc nhở khi quá ngắn */}
+                  {editFormData.title.length > 0 &&
+                    editFormData.title.length < TITLE_MIN_LENGTH && (
+                      <p className="text-[11px] text-orange-600 font-medium flex items-center gap-1 mt-1 animate-in fade-in slide-in-from-top-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        Tiêu đề tối thiểu {TITLE_MIN_LENGTH} ký tự (Hiện tại:{" "}
+                        {editFormData.title.length})
+                      </p>
+                    )}
                 </div>
               ) : (
                 <div className="space-y-1">
@@ -1151,9 +1207,10 @@ export default function AuthorChapterDetailPage() {
         </Card>
       )}
       {/* AI Assessment */}
-      {chapter && (chapter.aiScore !== undefined || vietnameseFeedback) && (
+      {/* Khối báo cáo kiểm duyệt AI mới */}
+      {chapter && (chapter.aiScore !== undefined || chapter.aiFeedback) && (
         <Card className="border-blue-200 dark:border-blue-800">
-          <CardHeader>
+          <CardHeader className="pb-0">
             <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
               <Star className="h-5 w-5" />
               Đánh giá AI
@@ -1163,21 +1220,15 @@ export default function AuthorChapterDetailPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Điểm số */}
+            {/* 1. Hiển thị điểm số dạng thanh tiến trình */}
             {chapter.aiScore != null && (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 mt-4">
                 <div className="flex items-center gap-2">
                   <Star className="h-5 w-5 text-yellow-500" />
                   <span className="font-medium">Điểm AI:</span>
                 </div>
                 <Badge
-                  variant={
-                    chapter.aiScore >= 8
-                      ? "default"
-                      : chapter.aiScore >= 6
-                      ? "secondary"
-                      : "destructive"
-                  }
+                  variant={chapter.aiScore >= 7 ? "default" : "destructive"}
                   className="text-lg px-3 py-1"
                 >
                   {chapter.aiScore.toFixed(1)}/10
@@ -1186,11 +1237,7 @@ export default function AuthorChapterDetailPage() {
                   <div className="w-full bg-gray-200 rounded-full h-3 dark:bg-gray-700">
                     <div
                       className={`h-3 rounded-full transition-all ${
-                        chapter.aiScore >= 8
-                          ? "bg-green-500"
-                          : chapter.aiScore >= 6
-                          ? "bg-yellow-500"
-                          : "bg-red-500"
+                        chapter.aiScore >= 7 ? "bg-green-500" : "bg-red-500"
                       }`}
                       style={{ width: `${(chapter.aiScore / 10) * 100}%` }}
                     />
@@ -1199,27 +1246,12 @@ export default function AuthorChapterDetailPage() {
               </div>
             )}
 
-            {/* Feedback tiếng Việt - HIỂN THỊ ĐẦY ĐỦ */}
-            {vietnameseFeedback && (
-              <div className="mt-6 p-5 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                <p className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-3">
-                  Góp ý chi tiết từ AI:
-                </p>
-                <div className="prose prose-sm dark:prose-invert max-w-none text-gray-800 dark:text-gray-200 leading-relaxed">
-                  {renderContent(vietnameseFeedback)}{" "}
-                  {/* Dùng renderContent để hỗ trợ xuống dòng, in đậm... */}
-                </div>
-              </div>
-            )}
-
-            {/* Nếu không có feedback tiếng Việt */}
-            {!vietnameseFeedback && chapter?.aiFeedback && (
-              <Alert>
-                <AlertDescription className="text-sm">
-                  AI đã đánh giá chương nhưng chưa có phản hồi tiếng Việt.
-                </AlertDescription>
-              </Alert>
-            )}
+            {/* 2. Component chi tiết vi phạm và phản hồi */}
+            <AiModerationReport
+              aiFeedback={chapter.aiFeedback}
+              aiViolations={chapter.aiViolations}
+              contentType="chương"
+            />
           </CardContent>
         </Card>
       )}

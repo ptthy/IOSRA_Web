@@ -154,56 +154,85 @@ export default function SubmitAIPage() {
 
         <CardContent className="p-6 space-y-6">
           {/* Thay đổi grid-cols từ 2 thành 3 trên màn hình desktop */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Cột 1: Tên truyện */}
-            <div className="space-y-1">
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Tên truyện
-              </p>
-              <p className="font-semibold text-lg text-primary">
-                {story.title}
-              </p>
+          <div className="flex flex-col md:flex-row gap-8 items-start">
+            {/* CỘT TRÁI: ẢNH BÌA - Cố định kích thước để nhìn chuyên nghiệp */}
+            <div className="w-full md:w-48 flex-shrink-0">
+              <div className="aspect-[2/3] rounded-xl overflow-hidden border-2 border-primary/10 shadow-md bg-slate-100 group">
+                {story.coverUrl ? (
+                  <img
+                    src={story.coverUrl}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    alt="Cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-[10px] text-slate-400">
+                    No Cover
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Cột 2: Thể loại */}
-            {story.tags && story.tags.length > 0 && (
+            {/* CỘT PHẢI: CHI TIẾT TRUYỆN - Xếp chồng dọc */}
+            <div className="flex-1 space-y-6">
+              {/* 1. Tên truyện */}
               <div className="space-y-1">
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Thể loại
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                  Tên truyện
                 </p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {story.tags.map((tag) => (
-                    <Badge
-                      key={tag.tagId}
-                      variant="outline"
-                      className="bg-primary/5 border-primary/20"
-                    >
-                      {tag.tagName}
-                    </Badge>
-                  ))}
-                </div>
+                <h2 className="font-bold text-2xl leading-tight text-primary">
+                  {story.title}
+                </h2>
               </div>
-            )}
 
-            {/* Cột 3: Ngôn ngữ & Mã Code */}
-            <div className="space-y-1">
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Ngôn ngữ
-              </p>
-              <div className="flex items-center gap-2 pt-1">
-                <Badge variant="secondary" className="font-medium">
-                  {story.languageCode === "vi-VN" && "Tiếng Việt"}
-                  {story.languageCode === "en-US" && "English"}
-                  {story.languageCode === "zh-CN" && "中文 (Chinese)"}
-                  {story.languageCode === "ja-JP" && "日本語 (Japanese)"}
-                  {/* Fallback nếu không khớp các mã trên */}
-                  {!["vi-VN", "en-US", "zh-CN", "ja-JP"].includes(
-                    story.languageCode
-                  ) && story.languageCode}
-                </Badge>
-                <span className="text-xs text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">
-                  {story.languageCode}
-                </span>
+              {/* Hàng ngang phụ cho Thể loại và Ngôn ngữ */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {/* 2. Thể loại */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    Thể loại
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {story.tags && story.tags.length > 0 ? (
+                      story.tags.map((tag) => (
+                        <Badge
+                          key={tag.tagId}
+                          variant="outline"
+                          className="bg-primary/5 border-primary/20 text-[10px] px-3 py-0.5 font-medium"
+                        >
+                          {tag.tagName}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">
+                        Chưa có thẻ
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Ngôn ngữ */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    Ngôn ngữ
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant="secondary"
+                      className="font-bold text-[11px] px-3"
+                    >
+                      {story.languageCode === "vi-VN" && "Tiếng Việt"}
+                      {story.languageCode === "en-US" && "English"}
+                      {story.languageCode === "zh-CN" && "中文 (Chinese)"}
+                      {story.languageCode === "ja-JP" && "日本語 (Japanese)"}
+                      {!["vi-VN", "en-US", "zh-CN", "ja-JP"].includes(
+                        story.languageCode
+                      ) && story.languageCode}
+                    </Badge>
+                    <span className="text-[10px] text-muted-foreground font-mono bg-muted px-2 py-0.5 rounded border border-border/50">
+                      {story.languageCode}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

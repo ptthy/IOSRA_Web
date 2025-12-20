@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import VoiceChapterPlayer from "@/components/author/VoiceChapterPlayer";
 import { profileService } from "@/services/profileService";
 import { voiceChapterService } from "@/services/voiceChapterService";
+import { AiModerationReport } from "@/components/AiModerationReport";
 // Base URL cho R2 bucket
 const R2_BASE_URL = "https://pub-15618311c0ec468282718f80c66bcc13.r2.dev";
 
@@ -719,8 +720,9 @@ export default function AuthorChapterViewPage() {
           </CardContent>
         </Card>
       )}
-      {/* AI Assessment */}
-      {chapter && (chapter.aiScore !== undefined || vietnameseFeedback) && (
+
+      {/* AI Assessment - Sử dụng AiModerationReport để đồng bộ UI */}
+      {chapter && (chapter.aiScore !== undefined || chapter.aiFeedback) && (
         <Card className="border-blue-200 dark:border-blue-800">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
@@ -731,12 +733,13 @@ export default function AuthorChapterViewPage() {
               Phân tích và đánh giá tự động từ hệ thống AI
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
+            {/* 1. Thanh hiển thị điểm số AI (Giữ lại giao diện cũ) */}
             {chapter.aiScore != null && (
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Star className="h-5 w-5 text-yellow-500" />
-                  <span className="font-medium">Điểm AI:</span>
+                  <span className="font-medium text-sm">Điểm AI:</span>
                 </div>
                 <Badge
                   variant={
@@ -751,28 +754,24 @@ export default function AuthorChapterViewPage() {
                   {chapter.aiScore.toFixed(1)}/10
                 </Badge>
                 <div className="flex-1">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
                     <div
-                      className="bg-green-500 h-2 rounded-full"
+                      className={`h-2.5 rounded-full transition-all duration-500 ${
+                        chapter.aiScore >= 7 ? "bg-green-500" : "bg-red-500"
+                      }`}
                       style={{ width: `${(chapter.aiScore / 10) * 100}%` }}
                     ></div>
                   </div>
                 </div>
               </div>
             )}
-            {vietnameseFeedback && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <MessageSquare className="h-4 w-4 text-blue-500" />
-                  <span className="font-medium">Nhận xét AI:</span>
-                </div>
-                <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
-                  <AlertDescription className="whitespace-pre-wrap text-sm">
-                    {vietnameseFeedback}
-                  </AlertDescription>
-                </Alert>
-              </div>
-            )}
+
+            {/* 2. Sử dụng component mới để hiển thị Feedback (khối đặc) và Vi phạm chi tiết */}
+            <AiModerationReport
+              aiFeedback={chapter.aiFeedback}
+              aiViolations={chapter.aiViolations}
+              contentType="chương"
+            />
           </CardContent>
         </Card>
       )}
