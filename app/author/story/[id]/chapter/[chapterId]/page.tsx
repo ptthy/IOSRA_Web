@@ -43,6 +43,7 @@ import {
   AlertCircle,
   Gem,
   UserCheck,
+  EyeOff,
 } from "lucide-react";
 import { chapterService } from "@/services/chapterService";
 import type { ChapterDetails } from "@/services/apiTypes";
@@ -959,6 +960,15 @@ export default function AuthorChapterDetailPage() {
                     Icon: XCircle,
                   };
                 }
+                // --- THÊM ĐOẠN NÀY ---
+                else if (chapter.status === "hidden") {
+                  statusConfig = {
+                    label: "Đã ẩn",
+                    bgColor: "bg-black", // Ép về màu đen tuyệt đối
+                    shadowColor: "text-zinc-900",
+                    Icon: EyeOff,
+                  };
+                }
 
                 return (
                   // Đã sửa: top-0 và right-8 (cách lề phải 32px)
@@ -1359,6 +1369,14 @@ export default function AuthorChapterDetailPage() {
 
                     <AlertDescription>
                       Trạng thái: Chương đã được xuất bản thành công
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {chapter.status === "hidden" && (
+                  <Alert className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-700">
+                    <XCircle className="h-4 w-4 text-gray-600" />
+                    <AlertDescription>
+                      Trạng thái: Chương này đã bị ẩn khỏi hệ thống.
                     </AlertDescription>
                   </Alert>
                 )}
