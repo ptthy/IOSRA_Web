@@ -137,7 +137,7 @@ export default function ManageStoriesPage() {
       {/* Header */}
       <div>
         <h2 className="text-3xl font-bold text-[var(--primary)]">
-          Quản lý Truyện
+          Quản Lý Truyện
         </h2>
         <p className="text-sm text-muted-foreground">
           Danh sách tất cả các truyện của bạn
