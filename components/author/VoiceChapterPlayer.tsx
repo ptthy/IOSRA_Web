@@ -753,7 +753,12 @@ export default function VoiceChapterPlayer({
                     </span> */}
                     <span className="font-bold text-blue-600 text-lg flex items-center gap-1">
                       {totalCost.toLocaleString()}
-                      <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+                      <span className="relative inline-flex items-center">
+                        <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+                        <span className="absolute -bottom-2 -right-2 text-yellow-500 text-lg font-bold leading-none">
+                          *
+                        </span>
+                      </span>
                     </span>
                   </div>
 
@@ -773,7 +778,12 @@ export default function VoiceChapterPlayer({
                       </span> */}
                       <span className="font-bold flex items-center gap-1">
                         {walletBalance.toLocaleString()}
-                        <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+                        <span className="relative inline-flex items-center">
+                          <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+                          <span className="absolute -bottom-2 -right-2 text-yellow-500 text-lg font-bold leading-none">
+                            *
+                          </span>
+                        </span>
                       </span>
                     </div>
 
@@ -883,12 +893,16 @@ export default function VoiceChapterPlayer({
                   <>
                     <Mic className="mr-2 h-5 w-5" />
                     Tạo Audio ngay
-                    <span className="ml-1 font-normal">
-                      {/* ({totalCost.toLocaleString()} chars) */}
-                      <span className="flex items-center gap-1 ml-1">
-                        ({totalCost.toLocaleString()}{" "}
-                        <Gem className="h-3 w-3 fill-current" />)
+                    <span className="ml-1 font-normal flex items-center gap-1">
+                      ({totalCost.toLocaleString()}
+                      {/* Bọc Gem vào span relative để hiện hoa thị */}
+                      <span className="relative inline-flex items-center ml-0.5">
+                        <Gem className="h-3 w-3 fill-current" />
+                        <span className="absolute -bottom-2 -right-2 text-yellow-400 text-xl font-black leading-none drop-shadow-sm">
+                          *
+                        </span>
                       </span>
+                      )
                     </span>
                   </>
                 )}
