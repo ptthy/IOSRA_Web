@@ -76,6 +76,10 @@ export default function VoiceChapterPlayer({
   const [playbackSpeed, setPlaybackSpeed] = useState("1.0");
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const [authorRank, setAuthorRank] = useState<string>("");
+  const [isRankRestricted, setIsRankRestricted] = useState(false);
+
   // --- THÊM: Ref cho Polling ---
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -172,7 +176,7 @@ export default function VoiceChapterPlayer({
     setIsLoading(true);
     try {
       // Load song song tất cả dữ liệu cần thiết
-      const [walletRes, chapterData, voiceList, count, rules] =
+      const [walletRes, chapterData, voiceList, count, rules, profileRes] =
         await Promise.all([
           // profileService.getWallet(),
           authorRevenueService.getSummary(), // <--- SỬA: Gọi API Summary
@@ -180,8 +184,16 @@ export default function VoiceChapterPlayer({
           voiceChapterService.getVoiceList(),
           voiceChapterService.getCharCount(chapterId),
           voiceChapterService.getPricingRules(), // <--- Gọi thêm cái này
+          profileService.getProfile(),
         ]);
       setPricingRules(rules || []); // <--- Lưu vào state
+
+      // Kiểm tra hạng tác giả
+      const rank = profileRes.data.author?.rankName || "Tân Thủ";
+      setAuthorRank(rank);
+      if (rank === "Tân Thủ") {
+        setIsRankRestricted(true);
+      }
       // Set Wallet
       if (walletRes.data) {
         //  setWalletBalance(walletRes.data.voiceCharBalance || 0);
@@ -199,7 +211,8 @@ export default function VoiceChapterPlayer({
         setIsAddingVoice(false); // Mặc định vào mode Player nếu đã có voice
       } else {
         // Nếu chưa có voice nào, tự động chọn tất cả (hoặc 1 cái tùy logic cũ)
-        setSelectedVoiceIds(voiceList.map((v) => v.voiceId));
+        // setSelectedVoiceIds(voiceList.map((v) => v.voiceId));
+        setSelectedVoiceIds([]); // BỎ MẶC ĐỊNH CHỌN HẾT
         setIsAddingVoice(true); // Vào mode Add Voice
       }
     } catch (error) {
@@ -351,7 +364,17 @@ export default function VoiceChapterPlayer({
       const charged =
         result.totalGenerationCostDias || result.charactersCharged || 0;
 
-      toast.success(`Tạo thành công! Đã trừ ${charged.toLocaleString()} Dias.`);
+      toast.success(
+        <div className="flex items-center gap-2 flex-wrap">
+          Tạo thành công! Đã trừ {charged.toLocaleString()}
+          <div className="relative inline-flex items-center">
+            <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+            <span className="absolute -bottom-3 -right-2 text-yellow-500 text-lg font-bold leading-none">
+              *
+            </span>
+          </div>
+        </div>
+      );
 
       // 2. Lấy số dư mới từ "authorRevenueBalanceAfter" thay vì "walletBalance"
       if (result.authorRevenueBalanceAfter !== undefined) {
@@ -657,7 +680,30 @@ export default function VoiceChapterPlayer({
           </div>
         </CardHeader>
         <CardContent>
-          {unpurchasedCount === 0 ? (
+          {isRankRestricted ? (
+            // HIỂN THỊ THÔNG BÁO KHÓA HẠNG
+            <div className="py-12 flex flex-col items-center justify-center text-center bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-200">
+              <Gem className="h-12 w-12 text-amber-500 mb-4" />
+              <h3 className="text-lg font-bold text-amber-900 dark:text-amber-100">
+                Chức năng giới hạn
+              </h3>
+              <p className="max-w-md text-amber-800/80 dark:text-amber-200/80 mt-2 px-6">
+                Bạn hiện đang là hạng tác giả{" "}
+                <span className="font-bold ">"{authorRank}"</span>. Bạn chỉ có
+                thể tạo Voice cho chương khi đạt hạng{" "}
+                <span className="font-bold">Đồng</span> trở lên.
+              </p>
+              <Button
+                variant="outline"
+                className="mt-6 border-amber-300 text-amber-900 hover:bg-amber-100"
+                onClick={() =>
+                  (window.location.href = "/author/author-upgrade-rank")
+                }
+              >
+                Tìm hiểu về Cấp bậc Tác giả
+              </Button>
+            </div>
+          ) : unpurchasedCount === 0 ? (
             <div className="text-center py-8 bg-slate-50 dark:bg-slate-900 rounded-lg">
               <Check className="h-10 w-10 text-green-500 mx-auto mb-2" />
               <h3 className="font-semibold text-slate-900 dark:text-slate-100">
