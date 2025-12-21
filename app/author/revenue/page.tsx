@@ -156,6 +156,12 @@ const LABELS_MAP: Record<string, string> = {
   Commitment: "Nội dung cam kết",
   ModeratorNote: "Ghi chú Admin",
 
+  // --- VIỆT HÓA CÁC TRƯỜNG CÒN SÓT ---
+  buyerId: "Người mua (ID)",
+  costDias: "Phí tiêu tốn (Dias)", // Thay cho 'Cost Dias'
+  charCount: "Số lượng ký tự", // Thay cho 'char Count'
+  generatedVoices: "Mã giọng đọc tạo", // Thay cho 'generated Voices'
+
   // --- CÁC MÃ ID ---
   transactionId: "Mã giao dịch",
   requestId: "Mã yêu cầu",
