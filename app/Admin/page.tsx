@@ -98,10 +98,7 @@ export default function AdminDashboard() {
 
       {/* 2. Filters */}
       <div className="flex flex-col md:flex-row gap-4 items-center bg-card p-4 rounded-lg border shadow-sm">
-        <div className="relative flex-1 w-full md:max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Tìm kiếm user" className="pl-8" disabled />
-        </div>
+       
         
         <div className="flex gap-4 w-full md:w-auto">
           <Select value={roleFilter} onValueChange={setRoleFilter}>

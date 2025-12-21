@@ -12,13 +12,12 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, AlertCircle, Search } from "lucide-react";
+import { Loader2, AlertCircle, Eye, EyeOff, Globe } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
 import { motion, Variants } from "framer-motion";
 
-// ✅ QUAN TRỌNG: Import ReportItem từ API Service để đồng bộ Type
+// Import ReportItem từ API Service
 import { getHandlingReports, ReportItem } from "@/services/moderationApi";
 import { ReportActionModal } from "./report-action-modal";
 import { cn } from "@/lib/utils";
@@ -36,12 +35,49 @@ const REASON_MAP: { [key: string]: string } = {
 
 const getTranslatedReason = (rawReason: string) => {
   const key = rawReason ? rawReason.trim().toLowerCase() : "other";
-  // Trả về tiếng Việt nếu có trong map, ngược lại trả về nguyên gốc hoặc "Khác"
   return REASON_MAP[key] || rawReason || "Khác";
 };
 
-// ========================= MOTION VARIANTS =========================
+// ========================= HELPER LẤY TRẠNG THÁI TARGET =========================
+const getTargetStatusInfo = (report: ReportItem) => {
+  let status = "";
+  
+  // Fix lỗi TS: Ép kiểu as any vì type gốc có thể thiếu field status
+  if (report.targetType === 'story' && report.story) {
+    status = (report.story as any).status || "published";
+  } else if (report.targetType === 'chapter' && report.chapter) {
+    status = (report.chapter as any).status || "published"; 
+  } else if (report.targetType === 'comment' && report.comment) {
+    status = (report.comment as any).status || "visible";
+  }
 
+  // Map status sang UI
+  switch (status) {
+    case "hidden":
+    case "deleted":
+    case "removed":
+      return { 
+        label: "Đã ẩn", 
+        color: "bg-red-100 text-red-700 border-red-200", 
+        icon: <EyeOff className="w-3 h-3 mr-1" /> 
+      };
+    case "published":
+    case "visible":
+      return { 
+        label: "Đang hiện", 
+        color: "bg-green-100 text-green-700 border-green-200", 
+        icon: <Globe className="w-3 h-3 mr-1" /> 
+      };
+    default:
+      return { 
+        label: status || "N/A", 
+        color: "bg-gray-100 text-gray-700 border-gray-200", 
+        icon: null 
+      };
+  }
+};
+
+// ========================= MOTION VARIANTS =========================
 const tabContentVariants: Variants = {
   hidden: { opacity: 0, y: 15 },
   visible: {
@@ -72,13 +108,8 @@ export function ReportsList() {
     setError(null);
 
     try {
-      // ✅ Logic: Tab UI là "approved" nhưng API cần gọi "resolved"
       const apiStatus = activeTab === "approved" ? "resolved" : activeTab;
-
-      // Gọi API (getHandlingReports giờ đã chấp nhận string | null)
       const response = await getHandlingReports(apiStatus, null, 1, 50);
-
-      // ✅ Fix lỗi setReports: Lấy mảng items từ response object
       const dataItems = response.items || [];
       setReports(dataItems);
       
@@ -102,6 +133,10 @@ export function ReportsList() {
   // ================= REUSABLE TABLE =================
 
   const ReportsTable = ({ data }: { data: ReportItem[] }) => {
+    const isPendingTab = activeTab === "pending";
+    const isApprovedTab = activeTab === "approved";
+    // const isRejectedTab = activeTab === "rejected"; // Không cần biến này nữa vì logic gom vào else
+
     if (!data || data.length === 0) {
       return (
         <div className="flex justify-center items-center min-h-[300px]">
@@ -115,75 +150,106 @@ export function ReportsList() {
         <Table>
           <TableHeader>
             <TableRow className="bg-[var(--card)] border-b">
-              <TableHead className="py-4 px-6">Loại</TableHead>
-              <TableHead className="py-4 px-6">Lý do</TableHead>
+              <TableHead className="py-4 px-6 w-[100px]">Loại</TableHead>
+              <TableHead className="py-4 px-6 w-[200px]">Lý do</TableHead>
               <TableHead className="py-4 px-6">Chi tiết</TableHead>
-              <TableHead className="py-4 px-6">Trạng thái</TableHead>
-              <TableHead className="py-4 px-6 text-center">Hành động</TableHead>
+              <TableHead className="py-4 px-6 w-[150px]">Trạng thái xử lý</TableHead>
+              
+              {/* Cột cuối cùng luôn hiện, nhưng tiêu đề thay đổi */}
+              <TableHead className="py-4 px-6 text-center w-[180px]">
+                {isPendingTab ? "Hành động" : "Chi tiết"}
+              </TableHead>
             </TableRow>
           </TableHeader>
 
           <TableBody>
-            {data.map((report) => (
-              <TableRow
-                // ✅ Sử dụng reportId làm key (khớp với API)
-                key={report.reportId}
-                className="border-b hover:bg-[var(--muted)]/20 transition-colors"
-              >
-                <TableCell className="py-4 px-6">
-                  <Badge className="uppercase bg-blue-50 text-blue-700 border-blue-200">
-                    {report.targetType}
-                  </Badge>
-                </TableCell>
+            {data.map((report) => {
+               const targetStatus = getTargetStatusInfo(report);
 
-                {/* ✅ ÁP DỤNG HÀM DỊCH THUẬT Ở ĐÂY */}
-                <TableCell className="py-4 px-6 font-medium text-red-600">
-                  {getTranslatedReason(report.reason)}
-                </TableCell>
-
-                <TableCell
-                  className="py-4 px-6 max-w-md truncate text-[var(--muted-foreground)]"
-                  title={report.details}
+               return (
+                <TableRow
+                  key={report.reportId}
+                  className="border-b hover:bg-[var(--muted)]/20 transition-colors"
                 >
-                  {report.details || "Không có mô tả"}
-                </TableCell>
+                  {/* Cột Loại */}
+                  <TableCell className="py-4 px-6">
+                    <Badge className="uppercase bg-blue-50 text-blue-700 border-blue-200">
+                      {report.targetType}
+                    </Badge>
+                  </TableCell>
 
-                <TableCell className="py-4 px-6">
-                  <Badge
-                    className={cn(
-                      report.status === "pending" &&
-                        "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
-                      // ✅ Check cả approved (UI) và resolved (API)
-                      (report.status === "approved" || report.status === "resolved") &&
-                        "bg-green-100 text-green-800 hover:bg-green-200",
-                      report.status === "rejected" &&
-                        "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                    )}
+                  {/* Cột Lý do */}
+                  <TableCell className="py-4 px-6 font-medium text-red-600">
+                    {getTranslatedReason(report.reason)}
+                  </TableCell>
+
+                  {/* Cột Chi tiết (Mô tả) */}
+                  <TableCell
+                    className="py-4 px-6 max-w-md truncate text-[var(--muted-foreground)]"
+                    title={report.details}
                   >
-                    {/* ✅ Hiển thị text tiếng Việt phù hợp */}
-                    {report.status === "resolved" || report.status === "approved" 
-                      ? "Đã xử phạt" 
-                      : report.status === "rejected" 
-                        ? "Đã từ chối" 
-                        : "Chờ xử lý"}
-                  </Badge>
-                </TableCell>
+                    {report.details || "Không có mô tả"}
+                  </TableCell>
 
-                <TableCell className="py-4 px-6 text-center">
-                  {report.status === "pending" && (
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      <Button
-                        size="sm"
-                        onClick={() => handleOpenProcess(report)}
-                        className="bg-[var(--primary)] hover:bg-[color-mix(in srgb, var(--primary) 75%, black)] text-white px-4 rounded-lg"
-                      >
-                        Xử lý
-                      </Button>
-                    </motion.div>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
+                  {/* Cột Trạng thái xử lý */}
+                  <TableCell className="py-4 px-6">
+                    <Badge
+                      className={cn(
+                        "whitespace-nowrap",
+                        report.status === "pending" &&
+                          "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
+                        (report.status === "approved" || report.status === "resolved") &&
+                          "bg-green-100 text-green-800 hover:bg-green-200",
+                        report.status === "rejected" &&
+                          "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                      )}
+                    >
+                      {report.status === "resolved" || report.status === "approved" 
+                        ? "Đã xử phạt" 
+                        : report.status === "rejected" 
+                          ? "Đã từ chối" 
+                          : "Chờ xử lý"}
+                    </Badge>
+                  </TableCell>
+
+                  {/* Cột Hành động / Chi tiết (LOGIC MỚI) */}
+                  <TableCell className="py-4 px-6 text-center">
+                    {isPendingTab ? (
+                      // === Tab Chờ xử lý: Chỉ hiện nút Xử lý ===
+                      <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                        <Button
+                          size="sm"
+                          onClick={() => handleOpenProcess(report)}
+                          className="bg-[var(--primary)] hover:bg-[color-mix(in srgb, var(--primary) 75%, black)] text-white px-4 rounded-lg shadow-sm"
+                        >
+                          Xử lý
+                        </Button>
+                      </motion.div>
+                    ) : (
+                      // === Tab Đã xử phạt & Đã từ chối: Hiện nút Xem chi tiết ===
+                      <div className="flex flex-col items-center gap-2">
+                        {/* Nếu là tab Approved thì hiện thêm trạng thái nội dung (Đã ẩn/Hiện) */}
+                        {isApprovedTab && (
+                          <Badge variant="outline" className={cn("flex items-center w-fit px-2 py-0.5 text-[10px]", targetStatus.color)}>
+                            {targetStatus.icon} {targetStatus.label}
+                          </Badge>
+                        )}
+                        
+                        {/* Cả Approved và Rejected đều có nút này */}
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 text-xs text-muted-foreground hover:text-primary hover:bg-blue-50"
+                          onClick={() => handleOpenProcess(report)}
+                        >
+                          <Eye className="w-3 h-3 mr-1" /> Xem chi tiết
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </Card>
@@ -234,7 +300,6 @@ export function ReportsList() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <TabsList className="bg-[var(--card)] border border-[var(--border)] h-12 p-1 flex items-center gap-1 rounded-lg">
-
             {/* Pending */}
             <TabsTrigger
               value="pending"
@@ -267,20 +332,10 @@ export function ReportsList() {
             >
               Đã từ chối
             </TabsTrigger>
-
           </TabsList>
-
-          <div className="relative w-full md:w-96">
-            {/* <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
-            <Input
-              placeholder="Tìm ID hoặc lý do..."
-              className="pl-10 h-12 bg-[var(--card)] border border-[var(--border)]"
-            /> */}
-          </div>
         </div>
 
         <motion.div key={activeTab} variants={tabContentVariants} initial="hidden" animate="visible">
-          {/* Vì logic fetch đã theo activeTab, ta render trực tiếp table */}
           <TabsContent value={activeTab} forceMount>
             <ReportsTable data={reports} />
           </TabsContent>
@@ -290,7 +345,7 @@ export function ReportsList() {
       <ReportActionModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        report={selectedReport}
+        report={selectedReport as any}
         onSuccess={() => fetchReports()}
       />
     </div>
