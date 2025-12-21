@@ -21,7 +21,9 @@ import {
   Music2,
   Crown,
   Unlock,
+  Flag,
 } from "lucide-react";
+import { ReportModal } from "@/components/report/ReportModal";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -68,7 +70,6 @@ const languageNames: Record<string, string> = {
   "ja-JP": "日本語 (Tiếng Nhật)",
   "en-US": "English (Tiếng Anh)",
   "zh-CN": "中文 (Tiếng Trung)",
-  
 };
 interface ReaderToolbarProps {
   chapterNo: number;
@@ -85,7 +86,7 @@ interface ReaderToolbarProps {
   autoPlayAfterUnlock?: boolean; //  PROP MỚI: Tự động phát sau khi mở khóa
   setShowTopUpModal: (show: boolean) => void;
   mood?: { code: string; name: string };
-  moodMusicPaths?: string[];
+  moodMusicPaths?: { title: string; storagePath: string }[];
   hasActiveSubscription?: boolean;
   languageCode?: string;
 }
@@ -129,65 +130,43 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
   const [showMusicVolume, setShowMusicVolume] = useState(false);
   const bgMusicRef = useRef<HTMLAudioElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  // const getFullAudioUrl = (path: string | undefined | null) => {
+  //   if (!path) return "";
+  //   if (path.startsWith("http")) return path;
+  //   const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+  //   return `${AUDIO_BASE_URL}${cleanPath}`;
+  // };
+  const getFullAudioUrl = (path: any) => {
+    // Kiểm tra nếu path không phải string hoặc rỗng thì thoát sớm
+    if (typeof path !== "string" || !path) return "";
 
-  const getFullAudioUrl = (path: string | undefined | null) => {
-    if (!path) return "";
     if (path.startsWith("http")) return path;
     const cleanPath = path.startsWith("/") ? path.slice(1) : path;
     return `${AUDIO_BASE_URL}${cleanPath}`;
   };
 
-  // const fetchVoices = async () => {
-  //   setIsLoadingVoice(true);
-  //   try {
-  //     const data = await chapterCatalogApi.getChapterVoices(chapterId);
-  //     console.log("🎯 VOICES DATA:", data);
-  //     setVoices(data);
-
-  //     //  QUAN TRỌNG: Nếu có autoPlayAfterUnlock, chọn giọng đầu tiên và phát ngay
-  //     if (autoPlayAfterUnlock && data.length > 0) {
-  //       const firstOwnedVoice = data.find((v) => v.owned);
-  //       if (firstOwnedVoice) {
-  //         console.log("🎯 AUTO PLAYING VOICE AFTER UNLOCK:", firstOwnedVoice);
-  //         setCurrentVoice(firstOwnedVoice);
-  //         setVoiceSettings((prev) => ({ ...prev, isPlaying: true }));
-  //       }
-  //     } else if (!currentVoice) {
-  //       // Bình thường: chọn giọng đầu tiên đã sở hữu
-  //       const owned = data.find((v) => v.owned);
-  //       if (owned) setCurrentVoice(owned);
-  //     }
-  //   } catch (error) {
-  //     console.error("Lỗi tải giọng:", error);
-  //   } finally {
-  //     setIsLoadingVoice(false);
-  //   }
-  // };
   const fetchVoices = async () => {
     setIsLoadingVoice(true);
     try {
       const data = await chapterCatalogApi.getChapterVoices(chapterId);
-      console.log("🎯 VOICES DATA:", data);
 
-      // --- [SỬA] LỌC VOICE: Chỉ lấy chưa mua HOẶC đã mua + ready ---
+      // SỬA TẠI ĐÂY: Ưu tiên hiện voice đã sở hữu (owned)
       const visibleVoices = data.filter((v) => {
-        if (!v.owned) return true; // Chưa mua -> Hiện để bán
-        return v.status === "ready"; // Đã mua -> Phải xong mới hiện
+        if (v.owned) return true; // Nếu là tác giả hoặc đã mua -> Luôn hiện
+        return true; // Voice chưa mua cũng hiện để bán
       });
 
-      // Cập nhật state bằng danh sách đã lọc
       setVoices(visibleVoices);
 
-      // --- [SỬA] LOGIC AUTOPLAY: Dùng visibleVoices thay vì data ---
+      // Logic autoplay giữ nguyên
       if (autoPlayAfterUnlock && visibleVoices.length > 0) {
         const firstOwnedVoice = visibleVoices.find((v) => v.owned);
         if (firstOwnedVoice) {
-          console.log("🎯 AUTO PLAYING VOICE AFTER UNLOCK:", firstOwnedVoice);
           setCurrentVoice(firstOwnedVoice);
           setVoiceSettings((prev) => ({ ...prev, isPlaying: true }));
         }
       } else if (!currentVoice) {
-        // Bình thường: chọn giọng đầu tiên đã sở hữu trong danh sách CÓ THỂ NGHE
         const owned = visibleVoices.find((v) => v.owned);
         if (owned) setCurrentVoice(owned);
       }
@@ -321,9 +300,19 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
         case error.response?.status === 400 &&
           errorCode === "InsufficientBalance":
           toast.error("Số dư không đủ", {
-            description: `Bạn cần thêm ${voiceToBuy.priceDias} Dias để mua giọng đọc này.`,
+            description: (
+              <span className="flex items-center gap-1 flex-wrap">
+                Bạn cần thêm {voiceToBuy?.priceDias}
+                <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+                để mua giọng đọc này.
+              </span>
+            ),
             action: {
-              label: "Nạp Dias",
+              label: (
+                <span className="flex items-center gap-1">
+                  Nạp <Gem className="h-3 w-3 fill-white" />
+                </span>
+              ),
               onClick: () => setShowTopUpModal(true),
             },
           });
@@ -348,35 +337,18 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
     }
   };
 
-  // const refreshAndPlay = async (targetVoiceId: string) => {
-  //   try {
-  //     const data = await chapterCatalogApi.getChapterVoices(chapterId);
-  //     setVoices(data);
-  //     const newOwned = data.find((v) => v.voiceId === targetVoiceId);
-  //     if (newOwned && newOwned.owned) {
-  //       setCurrentVoice(newOwned);
-  //       setVoiceSettings((prev) => ({ ...prev, isPlaying: true }));
-  //     }
-  //   } catch (e) {
-  //     console.error("Reload error", e);
-  //   }
-  // };
   const refreshAndPlay = async (targetVoiceId: string) => {
     try {
       const data = await chapterCatalogApi.getChapterVoices(chapterId);
 
-      // --- [SỬA] LỌC VOICE TƯƠNG TỰ ---
+      // SỬA TẠI ĐÂY: Xóa bỏ điều kiện v.status === "ready"
       const visibleVoices = data.filter((v) => {
-        if (!v.owned) return true;
-        return v.status === "ready";
+        return true; // Hiện tất cả để đảm bảo không bị mất voice vừa mua
       });
 
       setVoices(visibleVoices);
 
-      // --- [SỬA] Tìm voice trong danh sách ĐÃ LỌC ---
-      // Nếu voice vừa mua bị lỗi/đang xử lý, nó sẽ không tìm thấy ở đây -> không lỗi player
       const newOwned = visibleVoices.find((v) => v.voiceId === targetVoiceId);
-
       if (newOwned && newOwned.owned) {
         setCurrentVoice(newOwned);
         setVoiceSettings((prev) => ({ ...prev, isPlaying: true }));
@@ -389,7 +361,8 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
   useEffect(() => {
     setIsMusicPlaying(false);
     if (moodMusicPaths && moodMusicPaths.length > 0) {
-      setActiveMusicPath(moodMusicPaths[0]); // Mặc định chọn bài đầu
+      // Mặc định chọn storagePath của bài đầu tiên
+      setActiveMusicPath(moodMusicPaths[0].storagePath);
     } else {
       setActiveMusicPath(null);
     }
@@ -411,28 +384,39 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
     }
   }, [isMusicPlaying, activeMusicPath, musicVolume]);
 
-  // 3. Hàm chọn nhạc (Check VIP)
   const handleMusicSelect = (path: string) => {
+    // 1. Xử lý tắt nhạc
     if (path === "turn_off") {
       setActiveMusicPath(null);
       setIsMusicPlaying(false);
       toast.info("Đã tắt nhạc nền");
       return;
     }
+
+    // 2. Chặn và hiện thông báo yêu cầu mua gói Premium
     if (!hasActiveSubscription) {
-      toast.error("Tính năng giới hạn", {
-        description: "Bạn phải mua gói Hội viên để nghe nhạc nền.",
+      toast.error("Tính năng Hội viên", {
+        description: "Để nghe nhạc bạn phải mua gói Premium.",
         icon: <Crown className="w-4 h-4 text-orange-500" />,
-        action: { label: "Xem gói", onClick: () => setShowTopUpModal(true) },
+        action: {
+          label: (
+            <span className="flex items-center gap-1">
+              Nâng cấp <Crown className="h-3 w-3 fill-white" />
+            </span>
+          ),
+          onClick: () => setShowTopUpModal(true), // Mở popup nạp tiền/mua gói
+        },
       });
       setIsMusicPlaying(false);
       return;
     }
+
+    // 3. Phát nhạc thành công cho Hội viên (VIP)
     setActiveMusicPath(path);
     setIsMusicPlaying(true);
-    toast.success("Đang phát nhạc nền", {
-      description: `Giai điệu: ${mood?.name || "Tâm trạng"}`,
-      icon: <Music className="w-4 h-4 text-pink-500" />,
+
+    toast.success("Đang phát nhạc nền Premium", {
+      icon: <Music2 className="w-4 h-4 text-pink-500" />,
     });
   };
   const formatTime = (seconds: number) => {
@@ -768,7 +752,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                 )}
               </SelectContent>
             </Select>
-            {moodMusicPaths.length > 0 && (
+            <div className="flex items-center">
               <Select
                 value={activeMusicPath || ""}
                 onValueChange={handleMusicSelect}
@@ -782,78 +766,129 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                     )}
                     <span className="truncate">
                       {activeMusicPath
-                        ? `Giai điệu ${
-                            moodMusicPaths.indexOf(activeMusicPath) + 1
-                          }`
-                        : "Chọn nhạc nền"}
+                        ? moodMusicPaths.find(
+                            (m) => m.storagePath === activeMusicPath
+                          )?.title || "Đang phát..."
+                        : mood?.name
+                        ? `Nhạc: ${mood.name}`
+                        : "Nhạc nền Premium"}
                     </span>
                   </div>
                 </SelectTrigger>
 
-                <SelectContent>
-                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/30">
-                    Mood: {mood?.name || "Tâm trạng"}
-                  </div>
-                  <div className="px-3 py-3 border-b space-y-2">
-                    <div className="flex justify-between text-[10px] font-bold uppercase opacity-70">
-                      <span>Âm lượng nhạc</span>
-                      <span>{musicVolume}%</span>
+                <SelectContent className="w-64 p-0 overflow-hidden">
+                  {/* Tiêu đề Menu */}
+                  <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted/30 flex items-center justify-between border-b">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] opacity-70 uppercase">
+                        Nhạc nền Premium
+                      </span>
+                      <span className="text-blue-600 ">
+                        Cảm xúc: {mood?.name || "Mặc định"}
+                      </span>
                     </div>
-                    <Slider
-                      value={[musicVolume]}
-                      max={100}
-                      step={1}
-                      onValueChange={(val) => setMusicVolume(val[0])}
-                      className="cursor-pointer"
-                    />
+                    <Crown className="w-3 h-3 text-orange-500" />
                   </div>
-                  <SelectItem value="turn_off">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <VolumeX className="w-3 h-3" />
-                      <span>Tắt nhạc</span>
-                    </div>
-                  </SelectItem>
-                  {/* --------------------- */}
-                  {moodMusicPaths.map((path, index) => (
-                    <SelectItem key={path} value={path}>
-                      <div className="flex items-center justify-between w-full min-w-[140px] gap-2">
-                        <span>Giai điệu {index + 1}</span>
-                        {hasActiveSubscription ? (
-                          <div className="flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">
-                            <Crown className="w-3 h-3" /> <span>Đã mở</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full">
-                            <Crown className="w-3 h-3" /> <span>VIP</span>
-                          </div>
-                        )}
+
+                  {!hasActiveSubscription ? (
+                    /* --- TRƯỜNG HỢP 1: CHƯA CÓ PREMIUM (HIỆN THÔNG BÁO DỤ MUA) --- */
+                    <div className="p-6 flex flex-col items-center text-center gap-3 bg-white dark:bg-slate-900">
+                      {/* Icon Vương miện mờ mờ giống icon loa bên voice */}
+                      <Crown className="w-12 h-12 text-orange-400 opacity-20" />
+
+                      <div className="space-y-1">
+                        <p className="text-[13px] font-bold text-slate-800 dark:text-slate-200">
+                          Tính năng Premium
+                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Bạn cần mua gói Premium để nghe nhạc
+                          <br />
+                          cho chương này
+                        </p>
                       </div>
-                    </SelectItem>
-                  ))}
+
+                      <Button
+                        size="sm"
+                        className="w-full h-9 text-xs bg-orange-500 hover:bg-orange-600 text-white rounded-full mt-2 font-bold shadow-md transition-all hover:scale-105"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowTopUpModal(true);
+                          // THÊM DÒNG NÀY: Giả lập phím Escape để đóng cái Dropdown đang mở
+                          document.dispatchEvent(
+                            new KeyboardEvent("keydown", { key: "Escape" })
+                          );
+                        }}
+                      >
+                        <Crown className="w-3 h-3 mr-2 fill-current" />
+                        Nâng cấp ngay
+                      </Button>
+                    </div>
+                  ) : (
+                    /* --- TRƯỜNG HỢP 2: ĐÃ CÓ PREMIUM (HIỆN DANH SÁCH NHẠC THẬT) --- */
+                    <>
+                      <div className="px-3 py-3 border-b space-y-2">
+                        <div className="flex justify-between text-[10px] font-bold uppercase opacity-70">
+                          <span>Âm lượng nhạc</span>
+                          <span>{musicVolume}%</span>
+                        </div>
+                        <Slider
+                          value={[musicVolume]}
+                          max={100}
+                          onValueChange={(val) => setMusicVolume(val[0])}
+                        />
+                      </div>
+
+                      <SelectItem value="turn_off">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <VolumeX className="w-3 h-3" />
+                          <span>Tắt nhạc</span>
+                        </div>
+                      </SelectItem>
+
+                      {moodMusicPaths.length > 0 ? (
+                        moodMusicPaths.map((music, index) => (
+                          <SelectItem
+                            key={music.storagePath}
+                            value={music.storagePath}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Music2 className="w-3 h-3" />
+                              {/* Hiển thị title thật từ API thay vì "Giai điệu + index" */}
+                              <span>{music.title}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="p-4 text-xs text-center text-muted-foreground italic">
+                          Đang cập nhật nhạc...
+                        </div>
+                      )}
+                    </>
+                  )}
                 </SelectContent>
               </Select>
-            )}
+            </div>
           </div>
         </div>
 
         <div className="flex items-center justify-end gap-1 w-fit shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowReportModal(true)}
+            className={cn(
+              "h-9 w-9 text-destructive hover:bg-destructive/10", // Màu đỏ nhẹ cho nút báo cáo
+              themeClasses.textMuted
+            )}
+            title="Báo cáo chương này"
+          >
+            <Flag className="h-5 w-5" />
+          </Button>
+          {/* Popover chỉnh âm lượng nhạc nền (Chỉ hiện khi đã là VIP và đang có nhạc) */}
           {activeMusicPath && hasActiveSubscription && (
             <Popover open={showMusicVolume} onOpenChange={setShowMusicVolume}>
               <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "hidden lg:flex h-9 w-9",
-                    isMusicPlaying
-                      ? "text-pink-500 bg-pink-50 dark:bg-pink-900/10"
-                      : themeClasses.textMuted,
-                    themeClasses.hover
-                  )}
-                  title="Âm lượng nhạc nền"
-                >
-                  <Music2 className="h-5 w-5" />
-                </Button>
+                <span className="sr-only">Chỉnh âm lượng nhạc</span>
               </PopoverTrigger>
               <PopoverContent side="bottom" align="end" className="w-32 p-3">
                 <div className="space-y-2">
@@ -917,7 +952,13 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
           </Button>
         </div>
       </div>
-
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        targetType="chapter"
+        targetId={chapterId}
+        targetTitle={`Chương ${chapterNo}: ${chapterTitle}`}
+      />
       <Dialog
         open={!!voiceToBuy}
         onOpenChange={(open) => !open && setVoiceToBuy(null)}
@@ -928,15 +969,19 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
               <ShoppingCart className="w-5 h-5 text-blue-600" />
               Xác nhận mua giọng đọc
             </DialogTitle>
-            <DialogDescription>
-              Bạn có muốn sử dụng <strong>{voiceToBuy?.priceDias} Dias</strong>{" "}
+            <DialogDescription className="flex items-center gap-1 flex-wrap">
+              Bạn có muốn sử dụng
+              <span className="font-bold flex items-center gap-1 text-blue-600">
+                {voiceToBuy?.priceDias}
+                <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+              </span>
               để mở khóa vĩnh viễn giọng đọc:
             </DialogDescription>
           </DialogHeader>
 
           <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg flex items-center gap-4 my-2 border border-slate-100 dark:border-slate-800">
             <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-              <Volume2 className="w-5 h-5" />
+              <Volume2 className="h-5 w-5" />
             </div>
             <div>
               <h4 className="font-semibold text-sm">{voiceToBuy?.voiceName}</h4>
@@ -947,9 +992,10 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
             <div className="ml-auto">
               <Badge
                 variant="outline"
-                className="border-orange-200 text-orange-600 bg-orange-50"
+                className="border-orange-200 text-orange-600 bg-orange-50 flex items-center gap-1"
               >
-                {voiceToBuy?.priceDias} Dias
+                {voiceToBuy?.priceDias}
+                <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
               </Badge>
             </div>
           </div>

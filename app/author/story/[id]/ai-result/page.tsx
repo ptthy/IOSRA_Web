@@ -163,9 +163,9 @@ export default function AIResultPage() {
       {story.aiViolations && story.aiViolations.length > 0 && (
         <div className="mt-8">
           <AiModerationReport
-            aiFeedback={null}
             aiViolations={story.aiViolations}
             contentType="truyện"
+            hideFeedback={true} // THÊM DÒNG NÀY ĐỂ ẨN PHẦN FEEDBACK
           />
         </div>
       )}

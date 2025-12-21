@@ -383,9 +383,7 @@ export default function AuthorRankDashboard() {
             <CardContent className="relative z-10">
               <div className="flex items-center gap-3 mb-2">
                 <RankIcon rank={rankStatus.currentRankName} size={8} />
-                <div
-                  className={`text-2xl font-extrabold ${currentRankStyle.color}`}
-                >
+                <div className={`text-2xl font-bold ${currentRankStyle.color}`}>
                   {rankStatus.currentRankName}
                 </div>
               </div>
@@ -411,7 +409,7 @@ export default function AuthorRankDashboard() {
             </div>
             <CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Followers & Tiến Độ
+                Số lượng người theo dõi & Tiến độ
               </CardTitle>
               <div className="p-2 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl shadow-lg">
                 <TrendingUp className="w-5 h-5 text-white" />
@@ -419,7 +417,7 @@ export default function AuthorRankDashboard() {
             </CardHeader>
             <CardContent className="relative z-10 space-y-3">
               <div className="flex items-center gap-2">
-                <div className="text-2xl font-extrabold text-indigo-900 dark:text-indigo-100">
+                <div className="text-2xl font-bold text-indigo-900 dark:text-indigo-100">
                   {rankStatus.totalFollowers.toLocaleString()}
                 </div>
                 <Users className="w-6 h-6 text-indigo-500 dark:text-indigo-400" />
@@ -437,7 +435,7 @@ export default function AuthorRankDashboard() {
                   <p className="text-xs text-muted-foreground">
                     {isEligible
                       ? "✅ Đã đủ điều kiện"
-                      : `Cần thêm ${followersNeeded} followers`}
+                      : `Cần thêm ${followersNeeded} người theo dõi`}
                   </p>
                 </div>
               ) : (
@@ -486,7 +484,7 @@ export default function AuthorRankDashboard() {
                 <div className="flex items-center gap-3 mb-2">
                   <RankIcon rank={rankStatus.nextRankName} size={8} />
                   <div
-                    className={`text-2xl font-extrabold ${
+                    className={`text-2xl font-bold ${
                       isEligible
                         ? nextRankStyle.color
                         : "text-slate-700 dark:text-slate-300"
@@ -509,14 +507,14 @@ export default function AuthorRankDashboard() {
                     <Users className="w-4 h-4 text-blue-600" />
                     <span className="text-muted-foreground">Yêu cầu:</span>
                     <span className="font-semibold text-foreground">
-                      {rankStatus.nextRankMinFollowers} followers
+                      {rankStatus.nextRankMinFollowers} người theo dõi
                     </span>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   {isEligible
                     ? "Sẵn sàng thăng hạng!"
-                    : `Cần tối thiểu ${rankStatus.nextRankMinFollowers} followers`}
+                    : `Cần tối thiểu ${rankStatus.nextRankMinFollowers} người theo dõi`}
                 </p>
               </CardContent>
             </Card>

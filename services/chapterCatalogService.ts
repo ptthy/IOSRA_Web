@@ -27,7 +27,7 @@ export interface ChapterSummary {
   accessType: "free" | "dias"; // "free" hoặc "dias"
   priceDias: number;
   mood?: Mood;
-  moodMusicPaths?: string[];
+  moodMusicPaths?: { title: string; storagePath: string }[];
 }
 
 export interface ChapterDetail {
@@ -46,7 +46,7 @@ export interface ChapterDetail {
   priceDias: number;
   voices?: ChapterVoice[];
   mood?: Mood;
-  moodMusicPaths?: string[];
+  moodMusicPaths?: { title: string; storagePath: string }[];
 }
 
 export interface PaginatedResponse<T> {
