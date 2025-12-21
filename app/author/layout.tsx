@@ -74,7 +74,7 @@ export default function AuthorLayout({ children }: AuthorLayoutProps) {
             >
               <FileText className="h-5 w-5 shrink-0" />
               {!isCollapsed && (
-                <span className="ml-2 truncate">Quản lý Truyện</span>
+                <span className="ml-2 truncate">Quản Lý Truyện</span>
               )}
             </Button>
             <Button
@@ -85,19 +85,19 @@ export default function AuthorLayout({ children }: AuthorLayoutProps) {
             >
               <Trophy className="h-5 w-5 shrink-0 text-amber-500" />
               {!isCollapsed && (
-                <span className="ml-2 truncate">Nâng cấp Hạng Tác Giả</span>
+                <span className="ml-2 truncate">Nâng Cấp Hạng Tác Giả</span>
               )}
             </Button>
             <Button
               variant={isRevenueActive ? "secondary" : "ghost"}
               className="w-full justify-start"
               onClick={() => handleNavigate("author-revenue")}
-              title="Quản lý doanh thu "
+              title="Quản Lý Doanh Thu"
             >
               {/* Icon tiền tệ màu xanh lá */}
               <CircleDollarSign className="h-5 w-5 shrink-0 text-green-600" />
               {!isCollapsed && (
-                <span className="ml-2 truncate">Quản lý doanh thu</span>
+                <span className="ml-2 truncate">Quản Lý Doanh Thu</span>
               )}
             </Button>
 
@@ -106,12 +106,12 @@ export default function AuthorLayout({ children }: AuthorLayoutProps) {
               variant="ghost"
               className="w-full justify-start"
               onClick={() => setIsVoiceModalOpen(true)}
-              title="Định mức chi phí"
+              title="Định Mức Chi Phí"
             >
               {/* Giữ màu tím cho Icon để nhận diện tính năng AI, hoặc xóa class text-indigo-500 nếu muốn đen hoàn toàn */}
               <Sparkles className="h-5 w-5 shrink-0 text-indigo-500" />
               {!isCollapsed && (
-                <span className="ml-2 truncate">Định mức chi phí</span>
+                <span className="ml-2 truncate">Định Mức Chi Phí</span>
               )}
             </Button>
           </nav>
