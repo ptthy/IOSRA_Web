@@ -1,6 +1,6 @@
 // components/author/VoiceChapterPlayer.tsx
 "use client";
-
+import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { voiceChapterService } from "@/services/voiceChapterService";
 import { profileService } from "@/services/profileService";
@@ -53,6 +53,7 @@ export default function VoiceChapterPlayer({
   chapterId,
 }: VoiceChapterPlayerProps) {
   // --- Data States ---
+  const router = useRouter();
   const [createdVoices, setCreatedVoices] = useState<VoiceAudio[]>([]);
   const [availableVoices, setAvailableVoices] = useState<VoiceItem[]>([]);
   const [charCount, setCharCount] = useState<number>(0);
@@ -696,9 +697,7 @@ export default function VoiceChapterPlayer({
               <Button
                 variant="outline"
                 className="mt-6 border-amber-300 text-amber-900 hover:bg-amber-100"
-                onClick={() =>
-                  (window.location.href = "/author/author-upgrade-rank")
-                }
+                onClick={() => router.push("/author/author-upgrade-rank")}
               >
                 Tìm hiểu về Cấp bậc Tác giả
               </Button>
