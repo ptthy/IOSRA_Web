@@ -225,9 +225,6 @@ export function VoiceTopupModal({ isOpen, onClose }: VoiceTopupModalProps) {
                                 {rule.sellingPriceDias}
                                 <div className="relative">
                                   <Gem className="h-4 w-4 text-blue-500 fill-blue-500 opacity-80" />
-                                  <span className="absolute -bottom-2 -right-2 text-yellow-500 text-lg font-bold leading-none">
-                                    *
-                                  </span>
                                 </div>
                               </div>
                             </TableCell>

@@ -279,7 +279,13 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
       await chapterPurchaseApi.buyVoice(chapterId, [voiceToBuy.voiceId]);
 
       toast.success(`Đã mua giọng ${voiceToBuy.voiceName}`, {
-        description: `Đã trừ ${voiceToBuy.priceDias} Dias trong ví.`,
+        description: (
+          <span className="flex items-center gap-1">
+            Đã trừ {voiceToBuy.priceDias}
+            <Gem className="h-4 w-4 text-blue-500 fill-blue-500 opacity-80" />
+            trong ví.
+          </span>
+        ),
       });
 
       await refreshAndPlay(voiceToBuy.voiceId);
@@ -590,9 +596,10 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                               // Case 2: Bị khóa (chưa mua) -> Hiện giá
                               <Badge
                                 variant="outline"
-                                className="border-orange-500 text-orange-600 bg-orange-50 font-bold"
+                                className="border-orange-500 text-orange-600 bg-orange-50 font-bold flex items-center gap-1"
                               >
-                                {ch.priceDias} Dias
+                                {ch.priceDias}
+                                <Gem className="h-4 w-4 text-blue-500 fill-blue-500 opacity-80" />
                               </Badge>
                             ) : (
                               // Case 3: Free
