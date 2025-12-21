@@ -54,6 +54,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { StatusRibbon } from "@/components/StatusRibbon";
 // Component ImageWithFallback
 function ImageWithFallback({
   src,
@@ -582,7 +583,7 @@ export default function StoryDetailPage() {
       <div className="max-w-6xl mx-auto space-y-6 pb-16 pt-6 px-4">
         <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-card via-card to-muted/20">
           <CardContent className="p-0 relative">
-            {" "}
+            <StatusRibbon status={story.status} />{" "}
             {/* QUAN TRỌNG: Thêm 'relative' ở đây */}
             {/*  KHỐI NÚT BÁO CÁO (Nằm ngay đầu CardContent) 👇 */}
             <div className="absolute top-4 right-4 z-20">
@@ -754,38 +755,6 @@ export default function StoryDetailPage() {
                             0}
                         </p>
                       </div>
-                    </div>
-
-                    {/* Trạng thái */}
-                    <div className="md:ml-auto flex items-center">
-                      <Badge
-                        variant="outline"
-                        className={`px-3 py-1 text-[11px] font-bold border-none shadow-sm flex items-center gap-2 transition-all
-        ${
-          story.status === "completed"
-            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
-            : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-        }
-      `}
-                      >
-                        <span className="relative flex h-2 w-2">
-                          {story.status !== "completed" && (
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75"></span>
-                          )}
-                          <span
-                            className={`relative inline-flex rounded-full h-2 w-2 ${
-                              story.status === "completed"
-                                ? "bg-emerald-600"
-                                : "bg-amber-600"
-                            }`}
-                          ></span>
-                        </span>
-                        <span className="tracking-wider uppercase whitespace-nowrap">
-                          {story.status === "completed"
-                            ? "Hoàn thành"
-                            : "Đang cập nhật"}
-                        </span>
-                      </Badge>
                     </div>
                   </div>
                   {/* ... more stats ... */}

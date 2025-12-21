@@ -28,6 +28,7 @@ interface AiModerationReportProps {
   aiFeedback?: string | null;
   aiViolations?: AiViolation[] | null;
   contentType?: "truyện" | "chương";
+  hideFeedback?: boolean; // Thêm dòng này
 }
 
 const getViolationStyle = (label: string) => {
@@ -170,30 +171,34 @@ export const AiModerationReport: React.FC<AiModerationReportProps> = ({
   aiFeedback,
   aiViolations,
   contentType = "nội dung",
+  hideFeedback = false, // Mặc định là false để các trang khác không bị ảnh hưởng
 }) => {
   return (
     <div className="pt-6 border-t border-border mt-6 space-y-8">
       {/* PHẢN HỒI TỔNG QUÁT */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 text-primary dark:text-primary-foreground">
-          <FileText className="h-5 w-5" />
-          <h3 className="text-sm font-bold uppercase tracking-widest">
-            Phản hồi tổng quát từ AI
-          </h3>
-        </div>
-        <div className="p-5 bg-blue-100/50 dark:bg-blue-900/40 rounded-xl border-2 border-blue-200 dark:border-blue-700 shadow-sm">
-          <div className="text-[15px] leading-relaxed whitespace-pre-wrap text-gray-900 dark:text-gray-100 font-medium">
-            {aiFeedback ? (
-              extractVietnameseFeedback(aiFeedback)
-            ) : (
-              <span className="text-muted-foreground italic">
-                Không có nhận xét chi tiết cho {contentType} này.
-              </span>
-            )}
+      {/* Bao bọc phần PHẢN HỒI TỔNG QUÁT bằng điều kiện hideFeedback */}
+      {!hideFeedback && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-primary dark:text-primary-foreground">
+            <FileText className="h-5 w-5" />
+            <h3 className="text-sm font-bold uppercase tracking-widest">
+              Phản hồi tổng quát từ AI
+            </h3>
+          </div>
+
+          <div className="p-5 bg-blue-100/50 dark:bg-blue-900/40 rounded-xl border-2 border-blue-200 dark:border-blue-700 shadow-sm">
+            <div className="text-[15px] leading-relaxed whitespace-pre-wrap text-gray-900 dark:text-gray-100 font-medium">
+              {aiFeedback ? (
+                extractVietnameseFeedback(aiFeedback)
+              ) : (
+                <span className="text-muted-foreground italic">
+                  Không có nhận xét chi tiết cho {contentType} này.
+                </span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-
+      )}
       {/* CHI TIẾT VI PHẠM */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 text-destructive dark:text-red-400">
