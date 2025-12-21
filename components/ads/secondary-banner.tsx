@@ -34,7 +34,7 @@ export function SecondaryBanner({ onClick }: SecondaryBannerProps) {
           <div className="flex flex-wrap justify-center md:justify-start items-center gap-x-6 gap-y-2 xl:ml-8 pt-2 md:pt-5">
             {/* Daily Dias */}
             <div className="flex items-center gap-1.5">
-              <Gem className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+              <Gem className="w-3.5 h-3.5 text-blue-500 fill-blue-500 opacity-80" />
               <span className="text-[11px] font-medium text-foreground/80 whitespace-nowrap">
                 Nhận mỗi ngày
               </span>
