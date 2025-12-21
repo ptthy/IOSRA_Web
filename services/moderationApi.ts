@@ -17,10 +17,33 @@ export interface ReportItem {
     reporterId: string;
     createdAt: string;
     
-    // Các trường optional
-    story?: any;
-    chapter?: any;
-    comment?: any;
+    // ✅ CẬP NHẬT: Định nghĩa rõ kiểu dữ liệu cho các đối tượng lồng nhau
+    story?: {
+        storyId: string;
+        title: string;
+        authorId: string;
+        authorUsername?: string; // Bổ sung
+        coverUrl?: string;
+    };
+
+    chapter?: {
+        chapterId: string;
+        storyId: string;
+        title: string;       // Tên chương hoặc Tên truyện (tùy API trả về)
+        chapterNo: number;
+        contentPath: string;
+        priceDias?: number;
+        authorId: string;
+        authorUsername?: string; // ✅ Đã thêm theo yêu cầu
+    };
+
+    comment?: {
+        commentId: string;
+        content: string;
+        authorId: string;
+        authorUsername?: string;
+    };
+
     reporterUsername?: string;
     moderatorId?: string | null;
     moderatorUsername?: string | null;

@@ -1,17 +1,7 @@
-// File: page.tsx (Trang quản lý yêu cầu Author)
 "use client";
 
 import { useState, useEffect } from "react";
-// import { AppSidebar } from "@/components/op-sidebar"; // Nếu cần
-// import { SiteHeader } from "@/components/site-header"; // Nếu cần
-// import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"; // Nếu cần
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -23,12 +13,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -42,363 +27,325 @@ import {
   Search,
   CheckCircle,
   XCircle,
-  Crown,
-  Check,
-  X,
   Clock,
   Loader2,
-  Users, // Icon cho Follows
-  Trophy, // Icon cho Rank
-  AlertTriangle // Icon cảnh báo lỗi
+  Gem,
+  Shield,
+  ArrowRight,
+  Users,
+  Info,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"; // Cần component Tooltip nếu muốn tooltip xịn, nếu ko dùng title native
 import { toast } from "sonner";
 
-// Import API Service
 import {
   getUpgradeRequests,
   approveRequest,
   rejectRequest,
-  // ✅ Import thêm các hàm mới cho Rank
   getRankRequests,
   approveRankRequest,
-  rejectRankRequest
+  rejectRankRequest,
+  getAuthorsList,
 } from "@/services/operationModService";
 
-import OpLayout from "@/components/OpLayout"; 
+import OpLayout from "@/components/OpLayout";
 
-// --- Interface cho Author (Tab 1) ---
+// --- 1. CONFIG RANK STYLES ---
+const RANK_STYLES: Record<
+  string,
+  {
+    color: string;
+    bg: string;
+    shadow: string;
+  }
+> = {
+  Casual: {
+    color: "text-slate-700 dark:text-slate-300",
+    bg: "bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50",
+    shadow: "shadow-slate-200 dark:shadow-slate-800",
+  },
+  Bronze: {
+    color: "text-amber-800 dark:text-amber-300",
+    bg: "bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 dark:from-amber-900/30 dark:via-orange-900/30 dark:to-amber-800/30",
+    shadow: "shadow-amber-200 dark:shadow-amber-900",
+  },
+  Gold: {
+    color: "text-yellow-800 dark:text-yellow-300",
+    bg: "bg-gradient-to-br from-yellow-50 via-amber-50 to-yellow-100 dark:from-yellow-900/30 dark:via-amber-900/30 dark:to-yellow-800/30",
+    shadow: "shadow-yellow-200 dark:shadow-yellow-900",
+  },
+  Diamond: {
+    color: "text-cyan-800 dark:text-cyan-300",
+    bg: "bg-gradient-to-br from-cyan-50 via-blue-50 to-cyan-100 dark:from-cyan-900/30 dark:via-blue-900/30 dark:to-cyan-800/30",
+    shadow: "shadow-cyan-200 dark:shadow-cyan-900",
+  },
+};
+
+const DiamondIcon = () => (
+  <div className="relative inline-flex items-center ml-1">
+    <Gem className="h-3 w-3 text-blue-500 fill-blue-500 opacity-80" />
+    <span className="absolute -bottom-2 -right-1 text-yellow-500 text-[10px] font-bold leading-none">
+      *
+    </span>
+  </div>
+);
+
+const RankIcon = ({ rank, size = 4 }: { rank: string; size?: number }) => {
+  const r = (rank || "").toLowerCase();
+  const style = { width: `${size * 0.25}rem`, height: `${size * 0.25}rem` };
+
+  if (r.includes("diamond") || r.includes("kim cương")) {
+    return <Gem style={style} className="text-cyan-500 fill-cyan-100" />;
+  }
+  if (r.includes("gold") || r.includes("vàng")) {
+    return <Shield style={style} className="text-yellow-500 fill-yellow-100" />;
+  }
+  if (r.includes("bronze") || r.includes("đồng")) {
+    return <Shield style={style} className="text-orange-600 fill-orange-100" />;
+  }
+  return <Shield style={style} className="text-slate-400 fill-slate-100" />;
+};
+
+// --- Interfaces ---
 interface Author {
-  id: number | string;
+  id: string;
   name: string;
   email: string;
+  rank: string;
   stories: number;
-  views: number;
-  status: "active" | "suspended" | "sponsored";
+  followers: number;
   revenue: number;
+  withdrawn: number;
+  restricted: boolean;
+  verified: boolean;
 }
 
-// --- ✅ SỬA: Interface cho Rank/Sponsored Request (Tab 2) ---
-// Cập nhật để khớp với API /rank-requests
 interface SponsorRequest {
   requestId: string;
   authorId: string;
-  authorName: string;
-  email: string;
-  
-  currentRank: string; // Map từ currentRankName
-  followers: number;   // Map từ totalFollowers
-  targetRank: string;  // Map từ targetRankName
-  
+  authorUsername: string; // Tên username từ API
+  authorEmail?: string;
+  currentRankName: string;
+  targetRankName: string;
+  targetRankMinFollowers?: number; // Cần API trả về field này để so sánh
+  totalFollowers: number;
   createdAt: string;
-  reason: string;      // Map từ commitment
+  commitment: string;
   status: string;
 }
 
-// --- Interface cho Author Upgrade Request (Tab 3) ---
 interface AuthorUpgradeRequest {
   requestId: string;
   requesterId: string;
+  requesterUsername?: string;
+  requesterEmail?: string;
   status: "pending" | "approved" | "rejected";
   content: string;
   createdAt: string;
-  assignedOmodId: number | null;
-  requesterUsername?: string;
-  requesterEmail?: string;
 }
 
 export default function AuthorManagement() {
-  // --- State ---
   const [searchTerm, setSearchTerm] = useState("");
+
   const [authors, setAuthors] = useState<Author[]>([]);
   const [isLoadingAuthors, setIsLoadingAuthors] = useState(true);
 
-  // State cho Tab 2 (Rank/Sponsored)
   const [sponsorRequests, setSponsorRequests] = useState<SponsorRequest[]>([]);
-  const [isLoadingSponsorRequests, setIsLoadingSponsorRequests] = useState(true);
-
-  const [selectedAuthor, setSelectedAuthor] = useState<Author | null>(null);
-  
-  // State xử lý Modal Sponsored (Tab 2)
-  const [selectedSponsorRequest, setSelectedSponsorRequest] = useState<SponsorRequest | null>(null);
+  const [isLoadingSponsor, setIsLoadingSponsor] = useState(true);
   const [sponsorRejectReason, setSponsorRejectReason] = useState("");
-  const [showSponsorRejectDialog, setShowSponsorRejectDialog] = useState(false);
+  const [selectedSponsorRejectId, setSelectedSponsorRejectId] = useState<
+    string | null
+  >(null);
+  const [isSubmittingSponsor, setIsSubmittingSponsor] = useState(false);
 
-  // State cho Tab 3 (User -> Author)
-  const [authorUpgradeRequests, setAuthorUpgradeRequests] = useState<AuthorUpgradeRequest[]>([]);
-  const [isLoadingAuthorRequests, setIsLoadingAuthorRequests] = useState(true);
-  const [selectedAuthorRequest, setSelectedAuthorRequest] = useState<AuthorUpgradeRequest | null>(null);
+  const [authorRequests, setAuthorRequests] = useState<AuthorUpgradeRequest[]>(
+    []
+  );
+  const [isLoadingUpgrade, setIsLoadingUpgrade] = useState(true);
   const [authorRejectReason, setAuthorRejectReason] = useState("");
-  const [showAuthorRejectDialog, setShowAuthorRejectDialog] = useState(false);
-  const [isSubmittingReject, setIsSubmittingReject] = useState(false);
+  const [selectedAuthorRejectId, setSelectedAuthorRejectId] = useState<
+    string | null
+  >(null);
+  const [isSubmittingUpgrade, setIsSubmittingUpgrade] = useState(false);
 
-  // --- 1. Load danh sách Authors (Tab 1) ---
+  // ================= LOAD DATA =================
+
   useEffect(() => {
-    async function fetchApprovedAuthors() {
+    async function fetchAuthors() {
       try {
         setIsLoadingAuthors(true);
-        const data: AuthorUpgradeRequest[] = await getUpgradeRequests("approved");
-        
-        // Lọc: Chỉ lấy những đơn KHÔNG có nội dung JSON rank (để tránh lấy nhầm đơn rank up đã approved)
-        // Hoặc nếu backend trả về tất cả approved thì tạm chấp nhận hiển thị
-        const approvedAuthors: Author[] = data.map((req) => ({
-          id: req.requesterId,
-          name: req.requesterUsername || `User ID: ${req.requesterId}`,
-          email: req.requesterEmail || "(Chưa có email)",
-          stories: 0,
-          views: 0,
-          status: "active",
-          revenue: 0,
+        const data = await getAuthorsList();
+
+        const mappedAuthors: Author[] = data.map((item: any) => ({
+          id: item.accountId,
+          name: item.username || "Unknown",
+          email: item.email || "No Email",
+          rank: item.rankName || "Tân thủ",
+          stories: item.totalStory || 0,
+          followers: item.totalFollower || 0,
+          revenue: item.revenueBalance || 0,
+          withdrawn: item.revenueWithdrawn || 0,
+          restricted: item.restricted || false,
+          verified: item.verifiedStatus || false,
         }));
-        setAuthors(approvedAuthors);
+
+        setAuthors(mappedAuthors);
       } catch (error) {
-        console.error(error);
+        console.error("Lỗi tải danh sách tác giả:", error);
+        toast.error("Không thể tải danh sách tác giả");
       } finally {
         setIsLoadingAuthors(false);
       }
     }
-    fetchApprovedAuthors();
+    fetchAuthors();
   }, []);
 
-  // --- 2. ✅ SỬA: Load Sponsored/Rank Requests (Tab 2 - API Thật) ---
+  const fetchSponsorRequests = async () => {
+    try {
+      setIsLoadingSponsor(true);
+      const data = await getRankRequests("pending");
+      // Map API response to Interface
+      const mapped: SponsorRequest[] = data.map((item: any) => ({
+        requestId: item.requestId,
+        authorId: item.authorId,
+        authorUsername: item.authorUsername, // Map trường này
+        authorEmail: item.authorEmail,
+        currentRankName: item.currentRankName,
+        targetRankName: item.targetRankName,
+        targetRankMinFollowers: item.targetRankMinFollowers, // Lấy field này
+        totalFollowers: item.totalFollowers,
+        createdAt: item.createdAt,
+        commitment: item.commitment,
+        status: item.status,
+      }));
+      setSponsorRequests(mapped);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoadingSponsor(false);
+    }
+  };
+
   useEffect(() => {
-    async function fetchRankRequests() {
-      try {
-        // Gọi API: GET /api/OperationMod/rank-requests
-        const data = await getRankRequests("pending"); 
-        
-        // Map dữ liệu từ API Swagger vào Interface
-        const mappedData: SponsorRequest[] = data.map((item: any) => ({
-          requestId: item.requestId,
-          authorId: item.authorId,
-          authorName: item.authorUsername || "Unknown",
-          email: item.authorEmail || "No Email",
-          
-          currentRank: item.currentRankName || "Casual", 
-          targetRank: item.targetRankName || "Unknown",
-          followers: item.totalFollowers || 0,
-          
-          createdAt: item.createdAt,
-          reason: item.commitment || "No commitment",
-          status: item.status
-        }));
-
-        setSponsorRequests(mappedData);
-      } catch (error) {
-        console.error("Failed to fetch rank requests:", error);
-      } finally {
-        setIsLoadingSponsorRequests(false);
-      }
-    }
-
-    setIsLoadingSponsorRequests(true);
-    fetchRankRequests();
-    const interval = setInterval(fetchRankRequests, 30000); 
-    return () => clearInterval(interval);
+    fetchSponsorRequests();
   }, []);
 
-  // --- 3. Load Author Upgrade Requests (Tab 3) ---
+  const fetchUpgradeRequests = async () => {
+    try {
+      setIsLoadingUpgrade(true);
+      const data = await getUpgradeRequests("pending");
+      setAuthorRequests(data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoadingUpgrade(false);
+    }
+  };
+
   useEffect(() => {
-    async function fetchAuthorUpgradeRequests() {
-      try {
-        const data: AuthorUpgradeRequest[] = await getUpgradeRequests("pending");
-        
-        // ✅ QUAN TRỌNG: Lọc dữ liệu
-        // API /requests trả về cả rank-up (có content là JSON) và become-author (text thường)
-        // Chúng ta chỉ giữ lại cái nào KHÔNG PHẢI là Rank Request cho Tab 3
-        const onlyBecomeAuthorRequests = data.filter((req: any) => {
-            // Nếu content chứa "TargetRankId" hoặc "CurrentRankName" thì đó là Rank Request -> Bỏ qua
-            if (req.content && (req.content.includes("TargetRankId") || req.content.includes("CurrentRankName"))) {
-                return false; 
-            }
-            return true;
-        });
-
-        setAuthorUpgradeRequests(onlyBecomeAuthorRequests);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setIsLoadingAuthorRequests(false);
-      }
-    }
-
-    setIsLoadingAuthorRequests(true);
-    fetchAuthorUpgradeRequests();
-    const interval = setInterval(fetchAuthorUpgradeRequests, 30000);
-    return () => clearInterval(interval);
+    fetchUpgradeRequests();
   }, []);
 
-  // --- Helper: Badges ---
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "sponsored": return <Badge className="bg-[var(--primary)] text-white"><Crown className="w-3 h-3 mr-1" /> Sponsored</Badge>;
-      case "active": return <Badge variant="outline" className="border-green-500 text-green-500">Active</Badge>;
-      case "suspended": return <Badge variant="outline" className="border-red-500 text-red-500">Suspended</Badge>;
-      default: return <Badge variant="outline">Unknown</Badge>;
+  // ================= HANDLERS =================
+
+  const handleApproveSponsor = async (requestId: string) => {
+    if (!confirm("Bạn có chắc chắn muốn duyệt yêu cầu này?")) return;
+    try {
+      setIsSubmittingSponsor(true);
+      await approveRankRequest(requestId);
+      toast.success("Đã duyệt yêu cầu lên hạng!");
+      fetchSponsorRequests();
+    } catch (error: any) {
+      toast.error(error.message || "Lỗi khi duyệt");
+    } finally {
+      setIsSubmittingSponsor(false);
     }
   };
 
-  const getAuthorUpgradeStatusBadge = (status: string) => {
-    switch (status) {
-      case "pending": return <Badge variant="outline" className="border-blue-500 text-blue-500"><Clock className="w-3 h-3 mr-1" /> Đang chờ</Badge>;
-      case "approved": return <Badge variant="outline" className="border-green-500 text-green-500"><Check className="w-3 h-3 mr-1" /> Đã duyệt</Badge>;
-      case "rejected": return <Badge variant="destructive" className="bg-red-100 text-red-600"><X className="w-3 h-3 mr-1" /> Bị từ chối</Badge>;
-      default: return <Badge variant="outline">{status}</Badge>;
+  const handleRejectSponsor = async () => {
+    if (!selectedSponsorRejectId || !sponsorRejectReason) return;
+    try {
+      setIsSubmittingSponsor(true);
+      await rejectRankRequest(selectedSponsorRejectId, sponsorRejectReason);
+      toast.success("Đã từ chối yêu cầu.");
+      setSponsorRejectReason("");
+      setSelectedSponsorRejectId(null);
+      fetchSponsorRequests();
+    } catch (error: any) {
+      toast.error(error.message || "Lỗi khi từ chối");
+    } finally {
+      setIsSubmittingSponsor(false);
     }
   };
 
-  // --- ✅ VALIDATE: Hàm kiểm tra Author Promotion (Tab 3) ---
-  const validateAuthorPromotion = (request: AuthorUpgradeRequest) => {
-    // 1. Check AlreadyPending (Giả sử list authorUpgradeRequests có thể chứa trùng lặp)
-    const duplicate = authorUpgradeRequests.filter(r => r.requesterId === request.requesterId).length > 1;
-    if (duplicate) {
-        toast.warning(`Cảnh báo: User ${request.requesterUsername} đang có nhiều yêu cầu trùng lặp.`);
-        // Vẫn cho phép duyệt nhưng cảnh báo
+  const handleApproveUpgrade = async (requestId: string) => {
+    if (!confirm("Xác nhận duyệt người dùng này thành Tác giả?")) return;
+    try {
+      setIsSubmittingUpgrade(true);
+      await approveRequest(requestId);
+      toast.success("Đã duyệt lên Tác giả thành công!");
+      fetchUpgradeRequests();
+    } catch (error: any) {
+      toast.error(error.message || "Lỗi khi duyệt");
+    } finally {
+      setIsSubmittingUpgrade(false);
     }
-    // 2. Check CannotPromoteAuthor: Có thể thêm logic gọi API check role user ở đây nếu cần thiết
-    return true;
   };
 
-  // --- Logic: User -> Author (Tab 3) ---
-  const handleApproveAuthorRequest = async (request: AuthorUpgradeRequest) => {
-    if (!validateAuthorPromotion(request)) return;
+  const handleRejectUpgrade = async () => {
+    if (!selectedAuthorRejectId || !authorRejectReason) return;
+    try {
+      setIsSubmittingUpgrade(true);
+      await rejectRequest(selectedAuthorRejectId, authorRejectReason);
+      toast.success("Đã từ chối yêu cầu.");
+      setAuthorRejectReason("");
+      setSelectedAuthorRejectId(null);
+      fetchUpgradeRequests();
+    } catch (error: any) {
+      toast.error(error.message || "Lỗi khi từ chối");
+    } finally {
+      setIsSubmittingUpgrade(false);
+    }
+  };
 
-    const name = request.requesterUsername || `User ID: ${request.requesterId}`;
-    toast.promise(
-      async () => {
-        try {
-            await approveRequest(request.requestId);
-            setAuthorUpgradeRequests((prev) => prev.filter((r) => r.requestId !== request.requestId));
-            const newAuthor: Author = {
-              id: request.requesterId,
-              name: name,
-              email: request.requesterEmail || "(Chưa có email)",
-              stories: 0, views: 0, status: "active", revenue: 0,
-            };
-            setAuthors((prev) => [newAuthor, ...prev]);
-        } catch (error: any) {
-            // ✅ VALIDATE: Bắt lỗi CannotPromoteAuthor và AlreadyPending từ API
-            const code = error.response?.data?.code || error.code;
-            if (code === "CannotPromoteAuthor") {
-                throw new Error("Không thể thăng cấp: Tài khoản này đã là Author hoặc Role cao hơn.");
-            } else if (code === "AlreadyPending") {
-                throw new Error("Yêu cầu này đang được xử lý hoặc đã tồn tại.");
-            }
-            throw error; // Ném tiếp lỗi khác để toast hiển thị
-        }
-      },
-      { loading: `Đang duyệt ${name}...`, success: `Đã duyệt ${name}!`, error: (err) => err.message || "Lỗi khi duyệt." }
+  // ================= HELPERS: STYLING & MAPPING =================
+
+  const mapRankToKey = (rank: string) => {
+    if (!rank) return "Casual";
+    const lower = rank.toLowerCase();
+    if (lower.includes("kim cương") || lower.includes("diamond"))
+      return "Diamond";
+    if (lower.includes("vàng") || lower.includes("gold")) return "Gold";
+    if (lower.includes("đồng") || lower.includes("bronze")) return "Bronze";
+    return "Casual";
+  };
+
+  const getRankBadge = (rank: string) => {
+    const key = mapRankToKey(rank);
+    const style = RANK_STYLES[key] || RANK_STYLES.Casual;
+
+    return (
+      <Badge
+        variant="outline"
+        className={`${style.bg} ${style.color} ${style.shadow} border-0 font-medium px-3 py-1 flex w-fit items-center gap-1.5`}
+      >
+        <RankIcon rank={key} size={3.5} />
+        {rank}
+      </Badge>
     );
   };
 
-  const handleConfirmAuthorReject = async () => {
-    if (!selectedAuthorRequest || !authorRejectReason) {
-      toast.error("Vui lòng nhập lý do."); return;
-    }
-    const name = selectedAuthorRequest.requesterUsername || `User ID: ${selectedAuthorRequest.requesterId}`;
-    setIsSubmittingReject(true);
-    toast.promise(
-      async () => {
-        await rejectRequest(selectedAuthorRequest.requestId, authorRejectReason);
-        setAuthorUpgradeRequests((prev) => prev.filter((r) => r.requestId !== selectedAuthorRequest.requestId));
-      },
-      { loading: `Đang từ chối ${name}...`, success: `Đã từ chối ${name}.`, error: "Lỗi khi từ chối.", finally: () => { setShowAuthorRejectDialog(false); setIsSubmittingReject(false); } }
-    );
-  };
-  
-  // --- ✅ SỬA: Logic: Author -> Sponsored/Rank (Tab 2) ---
-  const handleApproveSponsorRequest = async (request: SponsorRequest) => {
-    toast.promise(
-      async () => {
-        // Gọi API approveRankRequest
-        await approveRankRequest(request.requestId);
-        setSponsorRequests((prev) => prev.filter((r) => r.requestId !== request.requestId));
-      },
-      {
-        loading: `Đang duyệt yêu cầu của ${request.authorName}...`,
-        success: `Đã nâng hạng cho ${request.authorName} lên ${request.targetRank}!`,
-        error: "Duyệt thất bại.",
-      }
-    );
-  };
-
-  const handleRejectSponsorRequest = async () => {
-    if (selectedSponsorRequest && sponsorRejectReason) {
-      toast.promise(
-        async () => {
-          // Gọi API rejectRankRequest
-          await rejectRankRequest(selectedSponsorRequest.requestId, sponsorRejectReason);
-          setSponsorRequests((prev) => prev.filter((r) => r.requestId !== selectedSponsorRequest.requestId));
-        },
-        {
-          loading: `Đang từ chối yêu cầu của ${selectedSponsorRequest.authorName}...`,
-          success: `Đã từ chối yêu cầu.`,
-          error: "Từ chối thất bại.",
-          finally: () => {
-            setShowSponsorRejectDialog(false);
-            setSponsorRejectReason("");
-          }
-        }
-      );
-    }
-  };
-
-  // --- Filter Tab 1 ---
   const filteredAuthors = authors.filter(
     (a) =>
       a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
-  
-  // --- Hàm Render Tab 3 (User -> Author) ---
-  function renderAuthorUpgradeTable(requests: AuthorUpgradeRequest[], loading: boolean) {
-    return (
-      <Card className="border border-[var(--border)] bg-[var(--card)] shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-[var(--primary)]">{'Yêu cầu chờ duyệt (User -> Author)'}</CardTitle>
-            <CardDescription>Duyệt các user xin nâng cấp lên quyền Author.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tên User</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Ngày gửi</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead className="text-right">Hành động</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center h-24"><Loader2 className="w-6 h-6 mx-auto animate-spin" /></TableCell>
-                </TableRow>
-              ) : requests.length > 0 ? (
-                requests.map((req) => (
-                  <TableRow key={req.requestId}>
-                    <TableCell className="font-medium">{req.requesterUsername || `ID: ${req.requesterId}`}</TableCell>
-                    <TableCell className="text-muted-foreground">{req.requesterEmail || `(Chưa có)`}</TableCell>
-                    <TableCell>{new Date(req.createdAt).toLocaleDateString('vi-VN')}</TableCell>
-                    <TableCell>{getAuthorUpgradeStatusBadge(req.status)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex gap-2 justify-end">
-                        <Button size="sm" onClick={() => handleApproveAuthorRequest(req)} className="bg-green-600 hover:bg-green-700 text-white"><Check className="w-4 h-4 mr-1" /> Duyệt</Button>
-                        <Button size="sm" variant="outline" onClick={() => { setSelectedAuthorRequest(req); setAuthorRejectReason(""); setShowAuthorRejectDialog(true); }} className="border-red-500 text-red-500 hover:bg-red-50"><X className="w-4 h-4 mr-1" /> Từ chối</Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow><TableCell colSpan={5} className="text-center h-24 text-muted-foreground">Không có yêu cầu nào</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    );
-  }
 
-  // --- UI ---
   return (
     <OpLayout>
       <main className="p-6 space-y-6">
@@ -411,23 +358,36 @@ export default function AuthorManagement() {
             <TabsTrigger value="authors">Danh sách Authors</TabsTrigger>
             <TabsTrigger value="sponsor-requests" className="relative">
               Yêu cầu Sponsored
-              {sponsorRequests.length > 0 && <span className="ml-2 px-2 py-0.5 bg-[var(--primary)] text-white rounded-full text-xs">{sponsorRequests.length}</span>}
+              {sponsorRequests.length > 0 && (
+                <span className="ml-2 px-2 py-0.5 bg-[var(--primary)] text-white rounded-full text-xs">
+                  {sponsorRequests.length}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="author-requests" className="relative">
               Yêu cầu lên Author
-              {authorUpgradeRequests.length > 0 && <span className="ml-2 px-2 py-0.5 bg-blue-600 text-white rounded-full text-xs">{authorUpgradeRequests.length}</span>}
+              {authorRequests.length > 0 && (
+                <span className="ml-2 px-2 py-0.5 bg-blue-600 text-white rounded-full text-xs">
+                  {authorRequests.length}
+                </span>
+              )}
             </TabsTrigger>
           </TabsList>
 
-          {/* Tab 1: Danh sách Authors */}
+          {/* TAB 1: DANH SÁCH AUTHORS (Đã bỏ Status & Action) */}
           <TabsContent value="authors">
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>Danh sách Authors</CardTitle>
-                  <div className="relative w-64">
+                <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                  <CardTitle>Danh sách Tác giả</CardTitle>
+                  <div className="relative w-full md:w-64">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input placeholder="Tìm kiếm..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+                    <Input
+                      placeholder="Tìm kiếm tác giả..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
                   </div>
                 </div>
               </CardHeader>
@@ -435,30 +395,64 @@ export default function AuthorManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Tên</TableHead>
+                      <TableHead>Tên hiển thị</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead>Số truyện</TableHead>
-                      <TableHead>Views</TableHead>
-                      <TableHead>Doanh thu</TableHead>
-                      <TableHead>Trạng thái</TableHead>
+                      <TableHead>Hạng</TableHead>
+                      <TableHead className="text-center">Số truyện</TableHead>
+                      <TableHead className="text-center">Followers</TableHead>
+                      <TableHead className="text-right">Số dư ví</TableHead>
+                      <TableHead className="text-right">Đã đối soát</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoadingAuthors ? (
-                      <TableRow><TableCell colSpan={6} className="text-center"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          <Loader2 className="animate-spin mx-auto w-8 h-8 text-[var(--primary)]" />
+                        </TableCell>
+                      </TableRow>
                     ) : filteredAuthors.length > 0 ? (
                       filteredAuthors.map((a) => (
                         <TableRow key={a.id}>
-                          <TableCell>{a.name}</TableCell>
-                          <TableCell>{a.email}</TableCell>
-                          <TableCell>{a.stories}</TableCell>
-                          <TableCell>{a.views}</TableCell>
-                          <TableCell>{a.revenue > 0 ? `${a.revenue.toLocaleString()}₫` : "-"}</TableCell>
-                          <TableCell>{getStatusBadge(a.status)}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-1">
+                              {a.name}
+                              {a.verified && (
+                                <CheckCircle className="w-3 h-3 text-blue-500" />
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {a.email}
+                          </TableCell>
+                          <TableCell>{getRankBadge(a.rank)}</TableCell>
+                          <TableCell className="text-center">
+                            {a.stories}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {a.followers.toLocaleString()}
+                          </TableCell>
+
+                          <TableCell className="text-right font-semibold text-blue-600">
+                            {a.revenue.toLocaleString()}
+                            <DiamondIcon />
+                          </TableCell>
+
+                          <TableCell className="text-right text-gray-500">
+                            {a.withdrawn.toLocaleString()}
+                            <DiamondIcon />
+                          </TableCell>
                         </TableRow>
                       ))
                     ) : (
-                      <TableRow><TableCell colSpan={6} className="text-center">Không có Author nào.</TableCell></TableRow>
+                      <TableRow>
+                        <TableCell
+                          colSpan={7}
+                          className="text-center py-8 text-muted-foreground"
+                        >
+                          Không tìm thấy tác giả nào phù hợp.
+                        </TableCell>
+                      </TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -466,183 +460,317 @@ export default function AuthorManagement() {
             </Card>
           </TabsContent>
 
-          {/* ✅ SỬA: Tab 2 - Yêu cầu Sponsored/Rank (UI mới - Giữ nguyên layout) */}
-          <TabsContent value="sponsor-requests" className="space-y-4">
-              <div className="grid gap-4">
-                {isLoadingSponsorRequests ? (
-                   <Card className="border border-dashed"><CardContent className="py-12 text-center text-muted-foreground"><Loader2 className="w-6 h-6 mx-auto animate-spin" /> Đang tải...</CardContent></Card>
-                ) : sponsorRequests.length > 0 ? (
-                  sponsorRequests.map((request) => {
-                    // ✅ VALIDATE: Check RankMissing khi render
-                    const isRankMissing = !request.currentRank || request.currentRank === "Unknown";
-
-                    return (
-                        <Card key={request.requestId} className="border border-[var(--border)] bg-[var(--card)] shadow-sm">
-                            <CardHeader>
-                            <div className="flex items-start justify-between">
-                                <div>
-                                {/* Hiển thị Tên Tác Giả + Rank Đang Xin */}
-                                <CardTitle className="text-[var(--primary)] flex items-center gap-2">
-                                    {request.authorName} 
-                                    <Badge variant="secondary" className="ml-2">xin lên {request.targetRank}</Badge>
-                                </CardTitle>
-                                <CardDescription>{request.email}</CardDescription>
-                                </div>
-                                <Badge variant="outline">{new Date(request.createdAt).toLocaleDateString('vi-VN')}</Badge>
+          {/* TAB 2: YÊU CẦU SPONSORED (Đã update thêm field) */}
+          <TabsContent value="sponsor-requests">
+            <Card>
+              <CardHeader>
+                <CardTitle>Yêu cầu xét duyệt nâng hạng</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tên người dùng</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Yêu cầu nâng hạng</TableHead>
+                      <TableHead className="text-center">Followers</TableHead>
+                      <TableHead>Nội dung đơn</TableHead>
+                      <TableHead>Thời gian</TableHead>
+                      <TableHead className="text-right">Hành động</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoadingSponsor ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          <Loader2 className="animate-spin mx-auto w-8 h-8 text-[var(--primary)]" />
+                        </TableCell>
+                      </TableRow>
+                    ) : sponsorRequests.length > 0 ? (
+                      sponsorRequests.map((req) => (
+                        <TableRow key={req.requestId}>
+                          <TableCell>
+                            <div className="font-medium text-[var(--foreground)]">
+                              {req.authorUsername}
                             </div>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                            {/* UI Đã sửa: Rank & Followers */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <p className="text-sm text-[var(--muted-foreground)] flex items-center gap-1">
-                                        <Trophy className="w-4 h-4 text-yellow-500" /> 
-                                        Rank hiện tại
-                                    </p>
-                                    {isRankMissing ? (
-                                        <p className="font-bold text-red-500 flex items-center gap-1">
-                                            <AlertTriangle className="w-3 h-3"/> Lỗi: Rank Missing
-                                        </p>
-                                    ) : (
-                                        <p className="font-medium">{request.currentRank}</p>
-                                    )}
-                                </div>
-                                <div>
-                                <p className="text-sm text-[var(--muted-foreground)] flex items-center gap-1">
-                                    <Users className="w-4 h-4 text-blue-500" /> 
-                                    Total Follows
-                                </p>
-                                <p className="font-medium">{request.followers.toLocaleString()}</p>
-                                </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm text-muted-foreground">
+                              {req.authorEmail}
                             </div>
-                            
-                            <div>
-                                <p className="text-sm text-[var(--muted-foreground)] mb-1">Cam kết / Lý do</p>
-                                <p className="text-sm bg-[var(--muted)] p-3 rounded-lg">{request.reason}</p>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {getRankBadge(req.currentRankName)}
+                              <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                              {getRankBadge(req.targetRankName)}
                             </div>
-                            <div className="flex gap-2">
-                                <Button
-                                    onClick={() => handleApproveSponsorRequest(request)}
-                                    disabled={isRankMissing} // ✅ VALIDATE: Disable nếu RankMissing
-                                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                                >
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                Duyệt
-                                </Button>
-                                <Button
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div
+                                    className={`font-semibold cursor-help flex items-center justify-center gap-1 ${
+                                      req.targetRankMinFollowers &&
+                                      req.totalFollowers <
+                                        req.targetRankMinFollowers
+                                        ? "text-red-500"
+                                        : "text-green-600"
+                                    }`}
+                                  >
+                                    <Users className="w-3 h-3" />
+                                    {req.totalFollowers.toLocaleString()}
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>
+                                    Yêu cầu tối thiểu:{" "}
+                                    {req.targetRankMinFollowers?.toLocaleString() ||
+                                      "N/A"}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </TableCell>
+                          <TableCell className="max-w-[300px] whitespace-pre-wrap text-sm">
+                            {req.commitment}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {new Date(req.createdAt).toLocaleDateString(
+                              "vi-VN"
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                                onClick={() =>
+                                  handleApproveSponsor(req.requestId)
+                                }
+                                disabled={isSubmittingSponsor}
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" /> Duyệt
+                              </Button>
+                              <Button
+                                size="sm"
                                 variant="outline"
-                                onClick={() => {
-                                    setSelectedSponsorRequest(request);
-                                    setSponsorRejectReason(""); 
-                                    setShowSponsorRejectDialog(true);
-                                }}
-                                className="flex-1 border-red-500 text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
-                                >
-                                <XCircle className="w-4 h-4 mr-2" />
-                                Từ chối
-                                </Button>
+                                className="text-red-600 border-red-200 hover:bg-red-50"
+                                onClick={() =>
+                                  setSelectedSponsorRejectId(req.requestId)
+                                }
+                                disabled={isSubmittingSponsor}
+                              >
+                                <XCircle className="w-4 h-4 mr-1" /> Từ chối
+                              </Button>
                             </div>
-                            </CardContent>
-                        </Card>
-                    );
-                  })
-                ) : (
-                  <Card className="border border-dashed"><CardContent className="py-12 text-center text-muted-foreground">Không có yêu cầu Sponsored/Rank nào.</CardContent></Card>
-                )}
-              </div>
-            </TabsContent>
-
-          {/* Tab 3: Yêu cầu lên Author */}
-          <TabsContent value="author-requests" className="space-y-4">
-            {renderAuthorUpgradeTable(authorUpgradeRequests, isLoadingAuthorRequests)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={7}
+                          className="text-center py-8 text-muted-foreground"
+                        >
+                          Không có yêu cầu nào đang chờ.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </TabsContent>
 
+          {/* TAB 3: YÊU CẦU AUTHOR */}
+          <TabsContent value="author-requests">
+            <Card>
+              <CardHeader>
+                <CardTitle>Đơn đăng ký trở thành Tác giả</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tên người dùng</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Nội dung đơn</TableHead>
+                      <TableHead>Thời gian gửi</TableHead>
+                      <TableHead className="text-right">Hành động</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoadingUpgrade ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8">
+                          <Loader2 className="animate-spin mx-auto w-8 h-8 text-[var(--primary)]" />
+                        </TableCell>
+                      </TableRow>
+                    ) : authorRequests.length > 0 ? (
+                      authorRequests.map((req) => (
+                        <TableRow key={req.requestId}>
+                          <TableCell className="font-medium">
+                            {req.requesterUsername || req.requesterId}
+                          </TableCell>
+                          <TableCell>{req.requesterEmail || "N/A"}</TableCell>
+                          <TableCell className="max-w-[300px] whitespace-pre-wrap text-sm">
+                            {req.content}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {new Date(req.createdAt).toLocaleDateString(
+                              "vi-VN"
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                                onClick={() =>
+                                  handleApproveUpgrade(req.requestId)
+                                }
+                                disabled={isSubmittingUpgrade}
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" /> Duyệt
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-red-600 border-red-200 hover:bg-red-50"
+                                onClick={() =>
+                                  setSelectedAuthorRejectId(req.requestId)
+                                }
+                                disabled={isSubmittingUpgrade}
+                              >
+                                <XCircle className="w-4 h-4 mr-1" /> Từ chối
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={5}
+                          className="text-center py-8 text-muted-foreground"
+                        >
+                          Chưa có đơn đăng ký mới.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </main>
-      
-      {/* --- Dialogs --- */}
 
-      {/* Dialog Chi tiết Author */}
-      <Dialog open={!!selectedAuthor} onOpenChange={() => setSelectedAuthor(null)}>
-        <DialogContent className="max-w-2xl bg-[var(--card)] border border-[var(--border)]">
-          <DialogHeader>
-            <DialogTitle className="text-[var(--primary)]">Chi tiết tác giả</DialogTitle>
-          </DialogHeader>
-          {selectedAuthor && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div><p className="text-sm text-[var(--muted-foreground)]">Tên</p><p>{selectedAuthor.name}</p></div>
-                <div><p className="text-sm text-[var(--muted-foreground)]">Email</p><p>{selectedAuthor.email}</p></div>
-                <div><p className="text-sm text-[var(--muted-foreground)]">Số truyện</p><p>{selectedAuthor.stories}</p></div>
-                <div><p className="text-sm text-[var(--muted-foreground)]">Total Views</p><p>{selectedAuthor.views.toLocaleString()}</p></div>
-                <div><p className="text-sm text-[var(--muted-foreground)]">Doanh thu</p><p>{selectedAuthor.revenue > 0 ? `${selectedAuthor.revenue.toLocaleString()}₫` : 'Chưa có'}</p></div>
-                <div><p className="text-sm text-[var(--muted-foreground)] mb-2">Trạng thái</p>{getStatusBadge(selectedAuthor.status)}</div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* --- DIALOGS --- */}
 
-      {/* Dialog Từ chối Sponsored/Rank (Tab 2) */}
-      <Dialog open={showSponsorRejectDialog} onOpenChange={setShowSponsorRejectDialog}>
+      {/* Dialog Từ chối Sponsor/Rank */}
+      <Dialog
+        open={!!selectedSponsorRejectId}
+        onOpenChange={(open) => !open && setSelectedSponsorRejectId(null)}
+      >
         <DialogContent className="bg-[var(--card)] border border-[var(--border)]">
           <DialogHeader>
-            <DialogTitle className="text-[var(--primary)]">Từ chối yêu cầu Nâng hạng</DialogTitle>
+            <DialogTitle className="text-[var(--primary)] text-lg">
+              Từ chối yêu cầu lên hạng
+            </DialogTitle>
             <DialogDescription>
-              Vui lòng ghi rõ lý do từ chối
+              Bạn đang từ chối yêu cầu của tác giả
+              <strong className="text-[var(--foreground)] ml-1">
+                {
+                  sponsorRequests.find(
+                    (r) => r.requestId === selectedSponsorRejectId
+                  )?.authorUsername
+                }
+              </strong>
+              .
+              <br />
+              Vui lòng nhập lý do để tác giả được biết.
             </DialogDescription>
           </DialogHeader>
           <Textarea
-            placeholder="Nhập lý do từ chối..."
+            placeholder="Nhập lý do từ chối (bắt buộc)..."
             value={sponsorRejectReason}
             onChange={(e) => setSponsorRejectReason(e.target.value)}
-            className="min-h-[100px] bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)]"
+            disabled={isSubmittingSponsor}
+            className="min-h-[120px] bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)] focus-visible:ring-[var(--primary)]"
           />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSponsorRejectDialog(false)}>Hủy</Button>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button
-              onClick={handleRejectSponsorRequest}
-              disabled={!sponsorRejectReason}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              variant="outline"
+              onClick={() => setSelectedSponsorRejectId(null)}
+              disabled={isSubmittingSponsor}
+              className="border-[var(--border)] text-[var(--foreground)]"
             >
+              Hủy bỏ
+            </Button>
+            <Button
+              onClick={handleRejectSponsor}
+              disabled={!sponsorRejectReason || isSubmittingSponsor}
+              className="bg-red-600 hover:bg-red-700 text-white border-0"
+            >
+              {isSubmittingSponsor && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
               Xác nhận từ chối
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Từ chối Author Upgrade (Tab 3) */}
-      <Dialog open={showAuthorRejectDialog} onOpenChange={setShowAuthorRejectDialog}>
+      {/* Dialog Từ chối Author Upgrade */}
+      <Dialog
+        open={!!selectedAuthorRejectId}
+        onOpenChange={(open) => !open && setSelectedAuthorRejectId(null)}
+      >
         <DialogContent className="bg-[var(--card)] border border-[var(--border)]">
           <DialogHeader>
-            <DialogTitle className="text-[var(--primary)]">Từ chối yêu cầu lên Author</DialogTitle>
+            <DialogTitle className="text-[var(--primary)] text-lg">
+              Từ chối yêu cầu lên Author
+            </DialogTitle>
             <DialogDescription>
-              Bạn có chắc chắn muốn từ chối yêu cầu của 
-              <strong className="text-[var(--foreground)]"> {selectedAuthorRequest?.requesterUsername || selectedAuthorRequest?.requesterId}</strong>?
+              Bạn có chắc chắn muốn từ chối yêu cầu của
+              <strong className="text-[var(--foreground)] ml-1">
+                {authorRequests.find(
+                  (r) => r.requestId === selectedAuthorRejectId
+                )?.requesterUsername ||
+                  authorRequests.find(
+                    (r) => r.requestId === selectedAuthorRejectId
+                  )?.requesterId}
+              </strong>
+              ?
             </DialogDescription>
           </DialogHeader>
           <Textarea
             placeholder="Nhập lý do từ chối (bắt buộc)..."
             value={authorRejectReason}
             onChange={(e) => setAuthorRejectReason(e.target.value)}
-            disabled={isSubmittingReject}
-            className="min-h-[120px] bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)]"
+            disabled={isSubmittingUpgrade}
+            className="min-h-[120px] bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)] focus-visible:ring-[var(--primary)]"
           />
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setShowAuthorRejectDialog(false)}
-              disabled={isSubmittingReject}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setSelectedAuthorRejectId(null)}
+              disabled={isSubmittingUpgrade}
               className="border-[var(--border)] text-[var(--foreground)]"
             >
               Hủy
             </Button>
             <Button
-              onClick={handleConfirmAuthorReject}
-              disabled={!authorRejectReason || isSubmittingReject}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={handleRejectUpgrade}
+              disabled={!authorRejectReason || isSubmittingUpgrade}
+              className="bg-red-600 hover:bg-red-700 text-white border-0"
             >
-              {isSubmittingReject && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {isSubmittingUpgrade && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
               Xác nhận từ chối
             </Button>
           </DialogFooter>

@@ -24,7 +24,6 @@ import { postModerationDecision } from "@/services/moderationApi";
 import { ApprovalModal } from "@/app/Content/moderation/components/approval-modal";
 import { RejectModal } from "@/app/Content/moderation/components/reject-modal";
 
-// Định nghĩa Interface
 export interface StoryFromAPI {
   reviewId: string;
   storyId: string;
@@ -47,9 +46,26 @@ export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBac
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 1. Xử lý Duyệt (Approve) - Có Validate
+  // --- Helpers dịch tiếng Việt ---
+  const getAiLabel = (result: string) => {
+    switch (result) {
+      case "approved": return "Đã duyệt";
+      case "rejected": return "Từ chối";
+      case "flagged": return "Cảnh báo";
+      default: return result;
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "pending": return "Chờ duyệt";
+      case "published": return "Đã đăng";
+      case "rejected": return "Bị từ chối";
+      default: return status;
+    }
+  };
+
   const handleApprove = async (reason: string) => {
-    // ✅ VALIDATE: StoryRejectedByAi
     if (content.aiResult === 'rejected') {
         const confirmAi = confirm(
             "CẢNH BÁO QUAN TRỌNG: AI đã từ chối truyện này vì vi phạm nội dung.\n" +
@@ -70,12 +86,10 @@ export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBac
       toast.success("Đã duyệt truyện thành công!");
       onBack();
     } catch (error: any) {
-      // ✅ VALIDATE: ModerationAlreadyHandled & StoryNotPending
       const code = error.response?.data?.code || error.code;
-
       if (code === "ModerationAlreadyHandled") {
           toast.error("Lỗi: Truyện này đã được xử lý bởi người khác.");
-          onBack(); // Refresh lại
+          onBack(); 
       } else if (code === "StoryNotPending") {
           toast.error("Truyện không ở trạng thái chờ duyệt.");
       } else {
@@ -87,7 +101,6 @@ export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBac
     }
   };
 
-  // 2. Xử lý Từ chối (Reject) - Có Validate
   const handleReject = async (reason: string) => {
     if (!reason) {
         toast.error("Vui lòng nhập lý do từ chối.");
@@ -100,7 +113,6 @@ export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBac
       toast.success("Đã từ chối truyện.");
       onBack();
     } catch (error: any) {
-      // ✅ VALIDATE: ModerationAlreadyHandled
       const code = error.response?.data?.code || error.code;
       if (code === "ModerationAlreadyHandled") {
           toast.error("Lỗi: Truyện này đã được xử lý bởi người khác.");
@@ -124,7 +136,6 @@ export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBac
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] pb-10">
-  {/* ⭐ FIX STICKY CHUẨN — header nằm riêng 1 layer */}
       <div className="sticky top-0 z-50 bg-[var(--card)] border-b border-[var(--border)] px-6 py-4 shadow-md">
         <button onClick={onBack} className="flex items-center gap-2 mb-2">
           <ArrowLeft className="w-5 h-5" />
@@ -137,7 +148,6 @@ export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBac
         </p>
       </div>
 
-      {/* 2. Alert Info */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -152,17 +162,14 @@ export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBac
         </div>
       </motion.div>
 
-      {/* 3. Main Content Grid */}
       <div className="p-8 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* --- CỘT TRÁI (2/3) --- */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Card 1: Thông tin tổng quan (Ảnh bìa + Chi tiết) */}
             <Card className="p-6 border-l-4 border-l-[var(--primary)]">
                 <div className="flex flex-col md:flex-row gap-6">
-                    {/* Ảnh bìa */}
                     <div className="shrink-0">
                         <img 
                             src={content.coverUrl} 
@@ -171,11 +178,11 @@ export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBac
                         />
                     </div>
                     
-                    {/* Thông tin */}
                     <div className="flex-1 space-y-4">
                         <div>
                             <div className="flex justify-between items-start">
                                 <h2 className="text-xl font-bold text-[var(--foreground)] leading-tight">{content.title}</h2>
+                                {/* SỬA: Hiển thị AI Label Tiếng Việt */}
                                 <Badge 
                                     variant="outline" 
                                     className={
@@ -185,7 +192,7 @@ export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBac
                                     }
                                 >
                                     {content.aiResult === "rejected" && <AlertTriangle className="w-3 h-3 mr-1" />}
-                                    AI: {content.aiResult.toUpperCase()} ({content.aiScore})
+                                    AI: {getAiLabel(content.aiResult).toUpperCase()} ({content.aiScore})
                                 </Badge>
                             </div>
                             <div className="mt-2 text-sm text-[var(--muted-foreground)] space-y-1">
@@ -205,7 +212,6 @@ export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBac
                 </div>
             </Card>
 
-            {/* Card 2: Đại cương (Outline) */}
             <Card className="p-6 min-h-[300px]">
                 <CardHeader className="px-0 pt-0 border-b border-[var(--border)] pb-4 mb-4">
                     <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -220,7 +226,6 @@ export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBac
                 </CardContent>
             </Card>
 
-            {/* Card 3: Quyết định (Lặp lại ở dưới cùng để tiện thao tác) */}
             <Card className="p-6">
               <h3 className="mb-4 font-semibold">Quyết định kiểm duyệt</h3>
               <div className="grid grid-cols-2 gap-4">
@@ -248,7 +253,6 @@ export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBac
           {/* --- CỘT PHẢI (1/3) --- */}
           <div className="space-y-6">
             
-            {/* Card Tiêu chuẩn */}
             <Card className="p-6">
               <h3 className="mb-4 font-semibold flex items-center gap-2">
                 <BookOpen className="w-5 h-5" />
@@ -264,7 +268,6 @@ export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBac
               </ul>
             </Card>
 
-            {/* Card Tags */}
             <Card className="p-6">
                 <h3 className="mb-4 font-semibold flex items-center gap-2">
                     <Tag className="w-4 h-4"/> Thể loại 
@@ -278,9 +281,6 @@ export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBac
                 </div>
             </Card>
 
-           
-
-            {/* Card Thông tin kỹ thuật */}
             <Card className="p-6">
               <h3 className="mb-4 font-semibold">Thông tin bổ sung</h3>
               <div className="space-y-3 text-sm text-[var(--muted-foreground)] bg-[var(--muted)] p-4 rounded-lg">
@@ -294,7 +294,8 @@ export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBac
                 </div>
                 <div className="flex justify-between items-center">
                   <span>Trạng thái:</span>
-                  <Badge variant="secondary" className="text-xs uppercase">{content.status}</Badge>
+                  {/* SỬA: Hiển thị Status tiếng Việt */}
+                  <Badge variant="secondary" className="text-xs uppercase">{getStatusLabel(content.status)}</Badge>
                 </div>
               </div>
             </Card>
@@ -303,7 +304,6 @@ export function ReviewDetail({ content, onBack }: { content: StoryFromAPI, onBac
         </div>
       </div>
 
-      {/* Modals */}
       <ApprovalModal 
         isOpen={showApprovalModal} 
         onClose={() => setShowApprovalModal(false)} 

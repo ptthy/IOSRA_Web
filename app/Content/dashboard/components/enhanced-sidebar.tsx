@@ -1,13 +1,13 @@
 // File: app/Content/dashboard/components/enhanced-sidebar.tsx
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   BookOpen, BarChart3, MessageSquare,
-  Bell, History, ChartPie, LogOut,
+  Bell, ChartPie, LogOut,
   Moon, Sun, Tags,
   FileCheck,
-  Music 
+  Music
 } from "lucide-react";
 import {
   SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem,
@@ -17,9 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { useModeration } from "@/context/ModerationContext"; 
+import { useModeration } from "@/context/ModerationContext";
 import { useAuth } from "@/context/AuthContext";
-import { toast } from "sonner";
 
 interface EnhancedSidebarProps {
   currentPage: string;
@@ -35,20 +34,20 @@ export function EnhancedSidebar({
   onToggleTheme,
 }: EnhancedSidebarProps) {
   const router = useRouter();
-  const { counts } = useModeration(); 
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  
+  const { counts } = useModeration();
   const { logout } = useAuth();
 
   const menuItems = [
-    { id: "dashboard", label: "Tổng quan", icon: BarChart3, href: "/Content/dashboard" },
+    { id: "dashboard", label: "Tổng quan", icon: BarChart3, href: "/Content/review?tab=history" },
     { id: "content-list", label: "Duyệt Truyện", icon: BookOpen, badge: counts.pending, href: "/Content/review" },
-    { id: "chapters", label: "Duyệt Chương", icon: FileCheck, badge: counts.chaptersPending, href: "/Content/chapters" }, 
-    // { id: "sent-back", label: "Truyện gửi lại", icon: FileText, badge: counts.sentBack, href: "/Content/moderation?tab=sent-back" },
+    { id: "chapters", label: "Duyệt Chương", icon: FileCheck, badge: counts.chaptersPending, href: "/Content/chapters" },
     { id: "reports", label: "Báo cáo vi phạm", icon: MessageSquare, badge: counts.reports, href: "/Content/moderation?tab=reports" },
     { id: "statistics", label: "Thống kê", icon: ChartPie, href: "/Content/statistics" },
-    { id: "history", label: "Lịch sử kiểm duyệt", icon: History, href: "/Content/review?tab=history" },
-    { id: "tags", label: "Quản lý Tag", icon: Tags, href: "/Content/tags" }, 
-    // --- MỤC MỚI THÊM ---
-    { id: "music", label: "Nhạc nền", icon: Music, href: "/Content/music" }, 
+    { id: "tags", label: "Quản lý Tag", icon: Tags, href: "/Content/tags" },
+    { id: "music", label: "Nhạc nền", icon: Music, href: "/Content/music" },
   ];
 
   const navigateTo = (item: any) => {
@@ -58,8 +57,37 @@ export function EnhancedSidebar({
 
   const handleLogout = async () => {
     await logout();
-    // toast.success("Đã đăng xuất");
     router.push("/login");
+  };
+
+  // Logic kiểm tra active chuẩn xác dựa trên URL thực tế
+  const isItemActive = (item: any) => {
+    // Lấy phần đường dẫn gốc của item (bỏ ?tab=...)
+    const itemPath = item.href.split('?')[0];
+
+    // 1. Nhóm Review (/Content/review)
+    // Bao gồm: Tổng quan (có tab=history) và Duyệt truyện (không có tab history)
+    if (itemPath === "/Content/review") {
+      // Nếu đường dẫn hiện tại KHÔNG phải /Content/review thì return false ngay
+      // (Để tránh việc đang ở /Content/music mà nó vẫn tính toán sai)
+      if (pathname !== "/Content/review") return false;
+
+      const currentTab = searchParams.get("tab");
+      
+      // Nếu là item "Tổng quan" -> Bắt buộc phải có tab=history
+      if (item.id === "dashboard") {
+        return currentTab === "history";
+      }
+      
+      // Nếu là item "Duyệt Truyện" -> Bắt buộc KHÔNG được là history
+      if (item.id === "content-list") {
+        return currentTab !== "history";
+      }
+    }
+
+    // 2. Các trang thông thường (Nhạc nền, Thống kê, Tag...)
+    // So sánh tuyệt đối pathname hiện tại với href của item
+    return pathname === itemPath;
   };
 
   return (
@@ -85,7 +113,7 @@ export function EnhancedSidebar({
           transition={{ delay: 0.1 }}
           className="mx-4 mt-4 p-3 rounded-lg border border-[var(--border)] bg-[var(--muted)]/20"
         >
-           <div className="flex items-start gap-2">
+          <div className="flex items-start gap-2">
             <Bell className="w-4 h-4 text-[var(--primary)] flex-shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-[var(--foreground)] leading-tight">
@@ -102,7 +130,9 @@ export function EnhancedSidebar({
         <div className="p-4 flex-1">
           <SidebarMenu className="space-y-1">
             {menuItems.map((item) => {
-              const active = currentPage === item.id;
+              // Sử dụng hàm logic mới thay vì so sánh currentPage
+              const active = isItemActive(item);
+              
               return (
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton
@@ -117,7 +147,7 @@ export function EnhancedSidebar({
                   >
                     <item.icon className="w-5 h-5" />
                     <span>{item.label}</span>
-                    {item.badge != null && item.badge > 0 && ( 
+                    {item.badge != null && item.badge > 0 && (
                       <Badge
                         className={
                           active
@@ -137,10 +167,6 @@ export function EnhancedSidebar({
             <SidebarGroup className="pt-6 border-t border-[var(--border)] mt-6">
               <SidebarGroupLabel className="text-[var(--muted-foreground)]">HỖ TRỢ</SidebarGroupLabel>
               <SidebarMenu className="space-y-1">
-                
-                {/* Đã xóa mục Cài đặt (bottomItems) ở đây */}
-
-                {/* Dark mode switch */}
                 <SidebarMenuItem>
                   <div className="flex items-center justify-between p-2 rounded-lg text-[var(--foreground)] font-medium hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-gray-900 dark:hover:text-white cursor-pointer transition-colors duration-200">
                     <div className="flex items-center gap-3">

@@ -1,15 +1,16 @@
-// File: app/Content/chapters/components/chapter-list.tsx (ĐÃ SỬA LAYOUT)
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { 
-  Loader2, 
-  AlertCircle, 
-  BookOpen, 
-  Clock, 
-  User, 
+import {
+  Loader2,
+  AlertCircle,
+  BookOpen,
+  Clock,
+  User,
   AlertTriangle,
-  Search 
+  Search,
+  CheckCircle2, // Thêm icon
+  XCircle       // Thêm icon
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -24,7 +25,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-// import { useModeration } from "@/context/ModerationContext"; // (Tùy chọn)
 
 import { getModerationChapters } from "@/services/moderationApi";
 
@@ -32,21 +32,22 @@ import { getModerationChapters } from "@/services/moderationApi";
 export interface ChapterFromAPI {
   reviewId: string;
   chapterId: string;
-  storyId: string;       // Có thể thiếu
+  storyId: string;
   storyTitle: string;
   chapterTitle: string;
-  authorId: string;      // Có thể thiếu
+  authorId: string;
   authorUsername: string;
-  authorEmail?: string;  // Có thể thiếu
-  chapterNo: number;     // Có thể thiếu
-  wordCount?: number;    // Có thể thiếu
-  priceDias?: number;    // Có thể thiếu
-  
-  contentPath: string;   // <--- QUAN TRỌNG: Thêm dòng này để sửa lỗi
-  
+  authorEmail?: string;
+  chapterNo: number;
+  wordCount?: number;
+  priceDias?: number;
+
+  contentPath: string;
+
   aiScore: number;
+  aiResult?: "flagged" | "rejected" | "approved"; // <-- Đã thêm trường này
   aiFeedback?: string;
-  status: 'pending' | 'published' | 'rejected' | string;
+  status: "pending" | "published" | "rejected" | string;
   submittedAt: string;
   createdAt?: string;
 }
@@ -59,19 +60,27 @@ export function ChapterList({ onReviewClick }: ChapterListProps) {
   const [chapters, setChapters] = useState<ChapterFromAPI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // const { updateCount } = useModeration(); // (Tùy chọn)
+
+  // --- HÀM HELPER 1: Dịch AI Label (Viết trực tiếp trong component) ---
+  const getAiLabel = (result?: string) => {
+    switch (result) {
+      case "approved": return "An toàn";
+      case "rejected": return "Vi phạm";
+      case "flagged": return "Cảnh báo";
+      default: return "Cảnh báo"; // Mặc định
+    }
+  };
 
   useEffect(() => {
     const fetchPendingChapters = async () => {
       try {
         setIsLoading(true);
         setError(null);
-        
-        const data: ChapterFromAPI[] = await getModerationChapters('pending');
-        const filteredData = data; // Hiển thị TẤT CẢ data API trả về
+
+        const data: ChapterFromAPI[] = await getModerationChapters("pending");
+        const filteredData = data; 
 
         setChapters(filteredData);
-        
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -90,7 +99,7 @@ export function ChapterList({ onReviewClick }: ChapterListProps) {
       </div>
     );
   }
-  
+
   if (error) {
     return (
       <div className="flex justify-center items-center min-h-[400px] bg-red-50 text-red-700 p-4 rounded-lg">
@@ -99,7 +108,7 @@ export function ChapterList({ onReviewClick }: ChapterListProps) {
       </div>
     );
   }
-  
+
   if (chapters.length === 0) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
@@ -204,28 +213,40 @@ export function ChapterList({ onReviewClick }: ChapterListProps) {
                     </div>
                   </TableCell>
 
+                  {/* --- PHẦN SỬA ĐỔI: Hiển thị Label AI động --- */}
                   <TableCell className="py-4 px-6">
-                    <Badge 
+                    <Badge
                       variant="outline"
-                      className="bg-yellow-100 text-yellow-800 border-yellow-300"
+                      className={
+                        chapter.aiResult === 'approved' ? "bg-green-100 text-green-800 border-green-200" :
+                        chapter.aiResult === 'rejected' ? "bg-red-100 text-red-800 border-red-200" :
+                        "bg-yellow-100 text-yellow-800 border-yellow-300"
+                      }
                     >
-                      <AlertTriangle className="w-3 h-3 mr-1" />
-                      {chapter.aiScore.toFixed(1)} Điểm
+                      {chapter.aiResult === 'approved' ? <CheckCircle2 className="w-3 h-3 mr-1"/> : 
+                       chapter.aiResult === 'rejected' ? <XCircle className="w-3 h-3 mr-1"/> : 
+                       <AlertTriangle className="w-3 h-3 mr-1" />}
+                      
+                      {getAiLabel(chapter.aiResult)} ({chapter.aiScore.toFixed(1)})
                     </Badge>
                   </TableCell>
 
                   <TableCell className="py-4 px-6 text-[var(--muted-foreground)]">
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4" />
-                      {new Date(chapter.submittedAt).toLocaleString('vi-VN')}
+                      {new Date(chapter.submittedAt).toLocaleString("vi-VN")}
                     </div>
                   </TableCell>
-                  
+
                   <TableCell className="py-4 px-6 text-center">
                     <motion.div
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 15,
+                      }}
                     >
                       <Button
                         onClick={() => onReviewClick(chapter)}
@@ -241,60 +262,6 @@ export function ChapterList({ onReviewClick }: ChapterListProps) {
           </Table>
         </Card>
       </motion.div>
-
-      {/* Grid View (Ẩn đi, chỉ dùng Table) */}
-      {/* <motion.div
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-        initial="hidden"
-        animate="visible"
-        variants={{
-          hidden: { opacity: 0 },
-          visible: {
-            opacity: 1,
-            transition: { staggerChildren: 0.05 },
-          },
-        }}
-      >
-        {chapters.map((chapter) => (
-          <motion.div key={chapter.reviewId} variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
-            <Card
-              className="overflow-hidden cursor-pointer group hover:shadow-md transition-shadow border-gray-200 dark:border-gray-800"
-              onClick={() => onReviewClick(chapter)}
-            >
-              <div className="h-32 bg-gray-100 dark:bg-gray-800 flex items-center justify-center relative">
-                <BookOpen className="w-12 h-12 text-gray-400" />
-                <Badge
-                  className="absolute top-2 right-2 bg-yellow-500 hover:bg-yellow-600 text-white border-0"
-                >
-                  <AlertTriangle className="w-3 h-3 mr-1" />
-                  {chapter.aiScore.toFixed(1)} Điểm AI
-                </Badge>
-              </div>
-              
-              <div className="p-4 space-y-2">
-                <div className="text-xs text-gray-500 truncate uppercase font-medium tracking-wide">
-                  {chapter.storyTitle}
-                </div>
-
-                <h3 className="font-semibold text-base leading-tight truncate group-hover:text-blue-600 transition-colors">
-                  {chapter.chapterTitle}
-                </h3>
-                
-                <div className="pt-2 flex items-center justify-between text-xs text-gray-500">
-                  <div className="flex items-center gap-1">
-                    <User className="w-3 h-3 text-gray-400" />
-                    <span className="truncate max-w-[80px]">{chapter.authorUsername}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-gray-400" />
-                    <span>{new Date(chapter.submittedAt).toLocaleDateString('vi-VN')}</span>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </motion.div>
-        ))}
-      </motion.div> */}
     </div>
   );
 }
