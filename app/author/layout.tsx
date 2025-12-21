@@ -81,11 +81,11 @@ export default function AuthorLayout({ children }: AuthorLayoutProps) {
               variant={isRankActive ? "secondary" : "ghost"}
               className="w-full justify-start"
               onClick={() => handleNavigate("author-rank")}
-              title="Nâng cấp Rank"
+              title="Nâng cấp Hạng Tác Giả"
             >
               <Trophy className="h-5 w-5 shrink-0 text-amber-500" />
               {!isCollapsed && (
-                <span className="ml-2 truncate">Nâng cấp Rank</span>
+                <span className="ml-2 truncate">Nâng cấp Hạng Tác Giả</span>
               )}
             </Button>
             <Button

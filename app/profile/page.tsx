@@ -396,14 +396,16 @@ export default function ProfilePage() {
               <CardContent>
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div className="p-3 bg-background rounded-lg border shadow-sm">
-                    <p className="text-xs text-muted-foreground mb-1">Rank</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Hạng Tác Giả
+                    </p>
                     <p className="font-bold text-lg text-primary">
                       {authorStats.rankName}
                     </p>
                   </div>
                   <div className="p-3 bg-background rounded-lg border shadow-sm">
                     <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
-                      <Users className="h-3 w-3" /> Followers
+                      <Users className="h-3 w-3" /> Số lượng người theo dõi
                     </p>
                     <p className="font-bold text-lg">
                       {authorStats.totalFollower.toLocaleString()}
@@ -411,7 +413,7 @@ export default function ProfilePage() {
                   </div>
                   <div className="p-3 bg-background rounded-lg border shadow-sm">
                     <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
-                      <BookOpen className="h-3 w-3" /> Stories
+                      <BookOpen className="h-3 w-3" /> Tổng số truyện
                     </p>
                     <p className="font-bold text-lg">
                       {authorStats.totalStory}
@@ -608,8 +610,8 @@ export default function ProfilePage() {
                     Số dư Kim Cương
                   </p>
                   <p className="text-2xl font-bold text-primary flex items-center gap-1">
-                    <Gem className="h-5 w-5 text-blue-500 fill-blue-500" />{" "}
-                    {wallet.diaBalance.toLocaleString()}
+                    {wallet.diaBalance.toLocaleString()}{" "}
+                    <Gem className="h-5 w-5 text-blue-500 fill-blue-500" />
                   </p>
                 </div>
                 <Button
@@ -676,9 +678,14 @@ export default function ProfilePage() {
                         ) : (
                           <Gift className="mr-2 h-4 w-4" />
                         )}
-                        {isClaiming
-                          ? "Đang nhận..."
-                          : `Nhận ${subStatus.dailyDias} KC`}
+                        {isClaiming ? (
+                          "Đang nhận..."
+                        ) : (
+                          <span className="flex items-center gap-1">
+                            Nhận {subStatus.dailyDias}
+                            <Gem className="h-4 w-4 text-blue-500 fill-blue-500 opacity-80" />
+                          </span>
+                        )}
                       </Button>
                     ) : (
                       <div className="text-xs text-center text-muted-foreground bg-black/5 p-2 rounded">

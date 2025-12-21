@@ -339,7 +339,7 @@ export default function AuthorRankDashboard() {
               </div>
               <div>
                 <h2 className="text-3xl font-bold text-[var(--primary)]">
-                  Hệ thống Rank Tác Giả
+                  Hệ thống Hạng Tác Giả
                 </h2>
                 <p className="text-muted-foreground mt-1">
                   Quản lý cấp bậc, theo dõi tiến độ và nhận quyền lợi độc quyền.
@@ -372,7 +372,7 @@ export default function AuthorRankDashboard() {
             </div>
             <CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Rank Hiện Tại
+                Hạng Tác Giả Hiện Tại
               </CardTitle>
               <div
                 className={`p-2 ${currentRankStyle.badgeGradient} rounded-xl shadow-lg`}
