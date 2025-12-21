@@ -775,9 +775,9 @@ export default function AuthorRevenuePage() {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-[var(--primary)]">
+          <h2 className="text-3xl font-bold text-[var(--primary)]">
             Quản Lý Doanh Thu
-          </h1>
+          </h2>
           <p className="text-sm text-[var(--muted-foreground)]">
             Theo dõi thu nhập thực tế và lịch sử đối soát
           </p>

@@ -61,7 +61,9 @@ export default function AuthorLayout({ children }: AuthorLayoutProps) {
               title="Dashboard"
             >
               <LayoutDashboard className="h-5 w-5 shrink-0" />
-              {!isCollapsed && <span className="ml-2 truncate">Dashboard</span>}
+              {!isCollapsed && (
+                <span className="ml-2 truncate">Trạng Thái Truyện</span>
+              )}
             </Button>
 
             <Button

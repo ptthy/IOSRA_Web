@@ -1,4 +1,4 @@
-//app/author/story/[id]/ai-result/page.tsx
+// app/author/story/[id]/ai-result/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -18,20 +18,32 @@ import {
   XCircle,
   ArrowRight,
   Quote,
+  UserCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { storyService } from "@/services/storyService";
 import type { Story } from "@/services/apiTypes";
-import { toast } from "sonner";
 import { AiModerationReport } from "@/components/AiModerationReport";
-// --- HELPER FUNCTION ---
+
+// --- HELPERS ---
 const extractVietnameseFeedback = (
   feedback: string | null | undefined
 ): string | null => {
   if (!feedback) return null;
-  const vietnameseIndex = feedback.indexOf("Tiếng Việt:");
-  if (vietnameseIndex !== -1) {
-    return feedback.substring(vietnameseIndex + "Tiếng Việt:".length).trim();
+  const vietnameseMarkers = ["Tiếng việt:", "Tiếng Việt:"];
+  let foundIndex = -1;
+  let markerLength = 0;
+  for (const marker of vietnameseMarkers) {
+    const index = feedback.indexOf(marker);
+    if (index !== -1) {
+      foundIndex = index;
+      markerLength = marker.length;
+      break;
+    }
   }
+  if (foundIndex !== -1)
+    return feedback.substring(foundIndex + markerLength).trim();
+  if (feedback.includes("English:")) return null;
   return feedback;
 };
 
@@ -39,37 +51,9 @@ export default function AIResultPage() {
   const params = useParams();
   const router = useRouter();
   const storyId = params.id as string;
-
   const [story, setStory] = useState<Story | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const handleApiError = (error: any, defaultMessage: string) => {
-    // 1. Check lỗi Validation/Logic từ Backend
-    if (error.response && error.response.data && error.response.data.error) {
-      const { message, details } = error.response.data.error;
 
-      // Ưu tiên Validation (details)
-      if (details) {
-        const firstKey = Object.keys(details)[0];
-        if (firstKey && details[firstKey].length > 0) {
-          // Nối các lỗi lại thành 1 câu
-          const msg = details[firstKey].join(" ");
-          toast.error(msg);
-          return;
-        }
-      }
-
-      // Message từ Backend
-      if (message) {
-        toast.error(message);
-        return;
-      }
-    }
-
-    // 2. Fallback
-    const fallbackMsg = error.response?.data?.message || defaultMessage;
-    toast.error(fallbackMsg);
-  };
-  // -------------------
   useEffect(() => {
     loadStory();
   }, [storyId]);
@@ -79,279 +63,244 @@ export default function AIResultPage() {
     try {
       const data = await storyService.getStoryDetails(storyId);
       setStory(data);
-      // } catch (error) {
-      //   console.error("Error loading story:", error);
-      // } finally {
-      //   setIsLoading(false);
-      // }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error loading story:", error);
-      // --- DÙNG HELPER ---
-      handleApiError(error, "Không thể tải kết quả đánh giá.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (isLoading) {
+  if (isLoading)
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
-  }
 
-  if (!story || !story.aiScore) {
+  if (!story)
     return (
       <div className="text-center py-16">
         <p className="text-muted-foreground mb-4">
-          Không tìm thấy kết quả chấm điểm
+          Không tìm thấy thông tin kết quả đánh giá.
         </p>
         <Button onClick={() => router.push("/author/overview")}>
           Quay lại Dashboard
         </Button>
       </div>
     );
-  }
 
-  const isApproved = story.status === "published";
-  const isPendingCMod = story.status === "pending";
-  const isRejected = story.status === "rejected";
-
-  // --- TÁCH RIÊNG 2 PHẦN DỮ LIỆU ---
-
-  // 1. Kết quả ngắn (Vd: "approved")
-  // Ưu tiên aiResult, nếu không có thì tìm trong aiNote
-  const shortResult = story.aiResult || story.aiNote || "N/A";
-
-  // 2. Nội dung chi tiết (Vd: "Tiếng Việt: Nội dung...")
-  // Ưu tiên aiFeedback, nếu không có thì tìm trong aiMessage
-  const rawFeedback = story.aiFeedback || story.aiMessage;
-  const displayFeedback = extractVietnameseFeedback(rawFeedback);
+  const aiScore = story.aiScore ?? 0;
+  const isApproved =
+    story.status === "published" || story.status === "completed";
+  const isRejected =
+    story.status === "rejected" ||
+    (aiScore < 5 && story.status !== "published");
+  const isPending = !isApproved && !isRejected;
+  const shortResult = story.aiResult || (aiScore >= 5 ? "Đạt" : "Không đạt");
+  const displayFeedback = extractVietnameseFeedback(
+    story.aiFeedback || story.aiMessage
+  );
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl mb-2">Kết Quả AI Chấm Điểm</h1>
-        <p className="text-sm text-muted-foreground">Truyện: {story.title}</p>
+    <div className="max-w-6xl mx-auto space-y-8 pb-12 px-4 md:px-0">
+      <div className="border-b pb-4">
+        <h1 className="text-3xl mb-2 font-bold tracking-tight">
+          BÁO CÁO KIỂM DUYỆT CHI TIẾT
+        </h1>
+        <p className="text-slate-500 dark:text-slate-400 mt-1">
+          Tác phẩm:{" "}
+          <span className="font-semibold text-slate-700 dark:text-slate-200">
+            {story.title}
+          </span>
+        </p>
       </div>
 
-      {/* STATE A: APPROVED */}
       {isApproved && (
-        <Card className="border-2 border-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20">
-          <CardHeader>
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center flex-shrink-0">
-                <CheckCheck className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <div className="flex-1">
-                <CardTitle className="text-2xl text-emerald-700 dark:text-emerald-300">
-                  Chúc mừng! Truyện của bạn đã được Xuất bản
-                </CardTitle>
-                <CardDescription className="mt-2 text-emerald-600 dark:text-emerald-400">
-                  Truyện đã vượt qua kiểm duyệt AI và được tự động phê duyệt
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="space-y-6">
-            <div className="p-6 bg-white dark:bg-card rounded-lg border border-emerald-200 dark:border-emerald-800">
-              {/* Điểm số */}
-              <div className="text-center mb-6">
-                <p className="text-sm text-muted-foreground mb-2">Điểm AI</p>
-                <p className="text-6xl text-emerald-600 dark:text-emerald-400 font-bold">
-                  {story.aiScore.toFixed(2)}
-                </p>
-              </div>
-
-              <div className="grid gap-4 pt-4 border-t">
-                {/* PHẦN 1: Hiển thị trạng thái ngắn (aiResult) */}
-                <div className="flex items-center justify-between p-2">
-                  <span className="font-semibold text-emerald-800 dark:text-emerald-200">
-                    Kết quả AI:
-                  </span>
-                  <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-sm font-bold uppercase tracking-wide border border-emerald-200">
-                    {shortResult}
-                  </span>
-                </div>
-
-                {/* PHẦN 2: Hiển thị phản hồi chi tiết (aiFeedback) */}
-                <div className="bg-emerald-50/50 dark:bg-emerald-900/10 p-4 rounded-md border border-emerald-100 dark:border-emerald-800/50">
-                  <div className="flex items-center gap-2 mb-2 text-emerald-700 dark:text-emerald-300 font-semibold text-sm">
-                    <Quote className="w-4 h-4" />
-                    Chi tiết đánh giá:
-                  </div>
-                  <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
-                    {displayFeedback || "Không có phản hồi chi tiết."}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <Button
-              onClick={() => router.push(`/author/story/${storyId}/chapters`)}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
-              size="lg"
-            >
-              Quản lý Chương
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* STATE B: PENDING */}
-      {isPendingCMod && (
-        <Card className="border-2 border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20">
-          <CardHeader>
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center flex-shrink-0">
-                <Clock className="h-8 w-8 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div className="flex-1">
-                <CardTitle className="text-2xl text-amber-700 dark:text-amber-300">
-                  Truyện đang chờ duyệt thủ công
-                </CardTitle>
-                <CardDescription className="mt-2 text-amber-600 dark:text-amber-400">
-                  AI phát hiện nội dung cần xem xét thêm
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="space-y-6">
-            <div className="p-6 bg-white dark:bg-card rounded-lg border border-amber-200 dark:border-amber-800">
-              <div className="text-center mb-6">
-                <p className="text-sm text-muted-foreground mb-2">Điểm AI</p>
-                <p className="text-6xl text-amber-600 dark:text-amber-400 font-bold">
-                  {story.aiScore.toFixed(2)}
-                </p>
-              </div>
-
-              <div className="grid gap-4 pt-4 border-t">
-                {/* PHẦN 1: aiResult */}
-                <div className="flex items-center justify-between p-2">
-                  <span className="font-semibold text-amber-800 dark:text-amber-200">
-                    Kết quả AI:
-                  </span>
-                  <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-sm font-bold uppercase tracking-wide border border-amber-200">
-                    {shortResult}
-                  </span>
-                </div>
-
-                {/* PHẦN 2: aiFeedback */}
-                <div className="bg-amber-50/50 dark:bg-amber-900/10 p-4 rounded-md border border-amber-100 dark:border-amber-800/50">
-                  <div className="flex items-center gap-2 mb-2 text-amber-700 dark:text-amber-300 font-semibold text-sm">
-                    <Quote className="w-4 h-4" />
-                    Chi tiết đánh giá:
-                  </div>
-                  <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
-                    {displayFeedback || "Đang chờ đánh giá chi tiết."}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 bg-white dark:bg-card rounded-lg border">
-              <p className="text-sm">
-                <strong>Tiếp theo:</strong>
-              </p>
-              <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside">
-                <li>
-                  Đội ngũ ContentMod sẽ xem xét truyện trong vòng 2-5 ngày làm
-                  việc
-                </li>
-                <li>Bạn sẽ nhận được thông báo khi có kết quả</li>
-              </ul>
-            </div>
-
-            <Button
-              onClick={() => router.push("/author/overview")}
-              variant="outline"
-              className="w-full"
-              size="lg"
-            >
-              Quay lại Dashboard
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* STATE C: REJECTED */}
-      {isRejected && (
-        <Card className="border-2 border-destructive/50 bg-red-50/50 dark:bg-red-950/20">
-          <CardHeader>
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center flex-shrink-0">
-                <XCircle className="h-8 w-8 text-destructive" />
-              </div>
-              <div className="flex-1">
-                <CardTitle className="text-2xl text-destructive">
-                  Truyện của bạn đã bị Từ chối
-                </CardTitle>
-                <CardDescription className="mt-2 text-red-600 dark:text-red-400">
-                  AI phát hiện nội dung vi phạm nghiêm trọng
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="space-y-6">
-            <div className="p-6 bg-white dark:bg-card rounded-lg border border-destructive">
-              <div className="text-center mb-6">
-                <p className="text-sm text-muted-foreground mb-2">Điểm AI</p>
-                <p className="text-6xl text-destructive font-bold">
-                  {story.aiScore.toFixed(2)}
-                </p>
-              </div>
-
-              <div className="grid gap-4 pt-4 border-t">
-                {/* PHẦN 1: aiResult */}
-                <div className="flex items-center justify-between p-2">
-                  <span className="font-semibold text-destructive">
-                    Kết quả AI:
-                  </span>
-                  <span className="px-3 py-1 rounded-full bg-red-100 text-destructive text-sm font-bold uppercase tracking-wide border border-red-200">
-                    {shortResult}
-                  </span>
-                </div>
-
-                {/* PHẦN 2: aiFeedback */}
-                <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-md border border-red-100 dark:border-red-800/50">
-                  <div className="flex items-center gap-2 mb-2 text-destructive font-semibold text-sm">
-                    <Quote className="w-4 h-4" />
-                    Chi tiết đánh giá:
-                  </div>
-                  <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
-                    {displayFeedback ||
-                      "AI phát hiện nội dung vi phạm nghiêm trọng."}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <Button
-              onClick={() => router.push("/author/overview")}
-              variant="outline"
-              className="w-full"
-              size="lg"
-            >
-              Quay lại Dashboard
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-      {/* Hiển thị chi tiết vi phạm nếu có */}
-      <div className="mt-8">
-        <AiModerationReport
-          aiFeedback={null} // Truyền null vì feedback tổng quát đã hiện ở trên
-          aiViolations={story.aiViolations}
-          contentType="truyện"
+        <StatusCard
+          type="emerald"
+          icon={
+            <CheckCheck className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
+          }
+          title="Tác phẩm đã được phê duyệt"
+          description="Truyện của bạn đã vượt qua hệ thống kiểm duyệt AI và được xuất bản."
+          story={story}
+          aiScore={aiScore}
+          shortResult={shortResult}
+          displayFeedback={displayFeedback}
         />
+      )}
+
+      {isRejected && (
+        <StatusCard
+          type="red"
+          icon={
+            <XCircle className="h-10 w-10 text-red-600 dark:text-red-400" />
+          }
+          title="Tác phẩm bị từ chối"
+          description="Nội dung vi phạm tiêu chuẩn cộng đồng hoặc không đạt điểm chất lượng tối thiểu."
+          story={story}
+          aiScore={aiScore}
+          shortResult={shortResult}
+          displayFeedback={displayFeedback}
+        />
+      )}
+
+      {isPending && (
+        <StatusCard
+          type="amber"
+          icon={
+            <Clock className="h-10 w-10 text-amber-600 dark:text-amber-400" />
+          }
+          title="Đang chờ xét duyệt thủ công"
+          description="Hệ thống cần thêm sự xem xét từ đội ngũ kiểm duyệt viên."
+          story={story}
+          aiScore={aiScore}
+          shortResult={shortResult}
+          displayFeedback={displayFeedback}
+        />
+      )}
+
+      {story.aiViolations && story.aiViolations.length > 0 && (
+        <div className="mt-8">
+          <AiModerationReport
+            aiFeedback={null}
+            aiViolations={story.aiViolations}
+            contentType="truyện"
+          />
+        </div>
+      )}
+
+      <div className="flex justify-between items-center pt-6">
+        <Button
+          onClick={() => router.push("/author/overview")}
+          variant="ghost"
+          className="dark:text-slate-300"
+        >
+          Quay lại Dashboard
+        </Button>
+        {isApproved && (
+          <Button
+            onClick={() => router.push(`/author/story/${storyId}/chapters`)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-8"
+          >
+            Quản lý Chương <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        )}
       </div>
-      {/* ------------------- */}
     </div>
+  );
+}
+
+function StatusCard({
+  type,
+  icon,
+  title,
+  description,
+  story,
+  aiScore,
+  shortResult,
+  displayFeedback,
+}: any) {
+  const configs = {
+    emerald: {
+      border: "border-emerald-500/40 dark:border-emerald-500/20",
+      bgHeader: "bg-emerald-50/50 dark:bg-emerald-950/30",
+      bgContent: "bg-white dark:bg-slate-900/50",
+      accent: "text-emerald-600 dark:text-emerald-400",
+    },
+    red: {
+      border: "border-red-500/40 dark:border-red-500/20",
+      bgHeader: "bg-red-50/50 dark:bg-red-950/30",
+      bgContent: "bg-white dark:bg-slate-900/50",
+      accent: "text-red-600 dark:text-red-400",
+    },
+    amber: {
+      border: "border-amber-500/40 dark:border-amber-500/20",
+      bgHeader: "bg-amber-50/50 dark:bg-amber-950/30",
+      bgContent: "bg-white dark:bg-slate-900/50",
+      accent: "text-amber-600 dark:text-amber-400",
+    },
+  }[type as "emerald" | "red" | "amber"];
+
+  return (
+    <Card
+      className={`border-2 shadow-lg overflow-hidden ${configs.border} dark:bg-slate-900`}
+    >
+      <CardHeader
+        className={`flex flex-row items-center gap-6 py-8 border-b ${configs.bgHeader}`}
+      >
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-full shadow-inner">
+          {icon}
+        </div>
+        <div className="space-y-1">
+          <CardTitle className="text-2xl font-bold dark:text-slate-100">
+            {title}
+          </CardTitle>
+          <CardDescription className="text-slate-600 dark:text-slate-400 text-base">
+            {description}
+          </CardDescription>
+        </div>
+      </CardHeader>
+
+      <CardContent className={`p-8 ${configs.bgContent}`}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-stretch">
+          {/* CỘT AI */}
+          <div className="flex flex-col space-y-4">
+            <div className="flex items-center gap-2 font-bold text-slate-500 dark:text-slate-400 uppercase text-xs tracking-widest">
+              <Quote className="w-4 h-4" /> Đánh giá từ hệ thống AI
+            </div>
+            <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="p-6 h-[130px] flex flex-col justify-center border-b border-slate-200 dark:border-slate-700">
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-6xl font-black ${configs.accent}`}>
+                    {aiScore.toFixed(2)}
+                  </span>
+                  <span className="text-slate-400 font-medium text-xl">
+                    / 10.00
+                  </span>
+                </div>
+                {/* <div className="text-sm font-bold mt-2 text-slate-600 dark:text-slate-400">
+                  TRẠNG THÁI:{" "}
+                  <span className="text-slate-900 dark:text-slate-100 uppercase tracking-tighter">
+                    {shortResult}
+                  </span>
+                </div> */}
+              </div>
+              <div className="p-6 flex-1 bg-white/50 dark:bg-transparent">
+                <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed italic">
+                  "{displayFeedback || "Không có nhận xét chi tiết bổ sung."}"
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* CỘT MODERATOR */}
+          <div className="flex flex-col space-y-4">
+            <div className="flex items-center gap-2 font-bold text-slate-500 dark:text-slate-400 uppercase text-xs tracking-widest">
+              <UserCheck className="w-4 h-4" /> Phê duyệt thủ công
+            </div>
+            <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="p-6 h-[130px] flex flex-col justify-center border-b border-slate-200 dark:border-slate-700">
+                <div className="text-xs font-bold text-slate-400 uppercase mb-1">
+                  Trạng thái duyệt
+                </div>
+                <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">
+                  {story.moderatorStatus || "Không có"}
+                </div>
+              </div>
+              <div className="p-6 flex-1 bg-white/50 dark:bg-transparent">
+                <div className="text-xs font-bold text-slate-400 uppercase mb-2">
+                  Ghi chú từ kiểm duyệt viên
+                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-400 italic">
+                  {story.moderatorNote ||
+                    "Không có ghi chú cụ thể nào từ Content Mod đến bạn."}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -241,7 +241,9 @@ export default function AuthorDashboardPage() {
     <div className="space-y-6 pb-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl mb-2">Trạng Thái Truyện</h1>
+        <h2 className="text-3xl font-bold text-[var(--primary)]">
+          Trạng Thái Truyện
+        </h2>
         <p className="text-sm text-muted-foreground">
           Quản lý và theo dõi tác phẩm của bạn
         </p>
@@ -286,15 +288,19 @@ export default function AuthorDashboardPage() {
         <>
           {/* Alert về giới hạn 1 truyện */}
           <Alert>
-            <AlertCircle className="h-4 w-4 " />
+            <AlertCircle className="h-4 w-4" />
             <AlertTitle>
-              {" "}
               <strong>Quy định của ToraNovel</strong>
             </AlertTitle>
             <AlertDescription>
-              Bạn đang sáng tác truyện: <strong>{activeStory.title}</strong>
-              Theo quy định của ToraNovel, bạn chỉ có thể tạo truyện mới sau khi
-              hoàn thành tác phẩm hiện tại.
+              <div className="text-foreground">
+                <span>Bạn đang sáng tác truyện: </span>
+                <span className="font-bold">{activeStory?.title}</span>
+              </div>
+              <div className="mt-1">
+                Theo quy định của ToraNovel, bạn chỉ có thể tạo truyện mới sau
+                khi hoàn thành tác phẩm hiện tại.
+              </div>
             </AlertDescription>
           </Alert>
 
