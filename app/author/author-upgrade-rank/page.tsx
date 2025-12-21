@@ -322,7 +322,7 @@ export default function AuthorRankDashboard() {
   const isCommitmentMatched = typedCommitment === COMMITMENT_TEXT;
 
   return (
-    <div className="min-h-screen bg-background py-12">
+    <div className="min-h-screen bg-background pb-12">
       <div className="max-w-7xl mx-auto space-y-8 px-4 sm:px-6 lg:px-8">
         {/* Decorative Background Elements */}
         <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
@@ -338,9 +338,9 @@ export default function AuthorRankDashboard() {
                 <Trophy className="w-8 h-8 text-primary" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-foreground">
+                <h2 className="text-3xl font-bold text-[var(--primary)]">
                   Hệ thống Rank Tác Giả
-                </h1>
+                </h2>
                 <p className="text-muted-foreground mt-1">
                   Quản lý cấp bậc, theo dõi tiến độ và nhận quyền lợi độc quyền.
                 </p>

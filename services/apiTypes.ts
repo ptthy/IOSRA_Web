@@ -1,7 +1,8 @@
 // services/apiTypes.ts
 export interface AiViolation {
-  label: string;
-  evidence: string[]; // Khớp với mảng evidence từ OpenAiService.cs
+  word: string; // Khớp với "word": "spam_repetition"
+  count: number; // Khớp với "count": 3
+  samples: string[]; // Khớp với "samples": [...]
   penalty?: number;
 }
 export interface Story {
@@ -23,7 +24,7 @@ export interface Story {
     | "completed"
     | "hidden";
   aiScore?: number;
-  aiResult?: string;
+  aiResult?: string | null;
   aiNote?: string;
   aiMessage?: string;
   moderatorStatus?: string | null;
@@ -93,7 +94,8 @@ export interface ChapterDetails extends Chapter {
   summary?: string | null;
   accessType?: string;
   contentPath?: string;
-
+  moderatorStatus?: string | null;
+  moderatorNote?: string | null;
   rankName?: "Casual" | "Bronze" | "Gold" | "Diamond" | string;
   mood?: {
     code: string;

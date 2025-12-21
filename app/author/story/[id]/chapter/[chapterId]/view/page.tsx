@@ -29,6 +29,7 @@ import {
   AlertCircle,
   Sparkles,
   Gem,
+  UserCheck,
 } from "lucide-react";
 import { chapterService } from "@/services/chapterService";
 import type { ChapterDetails } from "@/services/apiTypes";
@@ -772,6 +773,48 @@ export default function AuthorChapterViewPage() {
               aiViolations={chapter.aiViolations}
               contentType="chương"
             />
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200">
+                    <UserCheck className="w-4 h-4 text-blue-500" />
+                    <h3 className="font-bold text-xs uppercase tracking-wider">
+                      Trạng thái kiểm duyệt từ ContentMod
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      className={`px-3 py-1 text-xs font-bold ${
+                        chapter?.moderatorStatus === "approved"
+                          ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                          : chapter?.moderatorStatus === "rejected"
+                          ? "bg-red-100 text-red-700 border-red-200"
+                          : "bg-slate-100 text-slate-600 border-slate-200"
+                      }`}
+                    >
+                      {chapter?.moderatorStatus === "approved"
+                        ? "ĐÃ DUYỆT"
+                        : chapter?.moderatorStatus === "rejected"
+                        ? "BỊ TỪ CHỐI"
+                        : "KHÔNG CÓ "}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200">
+                    <MessageSquare className="w-4 h-4 text-blue-500" />
+                    <h3 className="font-bold text-xs uppercase tracking-wider">
+                      Ghi chú từ ContentMod
+                    </h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground italic bg-white/40 p-3 rounded-lg border border-slate-100">
+                    {chapter?.moderatorNote ||
+                      "Nội dung không có ghi chú vi phạm."}
+                  </p>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
