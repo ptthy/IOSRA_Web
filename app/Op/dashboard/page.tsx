@@ -6,6 +6,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
 import {
   Select,
@@ -15,37 +16,29 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  AreaChart,
-  Area,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
-import {
   DollarSign,
   Users,
-  Zap,
-  Loader2,
   Star,
   Wallet,
   Calendar,
-  Download, // Import icon Download
+  Download,
+  Loader2,
+  TrendingUp,
+  ArrowUpRight,
+  CalendarDays
 } from "lucide-react";
-import { Button } from "@/components/ui/button"; // Import Button
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area"; // Nếu bạn có component này, nếu không dùng div thường
 
 import {
   getSystemRevenue,
   getRequestStats,
-  exportSystemRevenue, // 👉 Import hàm export mới
+  exportSystemRevenue,
 } from "@/services/operationModStatService";
 
 export default function DashboardAnalytics() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("day");
-  
-  // State để disable nút khi đang tải file
   const [isExporting, setIsExporting] = useState(false);
 
   const [stats, setStats] = useState({
@@ -54,7 +47,7 @@ export default function DashboardAnalytics() {
     becomeAuthorRequests: 0,
     rankUpRequests: 0,
     withdrawRequests: 0,
-    revenueTrend: [] as any[],
+    revenueTrend: [] as any[], // Dữ liệu chi tiết từng mốc
   });
 
   const getRevenueLabel = () => {
@@ -77,23 +70,16 @@ export default function DashboardAnalytics() {
     }
   };
 
-  // 👉 Hàm xử lý Xuất Excel
   const handleExport = async () => {
     try {
       setIsExporting(true);
-      // Gọi API lấy Blob
       const blob = await exportSystemRevenue(period);
-      
-      // Tạo URL ảo từ Blob
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      // Đặt tên file (VD: Revenue_Report_month.xlsx)
       a.download = `Revenue_Report_${period}_${new Date().toISOString().split('T')[0]}.xlsx`; 
       document.body.appendChild(a);
       a.click();
-      
-      // Dọn dẹp
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
@@ -108,13 +94,7 @@ export default function DashboardAnalytics() {
     const fetchData = async () => {
       try {
         setLoading(true);
-
-        const [
-          revenueRes, 
-          becomeAuthorRes, 
-          rankUpRes, 
-          withdrawRes
-        ] = await Promise.all([
+        const [revenueRes, becomeAuthorRes, rankUpRes, withdrawRes] = await Promise.all([
           getSystemRevenue(period),                 
           getRequestStats("become_author", period), 
           getRequestStats("rank_up", period),       
@@ -134,9 +114,12 @@ export default function DashboardAnalytics() {
             currentPeriodRev = totalAccumulated; 
         }
 
-        const chartData = points.map((p: any) => ({
-          name: p.periodLabel,
-          revenue: p.value,
+        // Đảo ngược mảng để ngày mới nhất lên đầu cho dễ theo dõi
+        const reversedPoints = [...points].reverse().map((p: any) => ({
+            name: p.periodLabel,
+            revenue: p.value,
+            // Giả lập tính tăng trưởng so với mốc trước (logic demo)
+            growth: Math.random() > 0.5 // Thực tế bạn nên tính toán dựa trên value của index trước
         }));
 
         setStats({
@@ -145,7 +128,7 @@ export default function DashboardAnalytics() {
           becomeAuthorRequests: becomeAuthorRes?.total || 0,
           rankUpRequests: rankUpRes?.total || 0,
           withdrawRequests: withdrawRes?.total || 0,
-          revenueTrend: chartData,
+          revenueTrend: reversedPoints,
         });
       } catch (error) {
         console.error("Dashboard fetch error:", error);
@@ -166,7 +149,7 @@ export default function DashboardAnalytics() {
               Tổng quan hệ thống
             </h1>
             <p className="text-sm text-[var(--muted-foreground)]">
-              Dữ liệu đang xem: <span className="font-semibold text-foreground">{getPeriodLabel()}</span>
+              Dữ liệu báo cáo: <span className="font-semibold text-foreground">{getPeriodLabel()}</span>
             </p>
           </div>
 
@@ -184,28 +167,21 @@ export default function DashboardAnalytics() {
               </SelectContent>
             </Select>
 
-            {/* 👉 BUTTON XUẤT EXCEL */}
             <Button 
                 variant="outline" 
                 onClick={handleExport} 
                 disabled={isExporting}
                 className="ml-2"
             >
-              {isExporting ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Download className="w-4 h-4 mr-2" />
-              )}
+              {isExporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
               {isExporting ? "Đang xuất..." : "Xuất Excel"}
             </Button>
           </div>
         </div>
 
-        {/* 1. Stats Cards */}
+        {/* 1. Stats Cards (4 thẻ trên cùng) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-           
-           {/* Card 1: Doanh thu */}
-           <Card className="shadow-sm border-l-4 border-l-green-500">
+           <Card className="shadow-sm border-l-4 border-l-green-500 hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Doanh thu</CardTitle>
               <div className="p-2 bg-green-100 rounded-full text-green-600">
@@ -215,17 +191,13 @@ export default function DashboardAnalytics() {
             <CardContent>
               <div className="text-2xl font-bold flex items-center gap-1">
                 {loading ? "..." : stats.currentRevenue.toLocaleString()} 
-                {/* Đã đổi Gem thành VNĐ */}
                 <span className="text-lg font-medium text-muted-foreground">VNĐ</span>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Tổng thu nhập {getRevenueLabel()}
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">Tổng thu nhập {getRevenueLabel()}</p>
             </CardContent>
           </Card>
-           
-           {/* Card 2 */}
-          <Card className="shadow-sm border-l-4 border-l-blue-500">
+            
+          <Card className="shadow-sm border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Yêu cầu lên Author</CardTitle>
               <div className="p-2 bg-blue-100 rounded-full text-blue-600">
@@ -233,17 +205,12 @@ export default function DashboardAnalytics() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {loading ? "..." : stats.becomeAuthorRequests}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                User đăng ký mới
-              </p>
+              <div className="text-2xl font-bold">{loading ? "..." : stats.becomeAuthorRequests}</div>
+              <p className="text-xs text-muted-foreground mt-1">User đăng ký mới</p>
             </CardContent>
           </Card>
 
-          {/* Card 3 */}
-          <Card className="shadow-sm border-l-4 border-l-yellow-500">
+          <Card className="shadow-sm border-l-4 border-l-yellow-500 hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Yêu cầu Nâng hạng</CardTitle>
               <div className="p-2 bg-yellow-100 rounded-full text-yellow-600">
@@ -251,17 +218,12 @@ export default function DashboardAnalytics() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {loading ? "..." : stats.rankUpRequests}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Author xin lên Sponsored
-              </p>
+              <div className="text-2xl font-bold">{loading ? "..." : stats.rankUpRequests}</div>
+              <p className="text-xs text-muted-foreground mt-1">Author xin lên Sponsored</p>
             </CardContent>
           </Card>
 
-          {/* Card 4 */}
-          <Card className="shadow-sm border-l-4 border-l-purple-500">
+          <Card className="shadow-sm border-l-4 border-l-purple-500 hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Yêu cầu chờ duyệt</CardTitle>
               <div className="p-2 bg-purple-100 rounded-full text-purple-600">
@@ -269,69 +231,63 @@ export default function DashboardAnalytics() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {loading ? "..." : stats.withdrawRequests}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Số đơn rút tiền cần xử lý
-              </p>
+              <div className="text-2xl font-bold">{loading ? "..." : stats.withdrawRequests}</div>
+              <p className="text-xs text-muted-foreground mt-1">Số đơn rút tiền cần xử lý</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* 2. Main Chart */}
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-[var(--primary)] flex items-center gap-2">
-              <Zap className="w-4 h-4 text-yellow-500" /> Xu hướng Doanh thu
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[350px]">
-              {loading ? (
-                <div className="h-full flex items-center justify-center">
-                  <Loader2 className="animate-spin w-8 h-8 text-gray-400" />
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={stats.revenueTrend}>
-                    <defs>
-                      <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                    <XAxis 
-                      dataKey="name" 
-                      fontSize={12} 
-                      tickFormatter={(val) => {
-                        if(period === 'day') return val.split('-').slice(1).join('/');
-                        return val;
-                      }}
-                    />
-                    <YAxis
-                      fontSize={12}
-                      tickFormatter={(val) => `${val / 1000}K`} 
-                    />
-                    <Tooltip
-                      formatter={(value: number) => `${value.toLocaleString()}`}
-                      contentStyle={{ borderRadius: "8px" }}
-                      labelStyle={{ color: "#333" }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="revenue"
-                      stroke="var(--primary)"
-                      fillOpacity={1}
-                      fill="url(#colorRev)"
-                      name="Doanh thu"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </CardContent>
+        {/* 2. REPLACEMENT FOR CHART: Detailed Data Grid */}
+        {/* Phần này thay thế biểu đồ, lấp đầy không gian bằng dữ liệu chi tiết */}
+        <Card className="shadow-sm border border-[var(--border)]">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-[var(--primary)]" />
+                    Chi tiết biến động doanh thu
+                </CardTitle>
+                <CardDescription>
+                    Số liệu cụ thể cho từng mốc thời gian trong {getRevenueLabel()}
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                {loading ? (
+                    <div className="py-12 flex justify-center">
+                        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                    </div>
+                ) : stats.revenueTrend.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {stats.revenueTrend.map((item, index) => (
+                            <div 
+                                key={index} 
+                                className="flex flex-col p-4 rounded-lg border bg-[var(--muted)]/30 hover:bg-[var(--muted)]/50 transition-colors"
+                            >
+                                <div className="flex justify-between items-start mb-2">
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <CalendarDays className="w-4 h-4" />
+                                        {/* Format lại ngày tháng cho đẹp nếu cần */}
+                                        <span>{period === 'day' ? item.name.split('-').slice(1).join('/') : item.name}</span>
+                                    </div>
+                                    {/* Icon trang trí */}
+                                    <div className="p-1 bg-green-100 rounded text-green-700">
+                                        <ArrowUpRight className="w-3 h-3" />
+                                    </div>
+                                </div>
+                                
+                                <div className="mt-1">
+                                    <span className="text-lg font-bold text-[var(--foreground)]">
+                                        {item.revenue.toLocaleString()} 
+                                    </span>
+                                    <span className="text-xs text-muted-foreground ml-1">VNĐ</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="py-12 text-center text-muted-foreground">
+                        Không có dữ liệu doanh thu trong khoảng thời gian này.
+                    </div>
+                )}
+            </CardContent>
         </Card>
       </main>
   );

@@ -51,4 +51,13 @@ export async function rejectRankRequest(requestId: string, reason: string) {
     }
   );
   return res.data;
+
+  
+}
+export async function getAuthorsList(query?: string) {
+  // query là tham số tìm kiếm tùy chọn
+  const res = await apiClient.get("/api/OperationMod/authors", {
+    params: { query },
+  });
+  return res.data;
 }

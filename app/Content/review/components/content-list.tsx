@@ -1,7 +1,7 @@
-// File: review/components/content-list.tsx
+// File: app/Content/review/components/content-list.tsx
 "use client";
 
-import { Search, User, Clock, Loader2, AlertCircle } from "lucide-react"; // Bỏ BookOpen (không dùng)
+import { Search, User, Clock, Loader2, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,10 +17,9 @@ import {
 } from "@/components/ui/table";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { useModeration } from "@/context/ModerationContext"; // ✅ SỬA 1: Import hook Context
+import { useModeration } from "@/context/ModerationContext";
 import { getModerationStories } from "@/services/moderationApi";
 
-// Định nghĩa kiểu dữ liệu từ API
 interface StoryFromAPI {
   reviewId: string;
   storyId: string;
@@ -48,7 +47,6 @@ export function ContentList({ onReview }: ContentListProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // ✅ SỬA 2: Lấy hàm 'updateCount' từ context
   const { updateCount } = useModeration();
 
   useEffect(() => {
@@ -58,25 +56,27 @@ export function ContentList({ onReview }: ContentListProps) {
         setError(null);
         const data: StoryFromAPI[] = await getModerationStories('pending');
         setStories(data);
-        
-        // ✅ SỬA 3: Gửi số lượng (data.length) lên Context
         updateCount('pending', data.length);
-        
       } catch (err: any) {
         setError(err.message);
-        updateCount('pending', 0); // Nếu lỗi, set số đếm về 0
+        updateCount('pending', 0);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchPendingStories();
-    
-    // ✅ SỬA 4: Thêm 'updateCount' vào dependency array
   }, [updateCount]); 
-  
 
-  // --- Render ---
+  // --- Helper để dịch tiếng Anh sang tiếng Việt ---
+  const getAiLabel = (result: string) => {
+    switch (result) {
+      case "approved": return "Đã duyệt";
+      case "rejected": return "Từ chối";
+      case "flagged": return "Cảnh báo";
+      default: return result;
+    }
+  };
 
   if (isLoading) {
     return (
@@ -97,8 +97,6 @@ export function ContentList({ onReview }: ContentListProps) {
   }
 
   if (stories.length === 0) {
-    // Tự động cập nhật sidebar là 0 nếu không có truyện
-    // (useEffect đã làm việc này)
     return (
        <div className="flex justify-center items-center min-h-[400px]">
         <p className="text-lg text-gray-500">Không có truyện nào chờ duyệt.</p>
@@ -130,7 +128,7 @@ export function ContentList({ onReview }: ContentListProps) {
         </p>
       </motion.div>
 
-      {/* Search (Giữ nguyên) */}
+      {/* Search */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -154,24 +152,12 @@ export function ContentList({ onReview }: ContentListProps) {
           <Table className="bg-[var(--card)] transition-colors duration-300">
             <TableHeader>
               <TableRow className="bg-[var(--card)] border-b border-[var(--border)] hover:bg-[var(--muted)]/10 transition-colors">
-                <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">
-                  Tiêu đề
-                </TableHead>
-                <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">
-                  Tác giả
-                </TableHead>
-                <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">
-                  Đánh giá AI
-                </TableHead>
-                <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">
-                  Thể loại
-                </TableHead>
-                <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">
-                  Thời gian gửi
-                </TableHead>
-                <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6 text-center">
-                  Hành động
-                </TableHead>
+                <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">Tiêu đề</TableHead>
+                <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">Tác giả</TableHead>
+                <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">Đánh giá AI</TableHead>
+                <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">Thể loại</TableHead>
+                <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6">Thời gian gửi</TableHead>
+                <TableHead className="text-[var(--foreground)] font-semibold py-4 px-6 text-center">Hành động</TableHead>
               </TableRow>
             </TableHeader>
 
@@ -196,6 +182,7 @@ export function ContentList({ onReview }: ContentListProps) {
                     </div>
                   </TableCell>
 
+                  {/* SỬA PHẦN NÀY: Hiển thị tiếng Việt */}
                   <TableCell className="py-4 px-6">
                     <Badge variant={story.aiResult === 'rejected' ? 'destructive' : 'outline'}
                       className={cn(
@@ -204,16 +191,16 @@ export function ContentList({ onReview }: ContentListProps) {
                         story.aiResult === 'rejected' && 'bg-red-100 text-red-800'
                       )}
                     >
-                     {story.aiResult} ({story.aiScore.toFixed(1)})
+                      {getAiLabel(story.aiResult)} ({story.aiScore.toFixed(1)})
                     </Badge>
                   </TableCell>
 
                   <TableCell className="py-4 px-6">
-                     {story.tags.slice(0, 2).map((tag) => (
+                      {story.tags.slice(0, 2).map((tag) => (
                       <Badge key={tag.tagId} variant="outline" className="mr-1 mb-1 bg-blue-100 text-blue-800">
                         {tag.tagName}
                       </Badge>
-                     ))}
+                      ))}
                   </TableCell>
 
                   <TableCell className="py-4 px-6 text-[var(--muted-foreground)]">

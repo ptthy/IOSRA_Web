@@ -40,11 +40,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import {
-  Download,
-  Loader2,
-  Gem,
-} from "lucide-react";
+import { Download, Loader2, Gem } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -79,13 +75,13 @@ interface Transaction {
 
 export default function ManageRevenuePage() {
   const [period, setPeriod] = useState("daily");
-  
+
   const [loading, setLoading] = useState(true);
   const [revenueData, setRevenueData] = useState<any>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [openDetail, setOpenDetail] = useState(false);
-  
+
   // State loading cho button export
   const [isExporting, setIsExporting] = useState(false);
 
@@ -111,8 +107,7 @@ export default function ManageRevenuePage() {
 
         const merged = [...listConfirmed, ...listRejected].sort(
           (a: Transaction, b: Transaction) =>
-            new Date(b.reviewedAt).getTime() -
-            new Date(a.reviewedAt).getTime()
+            new Date(b.reviewedAt).getTime() - new Date(a.reviewedAt).getTime()
         );
 
         setTransactions(merged);
@@ -134,13 +129,15 @@ export default function ManageRevenuePage() {
       let apiPeriod = "month";
       if (period === "daily") apiPeriod = "day";
       if (period === "yearly") apiPeriod = "year";
-      
+
       const blob = await exportSystemRevenue(apiPeriod);
-      
+
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `Revenue_Report_${apiPeriod}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      a.download = `Revenue_Report_${apiPeriod}_${
+        new Date().toISOString().split("T")[0]
+      }.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -169,10 +166,7 @@ export default function ManageRevenuePage() {
       value: p.value,
     })) || [];
 
-  const totalRevenue = pieData.reduce(
-    (acc, curr) => acc + curr.value,
-    0
-  );
+  const totalRevenue = pieData.reduce((acc, curr) => acc + curr.value, 0);
 
   const renderStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
@@ -218,10 +212,10 @@ export default function ManageRevenuePage() {
             </Select>
 
             {/* BUTTON DOWNLOAD */}
-            <Button 
-                variant="outline" 
-                onClick={handleExport} 
-                disabled={isExporting}
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              disabled={isExporting}
             >
               {isExporting ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -246,7 +240,6 @@ export default function ManageRevenuePage() {
                 <CardTitle>Biến động Doanh thu</CardTitle>
                 <CardDescription className="flex items-center gap-1">
                   Tổng thu: {totalRevenue.toLocaleString()}
-                  {/* Cập nhật 1: Đổi icon Gem thành VNĐ */}
                   <span className="font-medium text-muted-foreground">VNĐ</span>
                 </CardDescription>
               </CardHeader>
@@ -295,9 +288,13 @@ export default function ManageRevenuePage() {
                           />
                         ))}
                       </Pie>
-                      <Tooltip 
-                        formatter={(value: number) => value.toLocaleString()} 
-                        contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
+                      <Tooltip
+                        formatter={(value: number) => value.toLocaleString()}
+                        contentStyle={{
+                          borderRadius: "8px",
+                          border: "none",
+                          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                        }}
                       />
                     </PieChart>
                   </ResponsiveContainer>
@@ -306,28 +303,35 @@ export default function ManageRevenuePage() {
                 {/* Custom List Chi Tiết (Legend) */}
                 <div className="mt-4 space-y-3">
                   {pieData.map((item, index) => {
-                    const percent = totalRevenue > 0 
-                      ? ((item.value / totalRevenue) * 100).toFixed(1) 
-                      : "0";
-                    
+                    const percent =
+                      totalRevenue > 0
+                        ? ((item.value / totalRevenue) * 100).toFixed(1)
+                        : "0";
+
                     return (
-                      <div key={index} className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors"
+                      >
                         <div className="flex items-center gap-3">
                           {/* Dot màu */}
-                          <div 
-                            className="w-3 h-3 rounded-full shadow-sm" 
-                            style={{ backgroundColor: COLORS[index % COLORS.length] }} 
+                          <div
+                            className="w-3 h-3 rounded-full shadow-sm"
+                            style={{
+                              backgroundColor: COLORS[index % COLORS.length],
+                            }}
                           />
                           <span className="text-sm font-medium text-slate-700">
                             {item.name}
                           </span>
                         </div>
-                        
+
                         <div className="text-right">
                           <div className="text-sm font-bold flex items-center justify-end gap-1">
                             {item.value.toLocaleString()}
-                            {/* Cập nhật 2: Đổi icon Gem thành VNĐ ở phần chi tiết nguồn thu */}
-                            <span className="text-xs font-normal text-muted-foreground">VNĐ</span>
+                            <span className="text-xs font-normal text-muted-foreground">
+                              VNĐ
+                            </span>
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {percent}%
@@ -336,7 +340,7 @@ export default function ManageRevenuePage() {
                       </div>
                     );
                   })}
-                  
+
                   {pieData.length === 0 && (
                     <p className="text-center text-sm text-muted-foreground py-4">
                       Chưa có dữ liệu
@@ -352,9 +356,7 @@ export default function ManageRevenuePage() {
         <Card>
           <CardHeader>
             <CardTitle>Lịch sử đối soát doanh thu tác giả</CardTitle>
-            <CardDescription>
-              Các yêu cầu rút tiền đã xử lý
-            </CardDescription>
+            <CardDescription>Các yêu cầu rút tiền đã xử lý</CardDescription>
           </CardHeader>
           <CardContent>
             {transactions.length === 0 ? (
@@ -367,10 +369,12 @@ export default function ManageRevenuePage() {
                   <TableRow>
                     <TableHead>Mã GD</TableHead>
                     <TableHead>Ngân hàng</TableHead>
-                    {/* Cập nhật 3: Header "Số tiền" đổi thành Icon Kim Cương */}
                     <TableHead>
-                      <div className="flex items-center">
-                        <Gem className="w-3 h-3 text-blue-500" />
+                      <div className="relative inline-flex items-center">
+                        <Gem className="h-4 w-4 text-blue-500 fill-blue-500 opacity-80" />
+                        <span className="absolute -bottom-2 -right-2 text-yellow-500 text-lg font-bold leading-none">
+                          *
+                        </span>
                       </div>
                     </TableHead>
                     <TableHead>Trạng thái</TableHead>
@@ -385,22 +389,15 @@ export default function ManageRevenuePage() {
                         {tx.transactionCode ||
                           `#${tx.requestId.slice(0, 8)}...`}
                       </TableCell>
-                      <TableCell>
-                        {tx.bankName}
-                      </TableCell>
-                      {/* Cập nhật 4: Số tiền bỏ icon kim cương (chỉ hiện số) */}
+                      <TableCell>{tx.bankName}</TableCell>
                       <TableCell className="font-bold">
                         {tx.amount.toLocaleString()}
                       </TableCell>
-                      <TableCell>
-                        {renderStatusBadge(tx.status)}
-                      </TableCell>
+                      <TableCell>{renderStatusBadge(tx.status)}</TableCell>
                       <TableCell className="text-sm">
-                        {format(
-                          new Date(tx.reviewedAt),
-                          "dd/MM/yyyy HH:mm",
-                          { locale: vi }
-                        )}
+                        {format(new Date(tx.reviewedAt), "dd/MM/yyyy HH:mm", {
+                          locale: vi,
+                        })}
                       </TableCell>
                       <TableCell>
                         <Button
@@ -433,33 +430,49 @@ export default function ManageRevenuePage() {
                 </DialogDescription>
               </DialogHeader>
 
+              {/* SỬA LỖI HYDRATION Ở ĐÂY: Thay các thẻ p thành div */}
               <div className="space-y-3 text-sm">
-                <p><b>Mã GD:</b> {selectedTx.transactionCode || selectedTx.requestId}</p>
-                <p className="flex items-center gap-1">
+                <div className="flex items-center gap-2">
+                  <b>Mã GD:</b>{" "}
+                  {selectedTx.transactionCode || selectedTx.requestId}
+                </div>
+                
+                <div className="flex items-center gap-1">
                   <b>Số tiền:</b> {selectedTx.amount.toLocaleString()}
-                  <Gem className="w-4 h-4 text-blue-500" />
-                </p>
-                <p><b>Trạng thái:</b> {renderStatusBadge(selectedTx.status)}</p>
+                  <div className="relative inline-flex items-center">
+                    <Gem className="h-4 w-4 text-blue-500 fill-blue-500 opacity-80" />
+                    <span className="absolute -bottom-2 -right-2 text-yellow-500 text-lg font-bold leading-none">
+                      *
+                    </span>
+                  </div>
+                </div>
 
-                <div className="border-t pt-2">
-                  <p><b>Ngân hàng:</b> {selectedTx.bankName}</p>
-                  <p><b>Số TK:</b> {selectedTx.bankAccountNumber}</p>
-                  <p><b>Chủ TK:</b> {selectedTx.accountHolderName}</p>
+                <div className="flex items-center gap-2">
+                  <b>Trạng thái:</b> {renderStatusBadge(selectedTx.status)}
+                </div>
+
+                <div className="border-t pt-2 space-y-2">
+                  <div>
+                    <b>Ngân hàng:</b> {selectedTx.bankName}
+                  </div>
+                  <div>
+                    <b>Số TK:</b> {selectedTx.bankAccountNumber}
+                  </div>
+                  <div>
+                    <b>Chủ TK:</b> {selectedTx.accountHolderName}
+                  </div>
                 </div>
 
                 <div className="border-t pt-2">
                   <b>Ghi chú:</b>
-                  <p className="italic">
+                  <div className="italic mt-1">
                     {selectedTx.moderatorNote || "Không có"}
-                  </p>
+                  </div>
                 </div>
               </div>
 
               <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setOpenDetail(false)}
-                >
+                <Button variant="outline" onClick={() => setOpenDetail(false)}>
                   Đóng
                 </Button>
               </DialogFooter>

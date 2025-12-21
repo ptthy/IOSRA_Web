@@ -37,8 +37,8 @@ const roboto = Roboto({
 });
 
 const ENDPOINTS: { label: string; value: Endpoint }[] = [
-  { label: "Truyện (published)", value: "stories" },
-  { label: "Chương (published)", value: "chapters" },
+  { label: "Truyện (Đã đăng)", value: "stories" },
+  { label: "Chương (Đã đăng)", value: "chapters" },
   { label: "Quyết định (duyệt/từ chối)", value: "story-decisions" },
   { label: "Báo cáo mới", value: "reports" },
   { label: "Báo cáo đã xử lý", value: "reports/handled" },
@@ -55,7 +55,7 @@ const PIE_COLORS = ["#8B5FBF", "#5D3FD3", "#A97FE3", "#E0D4EE", "#B6A77B", "#FF7
 
 export default function StatisticsPage(): JSX.Element {
   const [endpoint, setEndpoint] = useState<Endpoint>("stories");
-  const [period, setPeriod] = useState<Period>("month");
+  const [period, setPeriod] = useState<Period>("day");
   const [from, setFrom] = useState<string | undefined>(undefined);
   const [to, setTo] = useState<string | undefined>(undefined);
 

@@ -1,4 +1,3 @@
-// File: app/Content/chapters/components/chapter-detail.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -25,7 +24,6 @@ import { RejectModal } from "@/app/Content/moderation/components/reject-modal";
 const R2_BASE_URL = "https://pub-15618311c0ec468282718f80c66bcc13.r2.dev";
 
 // ✅ Fix lỗi TS: Mở rộng interface nếu ChapterFromAPI thiếu trường này
-// (Dùng kỹ thuật intersection type để gộp ChapterFromAPI với các trường AI)
 type ChapterWithAI = ChapterFromAPI & {
   aiScore: number;
   aiResult: "flagged" | "rejected" | "approved";
@@ -49,6 +47,26 @@ export function ChapterDetail({ content: initialContent, onBack }: ChapterDetail
   // State cho nội dung chương
   const [chapterText, setChapterText] = useState<string>("");
   const [isLoadingContent, setIsLoadingContent] = useState(true);
+
+  // --- HÀM HELPER 1: Dịch AI Label ---
+  const getAiLabel = (result: string) => {
+    switch (result) {
+      case "approved": return "Đã duyệt";
+      case "rejected": return "Từ chối";
+      case "flagged": return "Cảnh báo";
+      default: return result;
+    }
+  };
+
+  // --- HÀM HELPER 2: Dịch Trạng thái ---
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "pending": return "Chờ duyệt";
+      case "published": return "Đã đăng";
+      case "rejected": return "Bị từ chối";
+      default: return status;
+    }
+  };
 
   // --- 2. LOGIC TẢI NỘI DUNG (Giữ nguyên logic của bạn) ---
   useEffect(() => {
@@ -98,7 +116,7 @@ export function ChapterDetail({ content: initialContent, onBack }: ChapterDetail
     fetchContent();
   }, [content.contentPath]); 
 
-  // --- HÀM XỬ LÝ DUYỆT (Đã thêm Validate) ---
+  // --- HÀM XỬ LÝ DUYỆT (Giữ nguyên Validate) ---
   const handleApprove = async (reason: string) => {
     // ✅ VALIDATE: ChapterRejectedByAi (Cảnh báo UI trước khi gọi API)
     if (content.aiResult === 'rejected') {
@@ -138,7 +156,7 @@ export function ChapterDetail({ content: initialContent, onBack }: ChapterDetail
     }
   };
 
-  // --- HÀM XỬ LÝ TỪ CHỐI (Đã thêm Validate) ---
+  // --- HÀM XỬ LÝ TỪ CHỐI (Giữ nguyên Validate) ---
   const handleReject = async (reason: string) => {
     if (!reason) {
       toast.error("Vui lòng cung cấp lý do từ chối.");
@@ -211,13 +229,22 @@ export function ChapterDetail({ content: initialContent, onBack }: ChapterDetail
               <div className="mb-6">
                 <div className="flex justify-between mb-3">
                   <h2 className="text-xl font-semibold">{content.chapterTitle}</h2>
+                  
+                  {/* --- SỬA ĐỔI HEADER BADGE (AI) --- */}
                   <Badge
                     variant="outline"
-                    className="bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400"
+                    className={
+                        content.aiResult === 'approved' ? "bg-green-100 text-green-800 border-green-200" :
+                        content.aiResult === 'rejected' ? "bg-red-100 text-red-800 border-red-200" :
+                        "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400"
+                    }
                   >
-                    <AlertTriangle className="w-3 h-3 mr-1" />
-                    {content.aiScore ? content.aiScore.toFixed(1) : "N/A"} Điểm AI
+                    {content.aiResult === 'approved' ? <CheckCircle2 className="w-3 h-3 mr-1"/> : 
+                     content.aiResult === 'rejected' ? <XCircle className="w-3 h-3 mr-1"/> : 
+                     <AlertTriangle className="w-3 h-3 mr-1" />}
+                    {getAiLabel(content.aiResult)} ({content.aiScore ? content.aiScore.toFixed(1) : "N/A"})
                   </Badge>
+
                 </div>
                 <div className="text-[var(--muted-foreground)] space-y-2">
                   <p>
@@ -326,9 +353,13 @@ export function ChapterDetail({ content: initialContent, onBack }: ChapterDetail
                   <span>Chapter ID:</span>
                   <span className="font-mono text-xs truncate max-w-[150px]" title={content.chapterId}>{content.chapterId}</span>
                 </div>
+                
+                {/* --- SỬA ĐỔI STATUS BADGE --- */}
                 <div className="flex justify-between items-center">
                   <span>Trạng thái:</span>
-                  <Badge variant="secondary" className="text-xs uppercase">{content.status}</Badge>
+                  <Badge variant="secondary" className="text-xs uppercase font-bold">
+                    {getStatusLabel(content.status)}
+                  </Badge>
                 </div>
               </div>
             </Card>
