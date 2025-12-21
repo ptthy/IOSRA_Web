@@ -368,9 +368,7 @@ export function TopUpModal({
                             className={`h-20 w-20 rounded-2xl flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-110 
                               ${theme.iconBg}`}
                           >
-                            <theme.icon
-                              className={`h-10 w-10 ${theme.iconColor}`}
-                            />
+                            <Gem className="h-10 w-10 text-blue-500 fill-blue-500 opacity-80" />
                           </div>
 
                           <div className="space-y-1">
