@@ -40,19 +40,31 @@ export const exportSystemRevenue = async (period: string, from?: string, to?: st
   });
   return res.data; // Trả về Blob
 };
+// 2. API Số lượng Requests 
+export const getRequestStats = async (type: string, period: string, from?: string, to?: string) => {
+  const params: any = { Period: period };
+  // Thêm logic kiểm tra from/to giống hệt getSystemRevenue
+  if (from) params.From = from;
+  if (to) params.To = to;
 
-// 2. API Số lượng Requests
-export const getRequestStats = async (type: string, period: string = 'month') => {
   const res = await apiClient.get(`/api/OperationModStat/requests/${type}`, { 
-    params: { Period: period } 
+    params // Truyền object params đã build ở trên
   });
   return res.data;
 };
 
-// 👉 2.1 API Xuất Excel Requests
-export const exportRequestStats = async (type: string, period: string = 'month') => {
+// 2.1 API Xuất Excel Requests 
+export const exportRequestStats = async (type: string, period: string, from?: string, to?: string) => {
+  const params: any = { 
+    Period: period, 
+    GenerateReport: true 
+  };
+  // Thêm logic kiểm tra from/to
+  if (from) params.From = from;
+  if (to) params.To = to;
+
   const res = await apiClient.get(`/api/OperationModStat/requests/${type}`, { 
-    params: { Period: period, GenerateReport: true },
+    params,
     responseType: 'blob'
   });
   return res.data;
