@@ -163,12 +163,12 @@ export default function CreateStoryPage() {
   //   toast.error(fallbackMsg);
   // };
   const LIMITS = {
-    TITLE_MIN: 20,
+    TITLE_MIN: 10,
     TITLE_MAX: 50,
     DESC_MIN: 6,
     DESC_MAX: 1000,
     OUTLINE_MIN: 20,
-    OUTLINE_MAX: 1000,
+    OUTLINE_MAX: 5000,
     PROMPT: 500,
   };
   // const handleApiError = (error: any, defaultMessage: string) => {

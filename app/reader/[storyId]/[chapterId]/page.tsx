@@ -101,60 +101,164 @@ export default function ReaderPage() {
     toast.error(fallbackMsg);
   };
   // --- 1. LOAD DATA ---
+  // useEffect(() => {
+  //   const fetchData = async () => {
+  //     setLoading(true);
+  //     setError(null);
+  //     try {
+  //       // A. Lấy chi tiết chương
+  //       const detail = await chapterCatalogApi.getChapterDetail(chapterId);
+  //       setChapter(detail);
+  //       console.log("🔥 CHI TIẾT CHAPTER API TRẢ VỀ:", detail);
+  //       setOriginalContentUrl(detail.contentUrl);
+
+  //       // B. Lấy danh sách tất cả chương
+  //       const chaptersRes = await chapterCatalogApi.getChapters({
+  //         StoryId: storyId,
+  //         Page: 1,
+  //         PageSize: 100,
+  //       });
+  //       setAllChapters(chaptersRes.items);
+
+  //       //  LOGIC MỚI: XỬ LÝ THEO isOwned
+  //       console.log("🎯 Chapter data:", {
+  //         chapterId: detail.chapterId,
+  //         isLocked: detail.isLocked,
+  //         isOwned: detail.isOwned,
+  //         accessType: detail.accessType,
+  //         contentUrl: detail.contentUrl,
+  //       });
+
+  //       // CASE 1: isOwned = true -> ĐÃ SỞ HỮU, HIỂN THỊ NỘI DUNG
+  //       if (detail.isOwned === true) {
+  //         console.log("✅ Chapter đã được sở hữu, tải nội dung...");
+  //         if (detail.contentUrl) {
+  //           try {
+  //             const text = await chapterCatalogApi.getChapterContent(
+  //               detail.contentUrl
+  //             );
+  //             setContent(text);
+  //             console.log(
+  //               "✅ Đã tải nội dung thành công, độ dài:",
+  //               text.length
+  //             );
+  //           } catch (err) {
+  //             console.error("❌ Lỗi tải nội dung:", err);
+  //             setError("Không thể tải nội dung văn bản.");
+  //           }
+  //         }
+  //       }
+  //       // CASE 2: isOwned = false -> CHƯA SỞ HỮU
+  //       else if (detail.isOwned === false) {
+  //         console.log("🔒 Chapter chưa sở hữu, kiểm tra điều kiện mở khóa...");
+
+  //         // Nếu là chapter free và không bị khóa -> HIỂN THỊ NỘI DUNG
+  //         if (detail.accessType === "free" && !detail.isLocked) {
+  //           console.log("📖 Chapter free, tải nội dung...");
+  //           if (detail.contentUrl) {
+  //             try {
+  //               const text = await chapterCatalogApi.getChapterContent(
+  //                 detail.contentUrl
+  //               );
+  //               setContent(text);
+  //             } catch (err) {
+  //               console.error("❌ Lỗi tải nội dung free:", err);
+  //               setError("Không thể tải nội dung văn bản.");
+  //             }
+  //           }
+  //         }
+  //         // Nếu là chapter trả phí -> KHÔNG tải nội dung, hiện overlay khóa
+  //         else if (detail.accessType === "dias" && detail.isLocked) {
+  //           console.log("💰 Chapter trả phí chưa mua, hiện overlay khóa");
+  //           setContent(""); // Đảm bảo không hiện nội dung
+  //         }
+  //       }
+  //       // CASE 3: isOwned = undefined (API cũ) -> Fallback logic cũ
+  //       else {
+  //         console.log("🔄 Sử dụng logic cũ vì isOwned không xác định");
+  //         const shouldLoadContent = !detail.isLocked;
+  //         if (shouldLoadContent && detail.contentUrl) {
+  //           try {
+  //             const text = await chapterCatalogApi.getChapterContent(
+  //               detail.contentUrl
+  //             );
+  //             setContent(text);
+  //           } catch (err) {
+  //             console.error("❌ Lỗi tải text:", err);
+  //             setError("Không thể tải nội dung văn bản.");
+  //           }
+  //         } else if (detail.isLocked) {
+  //           setContent("");
+  //         }
+  //       }
+  //     } catch (err: any) {
+  //       console.error("Lỗi tải chương:", err);
+  //       setError("Không thể tải thông tin chương truyện.");
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
+
+  //   if (storyId && chapterId) {
+  //     fetchData();
+  //   }
+  // }, [chapterId, storyId, refreshKey]);
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
-        // A. Lấy chi tiết chương
-        const detail = await chapterCatalogApi.getChapterDetail(chapterId);
-        setChapter(detail);
-        console.log("🔥 CHI TIẾT CHAPTER API TRẢ VỀ:", detail);
-        setOriginalContentUrl(detail.contentUrl);
+        // A. Lấy chi tiết chương (Sử dụng Service đã cập nhật catch lỗi 403)
+        let detail = await chapterCatalogApi.getChapterDetail(chapterId);
 
-        // B. Lấy danh sách tất cả chương
+        // B. Lấy danh sách tất cả chương để làm dữ liệu dự phòng
         const chaptersRes = await chapterCatalogApi.getChapters({
           StoryId: storyId,
           Page: 1,
           PageSize: 100,
         });
-        setAllChapters(chaptersRes.items);
+        const chapterList = chaptersRes.items;
+        setAllChapters(chapterList);
 
-        //  LOGIC MỚI: XỬ LÝ THEO isOwned
-        console.log("🎯 Chapter data:", {
-          chapterId: detail.chapterId,
-          isLocked: detail.isLocked,
-          isOwned: detail.isOwned,
-          accessType: detail.accessType,
-          contentUrl: detail.contentUrl,
-        });
+        // --- LOGIC BỔ SUNG: CẬP NHẬT THÔNG TIN HIỂN THỊ KHI BỊ KHÓA ---
+        // Nếu chương bị khóa và dữ liệu trả về từ API chi tiết bị trống (chapterNo = 0)
+        if (
+          detail.isLocked &&
+          (detail.chapterNo === 0 || detail.title === "Chương bị khóa")
+        ) {
+          const backupInfo = chapterList.find((c) => c.chapterId === chapterId);
+          if (backupInfo) {
+            detail = {
+              ...detail,
+              chapterNo: backupInfo.chapterNo,
+              title: backupInfo.title,
+            };
+          }
+        }
+
+        // Cập nhật state chapter sau khi đã có đủ thông tin hiển thị
+        setChapter(detail);
+        setOriginalContentUrl(detail.contentUrl);
+
+        // --- GIỮ NGUYÊN 3 CASE XỬ LÝ NỘI DUNG  ---
 
         // CASE 1: isOwned = true -> ĐÃ SỞ HỮU, HIỂN THỊ NỘI DUNG
         if (detail.isOwned === true) {
-          console.log("✅ Chapter đã được sở hữu, tải nội dung...");
           if (detail.contentUrl) {
             try {
               const text = await chapterCatalogApi.getChapterContent(
                 detail.contentUrl
               );
               setContent(text);
-              console.log(
-                "✅ Đã tải nội dung thành công, độ dài:",
-                text.length
-              );
             } catch (err) {
-              console.error("❌ Lỗi tải nội dung:", err);
               setError("Không thể tải nội dung văn bản.");
             }
           }
         }
         // CASE 2: isOwned = false -> CHƯA SỞ HỮU
         else if (detail.isOwned === false) {
-          console.log("🔒 Chapter chưa sở hữu, kiểm tra điều kiện mở khóa...");
-
           // Nếu là chapter free và không bị khóa -> HIỂN THỊ NỘI DUNG
           if (detail.accessType === "free" && !detail.isLocked) {
-            console.log("📖 Chapter free, tải nội dung...");
             if (detail.contentUrl) {
               try {
                 const text = await chapterCatalogApi.getChapterContent(
@@ -162,20 +266,17 @@ export default function ReaderPage() {
                 );
                 setContent(text);
               } catch (err) {
-                console.error("❌ Lỗi tải nội dung free:", err);
                 setError("Không thể tải nội dung văn bản.");
               }
             }
           }
           // Nếu là chapter trả phí -> KHÔNG tải nội dung, hiện overlay khóa
           else if (detail.accessType === "dias" && detail.isLocked) {
-            console.log("💰 Chapter trả phí chưa mua, hiện overlay khóa");
-            setContent(""); // Đảm bảo không hiện nội dung
+            setContent("");
           }
         }
         // CASE 3: isOwned = undefined (API cũ) -> Fallback logic cũ
         else {
-          console.log("🔄 Sử dụng logic cũ vì isOwned không xác định");
           const shouldLoadContent = !detail.isLocked;
           if (shouldLoadContent && detail.contentUrl) {
             try {
@@ -184,7 +285,6 @@ export default function ReaderPage() {
               );
               setContent(text);
             } catch (err) {
-              console.error("❌ Lỗi tải text:", err);
               setError("Không thể tải nội dung văn bản.");
             }
           } else if (detail.isLocked) {

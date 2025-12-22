@@ -162,6 +162,10 @@ export default function StoryDetailPage() {
     });
     return () => observer.disconnect();
   }, []);
+  // --- BỔ SUNG: Luôn cuộn lên đầu khi vừa vào trang hoặc đổi storyId ---
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [storyId]);
   //   Hàm xử lý khi bấm nút Report ở CommentItem
   const handleReportComment = (comment: ChapterComment) => {
     setReportTarget({
@@ -632,7 +636,7 @@ export default function StoryDetailPage() {
               </div>
               <div className="flex-1 space-y-5">
                 <div>
-                  <h1 className="text-2xl md:text-4xl font-bold mb-3">
+                  <h1 className="text-xl md:text-3xl font-bold mb-3">
                     {story.title}
                   </h1>
                   <div className="flex items-center gap-3 text-sm text-muted-foreground">

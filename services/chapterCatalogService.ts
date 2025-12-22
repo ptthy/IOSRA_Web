@@ -73,44 +73,98 @@ export const chapterCatalogApi = {
   },
 
   // Lấy chi tiết chương
+  // getChapterDetail: async (chapterId: string): Promise<ChapterDetail> => {
+  //   try {
+  //     const response = await apiClient.get(
+  //       `/api/ChapterCatalog/${chapterId}?_t=${new Date().getTime()}`
+  //     );
+  //     return response.data;
+  //   } catch (error: any) {
+  //     //  XỬ LÝ LỖI 403 - CHAPTER BỊ KHÓA
+  //     if (
+  //       error.response?.status === 403 &&
+  //       error.response?.data?.error?.code === "ChapterLocked"
+  //     ) {
+  //       // Lấy data lỗi từ backend
+  //       const errorData = error.response.data.error;
+  //       console.log(
+  //         "🎯 Chapter bị khóa (ChapterLocked), trả về chapter detail với isLocked: true"
+  //       );
+
+  //       // Lấy thông tin cơ bản từ response nếu có, hoặc dùng giá trị mặc định
+  //       const lockedChapter: ChapterDetail = {
+  //         chapterId: chapterId,
+  //         storyId: "", // Sẽ được điền sau khi fetch all chapters
+  //         // chapterNo: 0,
+  //         // title: "Chương bị khóa",
+  //         // Ưu tiên lấy chapterNo và title từ backend trả về trong lỗi
+  //         chapterNo: errorData.details?.chapterNo || 0,
+  //         title: errorData.details?.title || "Chương bị khóa",
+  //         contentUrl: "",
+  //         wordCount: 0,
+  //         charCount: 0,
+  //         publishedAt: "",
+  //         isLocked: true,
+  //         isOwned: false,
+  //         languageCode: "vi-VN",
+  //         accessType: "dias",
+  //         priceDias: error.response?.data?.error?.details?.price || 0, // Lấy giá nếu có
+  //         voices: [],
+  //       };
+  //       return lockedChapter;
+  //     }
+
+  //     // Các lỗi khác vẫn ném ra bình thường
+  //     console.error("Lỗi khác khi tải chapter:", error);
+  //     throw error;
+  //   }
+  // },
   getChapterDetail: async (chapterId: string): Promise<ChapterDetail> => {
     try {
+      // Thêm timestamp để tránh cache trình duyệt
       const response = await apiClient.get(
         `/api/ChapterCatalog/${chapterId}?_t=${new Date().getTime()}`
       );
       return response.data;
     } catch (error: any) {
-      //  XỬ LÝ LỖI 403 - CHAPTER BỊ KHÓA
+      // XỬ LÝ LỖI 403 - CHAPTER BỊ KHÓA
       if (
         error.response?.status === 403 &&
         error.response?.data?.error?.code === "ChapterLocked"
       ) {
-        console.log(
-          "🎯 Chapter bị khóa (ChapterLocked), trả về chapter detail với isLocked: true"
+        const errorData = error.response.data.error;
+        const details = errorData.details;
+
+        console.warn(
+          "🎯 Chapter bị khóa: Đang lấy thông tin cơ bản từ lỗi 403"
         );
 
-        // Lấy thông tin cơ bản từ response nếu có, hoặc dùng giá trị mặc định
+        // Tạo object ChapterDetail giả để giao diện vẫn có thông tin hiển thị
         const lockedChapter: ChapterDetail = {
           chapterId: chapterId,
-          storyId: "", // Sẽ được điền sau khi fetch all chapters
-          chapterNo: 0,
-          title: "Chương bị khóa",
-          contentUrl: "",
-          wordCount: 0,
-          charCount: 0,
-          publishedAt: "",
+          storyId: details?.storyId || "",
+          // Lấy số chương và tiêu đề thật từ details nếu backend cung cấp
+          chapterNo: details?.chapterNo || 0,
+          title: details?.title || "Chương bị khóa",
+          contentUrl: "", // Không có nội dung khi bị khóa
+          wordCount: details?.wordCount || 0,
+          charCount: details?.charCount || 0,
+          publishedAt: details?.publishedAt || "",
           isLocked: true,
           isOwned: false,
-          languageCode: "vi-VN",
+          languageCode: details?.languageCode || "vi-VN",
           accessType: "dias",
-          priceDias: error.response?.data?.error?.details?.price || 0, // Lấy giá nếu có
+          priceDias: details?.price || 0, // Giá để hiển thị ở Overlay
           voices: [],
+          mood: details?.mood,
+          moodMusicPaths: details?.moodMusicPaths || [],
         };
+
         return lockedChapter;
       }
 
-      // Các lỗi khác vẫn ném ra bình thường
-      console.error("Lỗi khác khi tải chapter:", error);
+      // Các lỗi nghiêm trọng khác (500, 404, mất mạng) thì ném ra cho UI xử lý
+      console.error("❌ Lỗi hệ thống khi tải chapter:", error);
       throw error;
     }
   },

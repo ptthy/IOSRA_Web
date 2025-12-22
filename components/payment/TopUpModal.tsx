@@ -237,9 +237,9 @@ export function TopUpModal({
                         <Gem className="h-4 w-4 fill-blue-500 text-blue-600 inline" />{" "}
                         mỗi ngày
                       </span>,
-                      "Không quảng cáo",
-                      "Truyện VIP miễn phí",
-                      "Giọng đọc AI Premium",
+                      "Đổi nhạc nền theo tâm trạng",
+                      "AI Dịch 4 ngôn ngữ",
+                      "Chatbot AI hỗ trợ đọc truyện",
                     ].map((item, i) => (
                       <li key={i} className="flex items-center gap-2 text-sm">
                         <div className="bg-green-400/20 p-1 rounded-full shrink-0">
