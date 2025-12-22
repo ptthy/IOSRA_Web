@@ -265,7 +265,7 @@ export default function AuthorChapterDetailPage() {
     languageCode: "vi-VN" as "vi-VN" | "en-US" | "zh-CN" | "ja-JP",
     accessType: "free" as "free" | "dias",
   });
-  const TITLE_MIN_LENGTH = 20;
+  const TITLE_MIN_LENGTH = 10;
   const TITLE_MAX_LENGTH = 50;
   // State theo dõi thay đổi chưa lưu
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
