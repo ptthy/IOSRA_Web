@@ -89,11 +89,17 @@ export default function WithdrawManagement() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 1. Fetch Data
+// 1. Fetch Data
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      const data = await getWithdrawRequests(); 
+      
+      // LOGIC MỚI: Truyền status vào API dựa trên tab đang chọn
+      // Nếu chọn 'all', ta truyền undefined để API trả về tất cả (nếu backend hỗ trợ)
+      // Nếu backend mặc định không tham số là 'pending', thì case 'all' có thể cần xử lý riêng tùy backend.
+      const paramStatus = filterStatus === 'all' ? undefined : filterStatus;
+
+      const data = await getWithdrawRequests(paramStatus); 
       setRequests(data);
     } catch (error) {
       console.error(error);
@@ -103,9 +109,11 @@ export default function WithdrawManagement() {
     }
   };
 
+  // LOGIC MỚI: Thêm filterStatus vào dependency array
+  // Mỗi khi bạn chọn tab khác, useEffect này sẽ chạy lại và gọi API lấy dữ liệu mới
   useEffect(() => {
     fetchRequests();
-  }, []);
+  }, [filterStatus]);
 
   // 2. Handle Approve
   const handleApproveClick = (req: WithdrawRequest) => {
@@ -156,9 +164,11 @@ export default function WithdrawManagement() {
     }
   };
 
-  // 4. Filtering Logic
+// 4. Filtering Logic
   const filteredRequests = requests.filter((r) => {
+    // Đoạn này vẫn giữ để đảm bảo UI không hiện sai nếu API lỡ trả về nhầm
     const statusMatch = filterStatus === "all" ? true : r.status.toLowerCase() === filterStatus.toLowerCase();
+    
     const searchLower = searchTerm.toLowerCase();
     const searchMatch = 
       (r.accountHolderName && r.accountHolderName.toLowerCase().includes(searchLower)) ||
@@ -172,7 +182,7 @@ export default function WithdrawManagement() {
     switch (s) {
       case "pending":
         return <Badge variant="outline" className="border-yellow-500 text-yellow-600 bg-yellow-50"><Clock className="w-3 h-3 mr-1"/>Chờ xử lý</Badge>;
-      case "approved":
+      case "confirmed":
         return <Badge variant="outline" className="border-green-500 text-green-600 bg-green-50"><CheckCircle className="w-3 h-3 mr-1"/>Đã duyệt</Badge>;
       case "rejected":
         return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1"/>Từ chối</Badge>;
@@ -214,7 +224,7 @@ export default function WithdrawManagement() {
                   <SelectContent>
                     <SelectItem value="all">Tất cả</SelectItem>
                     <SelectItem value="pending">Chờ xử lý</SelectItem>
-                    <SelectItem value="approved">Đã duyệt</SelectItem>
+                    <SelectItem value="confirmed">Đã duyệt</SelectItem>
                     <SelectItem value="rejected">Đã từ chối</SelectItem>
                   </SelectContent>
                 </Select>
