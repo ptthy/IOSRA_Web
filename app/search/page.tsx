@@ -90,18 +90,41 @@ export default function SearchPage() {
     return () => clearTimeout(timeoutId);
   }, [query]);
 
-  // Debounce cho main search
+  // // Debounce cho main search
+  // useEffect(() => {
+  //   const timeoutId = setTimeout(() => {
+  //     if (page === 1) {
+  //       loadStories();
+  //     } else {
+  //       setPage(1);
+  //     }
+  //   }, 500);
+
+  //   return () => clearTimeout(timeoutId);
+  // }, [
+  //   query,
+  //   selectedTag,
+  //   sortBy,
+  //   sortDir,
+  //   isPremium,
+  //   minAvgRating,
+  //   languageCode,
+  // ]);
+
+  // useEffect(() => {
+  //   loadStories();
+  // }, [page]);
+  // 1. Debounce cho các bộ lọc: Khi filter thay đổi thì reset về trang 1
+  // 1. CHỈ useEffect này chịu trách nhiệm gọi API loadStories
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (page === 1) {
-        loadStories();
-      } else {
-        setPage(1);
-      }
-    }, 500);
+      loadStories();
+    }, 500); // Chờ người dùng ngừng thao tác 500ms
 
     return () => clearTimeout(timeoutId);
+    // Lắng nghe TẤT CẢ các thay đổi bao gồm cả page và bộ lọc
   }, [
+    page,
     query,
     selectedTag,
     sortBy,
@@ -111,9 +134,21 @@ export default function SearchPage() {
     languageCode,
   ]);
 
+  // 2. Một useEffect phụ CHỈ để reset page về 1 khi các bộ lọc thay đổi
   useEffect(() => {
-    loadStories();
-  }, [page]);
+    if (page !== 1) {
+      setPage(1);
+    }
+    // Không cho page vào dependency ở đây để tránh lặp vô tận
+  }, [
+    query,
+    selectedTag,
+    sortBy,
+    sortDir,
+    isPremium,
+    minAvgRating,
+    languageCode,
+  ]);
 
   const loadStories = async () => {
     setLoading(true);
@@ -140,6 +175,8 @@ export default function SearchPage() {
       console.log("🎯 Using ADVANCE filter with params:", params);
       const result = await storyCatalogApi.getAdvancedFilter(params);
       setData(result);
+      // Cuộn lên đầu ngay sau khi có dữ liệu mới
+      window.scrollTo({ top: 0, behavior: "instant" });
       // } catch (error: any) {
       //   console.error("Error loading stories:", error);
 
