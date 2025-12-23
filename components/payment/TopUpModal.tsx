@@ -237,6 +237,14 @@ export function TopUpModal({
                         <Gem className="h-4 w-4 fill-blue-500 text-blue-600 inline" />{" "}
                         mỗi ngày
                       </span>,
+                      <span
+                        key="dias-daily"
+                        className="flex items-center gap-1"
+                      >
+                        500{" "}
+                        <Gem className="h-4 w-4 fill-blue-500 text-blue-600 inline" />{" "}
+                        ngay mua gói
+                      </span>,
                       "Đổi nhạc nền theo tâm trạng",
                       "AI Dịch 4 ngôn ngữ",
                       "Chatbot AI hỗ trợ đọc truyện",
