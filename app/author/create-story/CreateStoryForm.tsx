@@ -795,7 +795,7 @@ export default function CreateStoryForm({
               </span>
             </div>
             <Textarea
-              placeholder="Viết dàn ý chi tiết (20-1000 ký tự)..."
+              placeholder="Viết dàn ý chi tiết (20-5000 ký tự)..."
               value={outline}
               onChange={(e) => setOutline(e.target.value)}
               rows={8}
