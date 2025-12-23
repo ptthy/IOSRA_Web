@@ -107,7 +107,12 @@ export default function PublicProfilePage() {
   const [followLoading, setFollowLoading] = useState(false);
   const [notificationLoading, setNotificationLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("stories");
-
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
   // Filter states
   const [query, setQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string>("all");
@@ -209,40 +214,62 @@ export default function PublicProfilePage() {
     }
   };
 
-  // Function to reload followers list
+  // // Function to reload followers list
+  // const reloadFollowers = async () => {
+  //   if (!profile?.isAuthor) return;
+
+  //   try {
+  //     const followersData = await authorFollowService.getAuthorFollowers(
+  //       profile.author!.authorId,
+  //       //  { page: 1, pageSize: 10 }
+  //       { page: followersPage, pageSize: PAGE_SIZE } // <--- SỬA
+  //     );
+
+  //     // Đảm bảo không có duplicates
+  //     const uniqueFollowers = followersData.data.items.filter(
+  //       (follower, index, array) =>
+  //         array.findIndex((f) => f.followerId === follower.followerId) === index
+  //     );
+
+  //     //  setFollowers(uniqueFollowers);
+  //     setFollowers(followersData.data.items);
+  //     setTotalFollowers(followersData.data.total);
+  //   } catch (error) {
+  //     console.error("Error reloading followers:", error);
+  //   }
+  // };
+  // Tìm đến hàm reloadFollowers trong page.tsx
   const reloadFollowers = async () => {
-    if (!profile?.isAuthor) return;
+    // 1. Kiểm tra xem profile đã tải xong và có phải là tác giả không
+    if (!profile?.isAuthor || !profile.author?.authorId) return;
 
     try {
+      // 2. Gọi API với authorId của profile đang xem
       const followersData = await authorFollowService.getAuthorFollowers(
-        profile.author!.authorId,
-        //  { page: 1, pageSize: 10 }
-        { page: followersPage, pageSize: PAGE_SIZE } // <--- SỬA
+        profile.author.authorId, // Sử dụng authorId của tác giả đang xem
+        { page: followersPage, pageSize: PAGE_SIZE }
       );
 
-      // Đảm bảo không có duplicates
-      const uniqueFollowers = followersData.data.items.filter(
-        (follower, index, array) =>
-          array.findIndex((f) => f.followerId === follower.followerId) === index
-      );
-
-      //  setFollowers(uniqueFollowers);
+      // 3. Cập nhật state followers
       setFollowers(followersData.data.items);
       setTotalFollowers(followersData.data.total);
     } catch (error) {
-      console.error("Error reloading followers:", error);
+      console.error("Lỗi khi tải danh sách người theo dõi:", error);
     }
   };
   // QUAN TRỌNG: Thêm useEffect lắng nghe followersPage
   useEffect(() => {
     if (activeTab === "followers") {
       reloadFollowers();
+      scrollToTop(); // Thêm vào đây
     }
   }, [followersPage, activeTab]);
   // Function to reload all profile data với filters
   const reloadProfileData = async () => {
     try {
-      const [profileData, storiesData] = await Promise.all([
+      const [profileData, storiesData, followingData] = await Promise.all([
+        // THÊM: Gọi API này để lấy con số total ngay từ đầu
+
         publicProfileService.getPublicProfile(accountId),
         publicProfileService.getPublicStories(accountId, {
           Page: storiesPage, // <--- SỬA: Dùng state page
@@ -260,12 +287,19 @@ export default function PublicProfilePage() {
           MinAvgRating:
             minAvgRating !== "0" ? parseFloat(minAvgRating) : undefined,
         }),
+        authorFollowService.getFollowedAuthors({
+          page: 1,
+          pageSize: 1, // Chỉ cần lấy count nên pageSize = 1 cho nhẹ
+          accountId: accountId,
+        }),
       ]);
 
       setProfile(profileData.data);
       setStories(storiesData.data.items);
       setTotalStories(storiesData.data.total || 0);
-      // Load followers nếu là author
+      const authorData = profileData.data.author as any;
+      setFollowingCount(followingData.data.total || 0);
+
       if (profileData.data.isAuthor) {
         await reloadFollowers();
       }
@@ -273,9 +307,11 @@ export default function PublicProfilePage() {
       console.error("Error reloading profile:", error);
     }
   };
+
   // QUAN TRỌNG: Thêm useEffect lắng nghe sự thay đổi của storiesPage
   useEffect(() => {
     if (accountId) reloadProfileData();
+    scrollToTop(); // Thêm vào đây
   }, [storiesPage]);
   // Load profile data
   useEffect(() => {
@@ -588,32 +624,62 @@ export default function PublicProfilePage() {
     loadFollowingCount();
   }, [isOwnProfile]);
   // --- THÊM: Hàm load danh sách đang theo dõi ---
+  // const reloadFollowedAuthors = async () => {
+  //   if (!isOwnProfile) return;
+
+  //   setLoadingFollowed(true);
+  //   try {
+  //     const response = await authorFollowService.getFollowedAuthors({
+  //       // page: 1,
+  //       // pageSize: 50,
+  //       page: followingPage, // <--- SỬA
+  //       pageSize: PAGE_SIZE,
+  //     });
+  //     setFollowedAuthors(response.data.items);
+  //     setTotalFollowing(response.data.total); // <--- THÊM
+  //   } catch (error) {
+  //     console.error("Error loading followed authors:", error);
+  //   } finally {
+  //     setLoadingFollowed(false);
+  //   }
+  // };
   const reloadFollowedAuthors = async () => {
-    if (!isOwnProfile) return;
+    // XÓA BỎ DÒNG CHẶN: if (!isOwnProfile) return; <--- Đây là nguyên nhân khiến khách xem bị hiện số 0
 
     setLoadingFollowed(true);
     try {
       const response = await authorFollowService.getFollowedAuthors({
-        // page: 1,
-        // pageSize: 50,
-        page: followingPage, // <--- SỬA
+        page: followingPage,
         pageSize: PAGE_SIZE,
+        // TRUYỀN accountId của profile đang xem (lấy từ params URL)
+        accountId: accountId,
       });
+
       setFollowedAuthors(response.data.items);
-      setTotalFollowing(response.data.total); // <--- THÊM
+      setTotalFollowing(response.data.total);
+
+      setFollowingCount(response.data.total);
     } catch (error) {
-      console.error("Error loading followed authors:", error);
+      console.error("Lỗi tải danh sách đang theo dõi:", error);
     } finally {
       setLoadingFollowed(false);
     }
   };
 
-  // --- THÊM: Effect để load dữ liệu khi bấm qua tab 'following' ---
+  // // --- THÊM: Effect để load dữ liệu khi bấm qua tab 'following' ---
+  // useEffect(() => {
+  //   if (activeTab === "following" && isOwnProfile) {
+  //     reloadFollowedAuthors();
+  //   }
+  // }, [activeTab, isOwnProfile]);
+  // --- CẬP NHẬT: Effect để tự động load lại dữ liệu khi đổi Tab hoặc đổi Account ---
   useEffect(() => {
-    if (activeTab === "following" && isOwnProfile) {
+    // Khi chuyển sang tab 'following' HOẶC ID người dùng thay đổi, tự động load danh sách
+    if (activeTab === "following" && accountId) {
       reloadFollowedAuthors();
+      scrollToTop(); // Thêm vào đây
     }
-  }, [activeTab, isOwnProfile]);
+  }, [activeTab, followingPage, accountId]); // Thêm accountId
 
   // --- THÊM: Xử lý Hủy theo dõi (từ trong danh sách) ---
   const handleUnfollowFromList = async (
@@ -926,31 +992,28 @@ export default function PublicProfilePage() {
                           </p> */}
                         </div>
                       </div>
-                      {isOwnProfile && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                            <UserCheck className="h-5 w-5 text-green-600" />
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">
-                              Đang theo dõi
-                            </p>
-                            {/* Click vào số lượng sẽ tự chuyển xuống tab Following */}
-                            <p
-                              className="font-semibold cursor-pointer hover:underline hover:text-green-600"
-                              onClick={() => {
-                                setActiveTab("following");
-                                // Scroll xuống tabs (tùy chọn)
-                                document
-                                  .querySelector('[role="tablist"]')
-                                  ?.scrollIntoView({ behavior: "smooth" });
-                              }}
-                            >
-                              {followingCount}
-                            </p>
-                          </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
+                          <UserCheck className="h-5 w-5 text-green-600" />
                         </div>
-                      )}
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            Đang theo dõi
+                          </p>
+                          <p
+                            className="font-semibold cursor-pointer hover:underline hover:text-green-600"
+                            onClick={() => {
+                              setActiveTab("following");
+                              document
+                                .querySelector('[role="tablist"]')
+                                ?.scrollIntoView({ behavior: "smooth" });
+                            }}
+                          >
+                            {/* followingCount giờ sẽ hiện số 3 hoặc 9 ngay khi reloadProfileData chạy xong */}
+                            {followingCount}
+                          </p>
+                        </div>
+                      </div>
 
                       <div className="flex items-center gap-2 text-sm">
                         <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
@@ -1049,7 +1112,7 @@ export default function PublicProfilePage() {
                     </Badge>
                   </TabsTrigger>
                   {/* --- THÊM MỚI: Tab Đang theo dõi (Following) --- */}
-                  {/* Chỉ hiện tab này nếu là Chính chủ */}
+                  {/* Chỉ hiện tab này nếu là Chính chủ
                   {isOwnProfile && (
                     <TabsTrigger
                       value="following"
@@ -1061,7 +1124,20 @@ export default function PublicProfilePage() {
                         {followingCount}
                       </Badge>
                     </TabsTrigger>
+                    
                   )}
+                   */}
+                  <TabsTrigger
+                    value="following"
+                    className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 py-3"
+                  >
+                    <Users className="mr-2 h-4 w-4 text-green-600" />
+                    Đang theo dõi
+                    <Badge variant="secondary" className="ml-2">
+                      {/* Con số này sẽ hiện 'liền' ngay khi Profile load xong */}
+                      {followingCount}
+                    </Badge>
+                  </TabsTrigger>
                 </TabsList>
               </CardHeader>
 
@@ -1117,56 +1193,51 @@ export default function PublicProfilePage() {
                       {followers.map((follower, index) => (
                         <div
                           key={`${follower.followerId}-${index}`}
-                          className="flex items-center gap-4 p-4 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors cursor-pointer"
+                          className="flex items-center justify-between gap-4 p-4 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors cursor-pointer"
                           onClick={() =>
                             router.push(`/profile/${follower.followerId}`)
                           }
                         >
-                          {/* Avatar */}
-                          <div className="w-12 h-12 rounded-full overflow-hidden bg-muted flex-shrink-0">
-                            {follower.avatarUrl ? (
-                              <img
-                                src={follower.avatarUrl}
-                                alt={follower.username}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <span className="text-sm font-bold text-primary-foreground">
+                          {/* Thông tin Người theo dõi - HIỂN THỊ CÔNG KHAI */}
+                          <div className="flex items-center gap-4 flex-1 min-w-0">
+                            <div className="w-12 h-12 rounded-full overflow-hidden bg-muted flex-shrink-0 border">
+                              {follower.avatarUrl ? (
+                                <img
+                                  src={follower.avatarUrl}
+                                  alt={follower.username}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary font-bold">
                                   {follower.username.charAt(0).toUpperCase()}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Thông tin User */}
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">
-                              {follower.username}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              Theo dõi từ{" "}
-                              {new Date(follower.followedAt).toLocaleDateString(
-                                "vi-VN"
+                                </div>
                               )}
-                            </p>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-base truncate">
+                                {follower.username}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Theo dõi từ:{" "}
+                                {new Date(
+                                  follower.followedAt
+                                ).toLocaleDateString("vi-VN")}
+                              </p>
+                            </div>
                           </div>
 
-                          {/* Đã xóa phần hiển thị Badge Thông báo/Quả chuông ở đây */}
+                          {/* KHÔNG hiển thị các nút hành động (chuông/xóa) ở đây 
+              vì đây là danh sách công khai người xem chỉ được quyền nhìn */}
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-16">
-                      <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
-                        <Users className="h-10 w-10 text-muted-foreground" />
-                      </div>
-                      <p className="text-muted-foreground mb-2">
-                        Chưa có người theo dõi
-                      </p>
+                    <div className="text-center py-16 text-muted-foreground">
+                      Chưa có người theo dõi nào.
                     </div>
                   )}
-                  {/* --- THÊM PHÂN TRANG VÀO ĐÂY --- */}
+
+                  {/* Phân trang cho Followers */}
                   {followers.length > 0 && (
                     <PaginationControls
                       currentPage={followersPage}
@@ -1176,7 +1247,7 @@ export default function PublicProfilePage() {
                     />
                   )}
                 </TabsContent>
-                {/* --- THÊM MỚI: Content 3: Following (Danh sách mình đang follow) --- */}
+                {/* --- THÊM MỚI: Content 3: Following (Danh sách mình đang follow) 
                 {isOwnProfile && (
                   <TabsContent value="following" className="m-0">
                     {loadingFollowed ? (
@@ -1190,7 +1261,7 @@ export default function PublicProfilePage() {
                             key={author.authorId}
                             className="flex items-center justify-between gap-4 p-4 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors"
                           >
-                            {/* Thông tin Author (Click để qua profile) */}
+                            {/* Thông tin Author (Click để qua profile) 
                             <div
                               className="flex items-center gap-4 cursor-pointer flex-1"
                               onClick={() =>
@@ -1225,9 +1296,9 @@ export default function PublicProfilePage() {
                               </div>
                             </div>
 
-                            {/* Nút hành động */}
+                            {/* Nút hành động 
                             <div className="flex items-center gap-2">
-                              {/* Nút chuông */}
+                              {/* Nút chuông 
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -1247,7 +1318,7 @@ export default function PublicProfilePage() {
                                 )}
                               </Button>
 
-                              {/* Nút hủy theo dõi */}
+                              {/* Nút hủy theo dõi 
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -1283,7 +1354,7 @@ export default function PublicProfilePage() {
                         </Button>
                       </div>
                     )}
-                    {/* --- DÁN ĐOẠN CODE PHÂN TRANG VÀO ĐÂY --- */}
+                    {/* --- DÁN ĐOẠN CODE PHÂN TRANG VÀO ĐÂY 
                     {followedAuthors.length > 0 && (
                       <PaginationControls
                         currentPage={followingPage}
@@ -1292,9 +1363,109 @@ export default function PublicProfilePage() {
                         onPageChange={setFollowingPage}
                       />
                     )}
-                    {/* ---------------------------------------- */}
+                    {/* ---------------------------
                   </TabsContent>
-                )}
+                  --- */}
+                <TabsContent value="following" className="m-0">
+                  {loadingFollowed ? (
+                    <div className="flex justify-center py-10">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  ) : followedAuthors.length > 0 ? (
+                    <div className="space-y-3">
+                      {followedAuthors.map((author) => (
+                        <div
+                          key={author.authorId}
+                          className="flex items-center justify-between gap-4 p-4 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors"
+                        >
+                          {/* Phần thông tin: AI CŨNG XEM ĐƯỢC */}
+                          <div
+                            className="flex items-center gap-4 cursor-pointer flex-1"
+                            onClick={() =>
+                              router.push(`/profile/${author.authorId}`)
+                            }
+                          >
+                            <div className="w-12 h-12 rounded-full overflow-hidden bg-muted flex-shrink-0 border">
+                              {author.avatarUrl ? (
+                                <img
+                                  src={author.avatarUrl}
+                                  alt={author.username}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary font-bold">
+                                  {author.username.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-base">
+                                {author.username}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Theo dõi từ:{" "}
+                                {new Date(author.followedAt).toLocaleDateString(
+                                  "vi-VN"
+                                )}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Nút hành động: CHỈ HIỆN NẾU LÀ CHÍNH CHỦ */}
+                          {/* Khi khách xem, isOwnProfile = false, đoạn code này sẽ biến mất hoàn toàn */}
+                          {isOwnProfile && (
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() =>
+                                  handleToggleNotifyFromList(author)
+                                }
+                              >
+                                {author.notificationsEnabled ? (
+                                  <Bell className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+                                ) : (
+                                  <BellOff className="h-5 w-5 text-muted-foreground" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:bg-destructive/10"
+                                onClick={() =>
+                                  handleUnfollowFromList(
+                                    author.authorId,
+                                    author.username
+                                  )
+                                }
+                              >
+                                <Trash2 className="h-5 w-5" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-16">
+                      <Users className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">
+                        {isOwnProfile
+                          ? "Bạn chưa theo dõi ai."
+                          : "Người dùng này chưa theo dõi ai."}
+                      </p>
+                    </div>
+                  )}
+
+                  {followedAuthors.length > 0 && (
+                    <PaginationControls
+                      currentPage={followingPage}
+                      totalItems={totalFollowing}
+                      pageSize={PAGE_SIZE}
+                      onPageChange={setFollowingPage}
+                    />
+                  )}
+                </TabsContent>
               </CardContent>
             </Tabs>
           </Card>

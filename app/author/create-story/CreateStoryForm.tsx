@@ -682,7 +682,7 @@ export default function CreateStoryForm({
             />
           </div> */}
             <Input
-              placeholder="Nhập tên truyện từ 20-50 ký tự..."
+              placeholder="Nhập tên truyện từ 10-50 ký tự..."
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className={`transition-all ${
