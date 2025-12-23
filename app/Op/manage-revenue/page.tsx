@@ -356,7 +356,7 @@ export default function ManageRevenuePage() {
         <Card>
           <CardHeader>
             <CardTitle>Lịch sử đối soát doanh thu tác giả</CardTitle>
-            <CardDescription>Các yêu cầu rút tiền đã xử lý</CardDescription>
+            <CardDescription>Các yêu cầu đã xử lý</CardDescription>
           </CardHeader>
           <CardContent>
             {transactions.length === 0 ? (
