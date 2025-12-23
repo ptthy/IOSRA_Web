@@ -94,12 +94,17 @@ export const authorFollowService = {
    * GET /api/AuthorFollow/mine
    * Lấy danh sách tác giả mà tôi đang theo dõi
    */
-  getFollowedAuthors: (params?: { page?: number; pageSize?: number }) => {
+  getFollowedAuthors: (params?: {
+    page?: number;
+    pageSize?: number;
+    accountId?: string;
+  }) => {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append("page", params.page.toString());
     if (params?.pageSize)
       queryParams.append("pageSize", params.pageSize.toString());
-
+    // Gửi ID của tài khoản cần xem danh sách following
+    if (params?.accountId) queryParams.append("accountId", params.accountId);
     const url = `/api/AuthorFollow/mine${
       queryParams.toString() ? `?${queryParams.toString()}` : ""
     }`;
