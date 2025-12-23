@@ -365,7 +365,7 @@ export default function CreateChapterPage() {
                   name="title"
                   value={formData.title}
                   onChange={handleInputChange}
-                  placeholder="Ví dụ: Chương 1: Cuộc hành trình bắt đầu (tối thiểu 20 ký tự)"
+                  placeholder="Ví dụ: Chương 1: Cuộc hành trình bắt đầu (tối thiểu 10 ký tự)"
                   required
                   disabled={isSubmitting}
                   className={`border-2 transition-all ${
