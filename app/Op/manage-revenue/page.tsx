@@ -426,7 +426,7 @@ export default function ManageRevenuePage() {
               <DialogHeader>
                 <DialogTitle>Chi tiết giao dịch</DialogTitle>
                 <DialogDescription>
-                  Thông tin đầy đủ của giao dịch rút tiền
+                  Thông tin đầy đủ của giao dịch
                 </DialogDescription>
               </DialogHeader>
 

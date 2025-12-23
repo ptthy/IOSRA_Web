@@ -85,6 +85,14 @@ export default function PricingModal() {
   const GemIcon = () => (
     <Gem className="h-5 w-5 text-blue-500 fill-blue-500 inline-block" />
   );
+const GemStarIcon = () => (
+  <div className="relative inline-flex items-center">
+    <Gem className="h-4 w-4 text-blue-500 fill-blue-500 opacity-80" />
+    <span className="absolute -bottom-2 -right-2 text-yellow-500 text-lg font-bold leading-none">
+      *
+    </span>
+  </div>
+);
 
   return (
     <div className="p-6 space-y-6 font-sans">
@@ -92,7 +100,7 @@ export default function PricingModal() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Quản lý Biểu phí</h1>
           <p className="text-muted-foreground flex items-center gap-1">
-            Điều chỉnh biểu phí <GemIcon /> cho toàn bộ hệ thống.
+            Điều chỉnh biểu phí cho toàn bộ hệ thống.
           </p>
         </div>
         <Button variant="outline" onClick={() => fetchData(false)}>
@@ -195,7 +203,7 @@ export default function PricingModal() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Input type="number" className="w-24 h-9" defaultValue={rule.generation_dias} id={`vgen-${rule.rule_id}`} />
-                          <GemIcon />
+                         <GemStarIcon />
                         </div>
                       </TableCell>
                       <TableCell className="text-right">

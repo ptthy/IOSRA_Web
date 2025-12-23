@@ -36,7 +36,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { CheckCircle, Clock, XCircle, Search, Loader2, Gem } from "lucide-react"; // <--- Đã thêm Gem
+import { CheckCircle, Clock, XCircle, Search, Loader2, Gem } from "lucide-react";
 import { toast } from "sonner";
 
 // Import API Service
@@ -46,7 +46,6 @@ import {
   rejectWithdrawRequest 
 } from "@/services/operationModStatService";
 
-// Interface khớp với API response bạn cung cấp
 interface WithdrawRequest {
   requestId: string;
   amount: number;
@@ -58,9 +57,18 @@ interface WithdrawRequest {
   transactionCode?: string;
   createdAt: string;
   reviewedAt?: string;
-  // Các field khác nếu API trả về
   authorName?: string; 
 }
+
+// Component nhỏ để hiển thị Gem có dấu sao (Tái sử dụng code bạn cung cấp)
+const GemWithStar = ({ size = "h-4 w-4" }: { size?: string }) => (
+  <div className="relative inline-flex items-center">
+    <Gem className={`${size} text-blue-500 fill-blue-500 opacity-80`} />
+    <span className="absolute -bottom-2 -right-2 text-yellow-500 text-lg font-bold leading-none">
+      *
+    </span>
+  </div>
+);
 
 export default function WithdrawManagement() {
   const [requests, setRequests] = useState<WithdrawRequest[]>([]);
@@ -85,7 +93,6 @@ export default function WithdrawManagement() {
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      // Gọi API lấy danh sách
       const data = await getWithdrawRequests(); 
       setRequests(data);
     } catch (error) {
@@ -151,9 +158,7 @@ export default function WithdrawManagement() {
 
   // 4. Filtering Logic
   const filteredRequests = requests.filter((r) => {
-    // Lọc theo status
     const statusMatch = filterStatus === "all" ? true : r.status.toLowerCase() === filterStatus.toLowerCase();
-    // Lọc theo search (Tên chủ TK hoặc Số TK)
     const searchLower = searchTerm.toLowerCase();
     const searchMatch = 
       (r.accountHolderName && r.accountHolderName.toLowerCase().includes(searchLower)) ||
@@ -176,45 +181,15 @@ export default function WithdrawManagement() {
     }
   };
 
-  // Tính toán thống kê nhanh từ dữ liệu đã fetch
-  const stats = {
-    pending: requests.filter(r => r.status.toLowerCase() === 'pending').length,
-    approved: requests.filter(r => r.status.toLowerCase() === 'approved').length,
-    rejected: requests.filter(r => r.status.toLowerCase() === 'rejected').length,
-    totalAmountPending: requests.filter(r => r.status.toLowerCase() === 'pending').reduce((sum, r) => sum + r.amount, 0)
-  };
-
   return (
     <OpLayout>
       <main className="p-6 space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-[var(--primary)]">Quản lý Rút Tiền</h1>
-            <p className="text-sm text-[var(--muted-foreground)]">Xử lý yêu cầu thanh toán từ Author</p>
+            <h1 className="text-3xl font-bold text-[var(--primary)]">Quản lý Đối soát</h1>
+            <p className="text-sm text-[var(--muted-foreground)]">Xử lý yêu cầu đối soát từ Author</p>
           </div>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-yellow-50 border-yellow-200">
-            <CardHeader className="py-4"><CardTitle className="text-sm text-yellow-700">Chờ xử lý</CardTitle></CardHeader>
-            <CardContent className="pb-4">
-              <div className="text-2xl font-bold text-yellow-900">{stats.pending}</div>
-              <div className="text-xs text-yellow-700 font-medium flex items-center gap-1">
-                Tổng: {stats.totalAmountPending.toLocaleString()}
-                <Gem className="h-4 w-4 text-blue-500 fill-blue-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-green-50 border-green-200">
-            <CardHeader className="py-4"><CardTitle className="text-sm text-green-700">Đã duyệt</CardTitle></CardHeader>
-            <CardContent className="pb-4"><div className="text-2xl font-bold text-green-900">{stats.approved}</div></CardContent>
-          </Card>
-          <Card className="bg-red-50 border-red-200">
-            <CardHeader className="py-4"><CardTitle className="text-sm text-red-700">Đã từ chối</CardTitle></CardHeader>
-            <CardContent className="pb-4"><div className="text-2xl font-bold text-red-900">{stats.rejected}</div></CardContent>
-          </Card>
         </div>
 
         {/* Main Content */}
@@ -266,12 +241,16 @@ export default function WithdrawManagement() {
                   filteredRequests.map((req) => (
                     <TableRow key={req.requestId}>
                       <TableCell>{new Date(req.createdAt).toLocaleDateString('vi-VN')}</TableCell>
+                      
+                      {/* --- CẬP NHẬT: Thay thế icon tại đây --- */}
                       <TableCell className="font-bold text-green-600">
                         <div className="flex items-center gap-1">
                           {req.amount.toLocaleString()} 
-                          <Gem className="h-4 w-4 text-blue-500 fill-blue-500" />
+                          <GemWithStar size="h-4 w-4" />
                         </div>
                       </TableCell>
+                      {/* -------------------------------------- */}
+
                       <TableCell>{req.bankName}</TableCell>
                       <TableCell>{req.accountHolderName}</TableCell>
                       <TableCell>{req.bankAccountNumber}</TableCell>
@@ -308,10 +287,14 @@ export default function WithdrawManagement() {
                 <div className="bg-muted p-3 rounded text-sm">
                   <p><strong>Người nhận:</strong> {selectedRequest.accountHolderName}</p>
                   <p><strong>Ngân hàng:</strong> {selectedRequest.bankName} - {selectedRequest.bankAccountNumber}</p>
+                  
+                  {/* --- CẬP NHẬT: Thay thế icon tại đây (Modal) --- */}
                   <div className="text-lg font-bold text-green-600 mt-1 flex items-center gap-1">
                     Số tiền: {selectedRequest.amount.toLocaleString()} 
-                    <Gem className="h-5 w-5 text-blue-500 fill-blue-500" />
+                    <GemWithStar size="h-5 w-5" />
                   </div>
+                  {/* ---------------------------------------------- */}
+
                 </div>
                 <div className="space-y-2">
                   <Label>Mã giao dịch (Optional)</Label>
