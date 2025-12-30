@@ -2,12 +2,7 @@
 
 import { useState, useEffect } from "react";
 import OpLayout from "@/components/OpLayout";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -36,20 +31,27 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { CheckCircle, Clock, XCircle, Search, Loader2, Gem } from "lucide-react";
+import {
+  CheckCircle,
+  Clock,
+  XCircle,
+  Search,
+  Loader2,
+  Gem,
+} from "lucide-react";
 import { toast } from "sonner";
 
 // Import API Service
-import { 
-  getWithdrawRequests, 
-  approveWithdrawRequest, 
-  rejectWithdrawRequest 
+import {
+  getWithdrawRequests,
+  approveWithdrawRequest,
+  rejectWithdrawRequest,
 } from "@/services/operationModStatService";
 
 interface WithdrawRequest {
   requestId: string;
   amount: number;
-  status: 'pending' | 'approved' | 'rejected';
+  status: "pending" | "approved" | "rejected";
   bankName: string;
   bankAccountNumber: string;
   accountHolderName: string;
@@ -57,7 +59,7 @@ interface WithdrawRequest {
   transactionCode?: string;
   createdAt: string;
   reviewedAt?: string;
-  authorName?: string; 
+  authorName?: string;
 }
 
 // Component nhỏ để hiển thị Gem có dấu sao (Tái sử dụng code bạn cung cấp)
@@ -76,30 +78,31 @@ export default function WithdrawManagement() {
   const [filterStatus, setFilterStatus] = useState("pending");
   const [searchTerm, setSearchTerm] = useState("");
 
-  const [selectedRequest, setSelectedRequest] = useState<WithdrawRequest | null>(null);
-  
+  const [selectedRequest, setSelectedRequest] =
+    useState<WithdrawRequest | null>(null);
+
   // State Approve
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [transactionCode, setTransactionCode] = useState("");
   const [approveNote, setApproveNote] = useState("");
-  
+
   // State Reject
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-// 1. Fetch Data
+  // 1. Fetch Data
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      
+
       // LOGIC MỚI: Truyền status vào API dựa trên tab đang chọn
       // Nếu chọn 'all', ta truyền undefined để API trả về tất cả (nếu backend hỗ trợ)
       // Nếu backend mặc định không tham số là 'pending', thì case 'all' có thể cần xử lý riêng tùy backend.
-      const paramStatus = filterStatus === 'all' ? undefined : filterStatus;
+      const paramStatus = filterStatus === "all" ? undefined : filterStatus;
 
-      const data = await getWithdrawRequests(paramStatus); 
+      const data = await getWithdrawRequests(paramStatus);
       setRequests(data);
     } catch (error) {
       console.error(error);
@@ -109,11 +112,13 @@ export default function WithdrawManagement() {
     }
   };
 
-  // LOGIC MỚI: Thêm filterStatus vào dependency array
-  // Mỗi khi bạn chọn tab khác, useEffect này sẽ chạy lại và gọi API lấy dữ liệu mới
+  // Thay vì fetch tất cả rồi filter ở Client, ta truyền 'filterStatus' trực tiếp vào API.
+  // Điều này giúp:
+  // 1. Giảm tải băng thông (chỉ tải đúng dữ liệu cần xem).
+  // 2. Đảm bảo dữ liệu luôn mới nhất từ DB khi chuyển Tab.
   useEffect(() => {
     fetchRequests();
-  }, [filterStatus]);
+  }, [filterStatus]); // Trigger gọi lại API mỗi khi người dùng đổi Filter/Tab.
 
   // 2. Handle Approve
   const handleApproveClick = (req: WithdrawRequest) => {
@@ -122,19 +127,26 @@ export default function WithdrawManagement() {
     setApproveNote("");
     setShowApproveDialog(true);
   };
-
+  // Bước 1: Mở Modal để Admin nhập 'Mã giao dịch ngân hàng' (transactionCode).
+  // Bước 2: Gọi API approve.
+  // Bước 3: Nếu thành công, gọi fetchRequests() để đồng bộ lại số dư và trạng thái mới nhất.
+  // 'isSubmitting' dùng để chặn 'Double Click' - tránh việc gửi lệnh duyệt 2 lần liên tiếp lên Server.
   const confirmApprove = async () => {
     if (!selectedRequest) return;
-    setIsSubmitting(true);
+    setIsSubmitting(true); // Khóa nút bấm
     try {
-      await approveWithdrawRequest(selectedRequest.requestId, transactionCode, approveNote);
+      await approveWithdrawRequest(
+        selectedRequest.requestId,
+        transactionCode,
+        approveNote
+      );
       toast.success("Đã duyệt yêu cầu thành công!");
       setShowApproveDialog(false);
-      fetchRequests(); // Refresh data
+      fetchRequests(); // Re-sync dữ liệu toàn cục
     } catch (error) {
       toast.error("Duyệt thất bại.");
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false); // Mở khóa nút bấm
     }
   };
 
@@ -164,16 +176,22 @@ export default function WithdrawManagement() {
     }
   };
 
-// 4. Filtering Logic
+  // 4. Filtering Logic
+  // Sau khi đã lấy dữ liệu từ API theo Status, ta tiếp tục lọc nhanh (Local Search)
+  // theo Tên hoặc Số tài khoản để Admin tìm chính xác User mà không cần gọi lại API.
   const filteredRequests = requests.filter((r) => {
     // Đoạn này vẫn giữ để đảm bảo UI không hiện sai nếu API lỡ trả về nhầm
-    const statusMatch = filterStatus === "all" ? true : r.status.toLowerCase() === filterStatus.toLowerCase();
-    
+    const statusMatch =
+      filterStatus === "all"
+        ? true
+        : r.status.toLowerCase() === filterStatus.toLowerCase();
+
     const searchLower = searchTerm.toLowerCase();
-    const searchMatch = 
-      (r.accountHolderName && r.accountHolderName.toLowerCase().includes(searchLower)) ||
+    const searchMatch =
+      (r.accountHolderName &&
+        r.accountHolderName.toLowerCase().includes(searchLower)) ||
       (r.bankAccountNumber && r.bankAccountNumber.includes(searchLower));
-    
+
     return statusMatch && searchMatch;
   });
 
@@ -181,11 +199,32 @@ export default function WithdrawManagement() {
     const s = status.toLowerCase();
     switch (s) {
       case "pending":
-        return <Badge variant="outline" className="border-yellow-500 text-yellow-600 bg-yellow-50"><Clock className="w-3 h-3 mr-1"/>Chờ xử lý</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="border-yellow-500 text-yellow-600 bg-yellow-50"
+          >
+            <Clock className="w-3 h-3 mr-1" />
+            Chờ xử lý
+          </Badge>
+        );
       case "confirmed":
-        return <Badge variant="outline" className="border-green-500 text-green-600 bg-green-50"><CheckCircle className="w-3 h-3 mr-1"/>Đã duyệt</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="border-green-500 text-green-600 bg-green-50"
+          >
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Đã duyệt
+          </Badge>
+        );
       case "rejected":
-        return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1"/>Từ chối</Badge>;
+        return (
+          <Badge variant="destructive">
+            <XCircle className="w-3 h-3 mr-1" />
+            Từ chối
+          </Badge>
+        );
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -197,8 +236,12 @@ export default function WithdrawManagement() {
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-[var(--primary)]">Quản lý Đối soát</h1>
-            <p className="text-sm text-[var(--muted-foreground)]">Xử lý yêu cầu đối soát từ Author</p>
+            <h1 className="text-3xl font-bold text-[var(--primary)]">
+              Quản lý Đối soát
+            </h1>
+            <p className="text-sm text-[var(--muted-foreground)]">
+              Xử lý yêu cầu đối soát từ Author
+            </p>
           </div>
         </div>
 
@@ -210,9 +253,9 @@ export default function WithdrawManagement() {
               <div className="flex gap-2 w-full md:w-auto">
                 <div className="relative w-full md:w-64">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Tìm tên chủ TK, số TK..." 
-                    className="pl-8" 
+                  <Input
+                    placeholder="Tìm tên chủ TK, số TK..."
+                    className="pl-8"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -246,39 +289,65 @@ export default function WithdrawManagement() {
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={7} className="text-center h-32"><Loader2 className="mx-auto animate-spin" /></TableCell></TableRow>
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center h-32">
+                      <Loader2 className="mx-auto animate-spin" />
+                    </TableCell>
+                  </TableRow>
                 ) : filteredRequests.length > 0 ? (
                   filteredRequests.map((req) => (
                     <TableRow key={req.requestId}>
-                      <TableCell>{new Date(req.createdAt).toLocaleDateString('vi-VN')}</TableCell>
-                      
-                      {/* --- CẬP NHẬT: Thay thế icon tại đây --- */}
+                      <TableCell>
+                        {new Date(req.createdAt).toLocaleDateString("vi-VN")}
+                      </TableCell>
+
                       <TableCell className="font-bold text-green-600">
                         <div className="flex items-center gap-1">
-                          {req.amount.toLocaleString()} 
+                          {req.amount.toLocaleString()}
                           <GemWithStar size="h-4 w-4" />
                         </div>
                       </TableCell>
-                      {/* -------------------------------------- */}
 
                       <TableCell>{req.bankName}</TableCell>
                       <TableCell>{req.accountHolderName}</TableCell>
                       <TableCell>{req.bankAccountNumber}</TableCell>
                       <TableCell>{getStatusBadge(req.status)}</TableCell>
                       <TableCell className="text-right space-x-2">
-                        {req.status.toLowerCase() === 'pending' ? (
+                        {req.status.toLowerCase() === "pending" ? (
                           <>
-                            <Button size="sm" onClick={() => handleApproveClick(req)} className="bg-green-600 hover:bg-green-700 text-white">Duyệt</Button>
-                            <Button size="sm" variant="outline" onClick={() => handleRejectClick(req)} className="text-red-500 border-red-500 hover:bg-red-50">Từ chối</Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleApproveClick(req)}
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              Duyệt
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRejectClick(req)}
+                              className="text-red-500 border-red-500 hover:bg-red-50"
+                            >
+                              Từ chối
+                            </Button>
                           </>
                         ) : (
-                          <span className="text-xs text-muted-foreground italic">Đã xử lý</span>
+                          <span className="text-xs text-muted-foreground italic">
+                            Đã xử lý
+                          </span>
                         )}
                       </TableCell>
                     </TableRow>
                   ))
                 ) : (
-                  <TableRow><TableCell colSpan={7} className="text-center h-24 text-muted-foreground">Không tìm thấy yêu cầu nào.</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="text-center h-24 text-muted-foreground"
+                    >
+                      Không tìm thấy yêu cầu nào.
+                    </TableCell>
+                  </TableRow>
                 )}
               </TableBody>
             </Table>
@@ -290,36 +359,62 @@ export default function WithdrawManagement() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Xác nhận Duyệt</DialogTitle>
-              <DialogDescription>Vui lòng chuyển khoản trước khi xác nhận.</DialogDescription>
+              <DialogDescription>
+                Vui lòng chuyển khoản trước khi xác nhận.
+              </DialogDescription>
             </DialogHeader>
             {selectedRequest && (
               <div className="space-y-4 py-2">
                 <div className="bg-muted p-3 rounded text-sm">
-                  <p><strong>Người nhận:</strong> {selectedRequest.accountHolderName}</p>
-                  <p><strong>Ngân hàng:</strong> {selectedRequest.bankName} - {selectedRequest.bankAccountNumber}</p>
-                  
+                  <p>
+                    <strong>Người nhận:</strong>{" "}
+                    {selectedRequest.accountHolderName}
+                  </p>
+                  <p>
+                    <strong>Ngân hàng:</strong> {selectedRequest.bankName} -{" "}
+                    {selectedRequest.bankAccountNumber}
+                  </p>
+
                   {/* --- CẬP NHẬT: Thay thế icon tại đây (Modal) --- */}
                   <div className="text-lg font-bold text-green-600 mt-1 flex items-center gap-1">
-                    Số tiền: {selectedRequest.amount.toLocaleString()} 
+                    Số tiền: {selectedRequest.amount.toLocaleString()}
                     <GemWithStar size="h-5 w-5" />
                   </div>
-                  {/* ---------------------------------------------- */}
-
                 </div>
                 <div className="space-y-2">
                   <Label>Mã giao dịch (Optional)</Label>
-                  <Input placeholder="VD: FT123456..." value={transactionCode} onChange={e => setTransactionCode(e.target.value)} />
+                  <Input
+                    placeholder="VD: FT123456..."
+                    value={transactionCode}
+                    onChange={(e) => setTransactionCode(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Ghi chú (Optional)</Label>
-                  <Textarea placeholder="Ghi chú..." value={approveNote} onChange={e => setApproveNote(e.target.value)} />
+                  <Textarea
+                    placeholder="Ghi chú..."
+                    value={approveNote}
+                    onChange={(e) => setApproveNote(e.target.value)}
+                  />
                 </div>
               </div>
             )}
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowApproveDialog(false)}>Hủy</Button>
-              <Button onClick={confirmApprove} disabled={isSubmitting} className="bg-green-600 text-white hover:bg-green-700">
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Xác nhận
+              <Button
+                variant="outline"
+                onClick={() => setShowApproveDialog(false)}
+              >
+                Hủy
+              </Button>
+              <Button
+                onClick={confirmApprove}
+                disabled={isSubmitting}
+                className="bg-green-600 text-white hover:bg-green-700"
+              >
+                {isSubmitting && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}{" "}
+                Xác nhận
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -329,27 +424,44 @@ export default function WithdrawManagement() {
         <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle className="text-red-600">Từ chối Yêu cầu</DialogTitle>
-              <DialogDescription>Hành động này không thể hoàn tác.</DialogDescription>
+              <DialogTitle className="text-red-600">
+                Từ chối Yêu cầu
+              </DialogTitle>
+              <DialogDescription>
+                Hành động này không thể hoàn tác.
+              </DialogDescription>
             </DialogHeader>
             <div className="py-4">
-              <Label className="text-red-500 font-semibold">Lý do từ chối (Bắt buộc) *</Label>
-              <Textarea 
+              <Label className="text-red-500 font-semibold">
+                Lý do từ chối (Bắt buộc) *
+              </Label>
+              <Textarea
                 className="mt-2 h-32"
-                placeholder="VD: Sai thông tin ngân hàng..." 
-                value={rejectReason} 
-                onChange={(e) => setRejectReason(e.target.value)} 
+                placeholder="VD: Sai thông tin ngân hàng..."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
               />
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowRejectDialog(false)}>Hủy</Button>
-              <Button onClick={confirmReject} disabled={isSubmitting || !rejectReason.trim()} variant="destructive">
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Xác nhận Từ chối
+              <Button
+                variant="outline"
+                onClick={() => setShowRejectDialog(false)}
+              >
+                Hủy
+              </Button>
+              <Button
+                onClick={confirmReject}
+                disabled={isSubmitting || !rejectReason.trim()}
+                variant="destructive"
+              >
+                {isSubmitting && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}{" "}
+                Xác nhận Từ chối
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
       </main>
     </OpLayout>
   );

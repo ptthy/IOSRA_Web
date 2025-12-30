@@ -40,6 +40,7 @@ type ActiveTab = "revenue" | "author" | "rank" | "withdraw";
 
 export default function DashboardAnalytics() {
   const [loading, setLoading] = useState(true);
+  // 1. Quản lý trạng thái lọc dữ liệu
   const [period, setPeriod] = useState("day");
   const [isExporting, setIsExporting] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("revenue");
@@ -69,11 +70,14 @@ export default function DashboardAnalytics() {
         return "";
     }
   };
-
+/**
+ * Xử lý logic tải file Excel về máy người dùng
+ */
   const handleExport = async () => {
     try {
       setIsExporting(true);
       const blob = await exportSystemRevenue(period);
+      // Tạo link ảo để trình duyệt tự kích hoạt download
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

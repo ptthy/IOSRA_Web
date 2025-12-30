@@ -109,7 +109,7 @@ interface TagModalProps {
   tagToEdit?: TagPagedItem | null; // Nếu null là Thêm, có data là Sửa
   onConfirm: (tagName: string) => Promise<void>;
 }
-
+// Component Modal: Xử lý cả 2 trạng thái Thêm mới và Cập nhật (isEditMode)
 export function TagModal({ isOpen, onClose, tagToEdit, onConfirm }: TagModalProps) {
   const [tagName, setTagName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -125,6 +125,7 @@ export function TagModal({ isOpen, onClose, tagToEdit, onConfirm }: TagModalProp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Nếu có 'tag' truyền vào -> Gọi API Update, ngược lại gọi API Create
     if (!tagName.trim()) {
       toast.warning("Tên tag không được để trống");
       return;

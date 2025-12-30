@@ -56,6 +56,8 @@ import {
 import OpLayout from "@/components/OpLayout";
 
 // --- 1. CONFIG RANK STYLES ---
+// Định nghĩa style hiển thị cho từng cấp bậc tác giả. 
+// Giúp tách biệt logic hiển thị và logic xử lý dữ liệu
 const RANK_STYLES: Record<
   string,
   {
@@ -174,8 +176,9 @@ export default function AuthorManagement() {
   const [isSubmittingUpgrade, setIsSubmittingUpgrade] = useState(false);
 
   // ================= LOAD DATA =================
-
+// Các hàm useEffect này đảm nhiệm việc đồng bộ dữ liệu từ server khi component mount.
   useEffect(() => {
+    // Tải danh sách tác giả và chuyển đổi (map) sang định dạng hiển thị của table
     async function fetchAuthors() {
       try {
         setIsLoadingAuthors(true);
@@ -250,9 +253,9 @@ export default function AuthorManagement() {
   useEffect(() => {
     fetchUpgradeRequests();
   }, []);
-
-  // ================= HANDLERS =================
-
+// --- 3. ACTION HANDLERS ---
+// Xử lý các tương tác phê duyệt hoặc từ chối.
+// Lưu ý: Các hàm này đều yêu cầu xác nhận từ phía Moderator trước khi gọi API.
   const handleApproveSponsor = async (requestId: string) => {
     if (!confirm("Bạn có chắc chắn muốn duyệt yêu cầu này?")) return;
     try {

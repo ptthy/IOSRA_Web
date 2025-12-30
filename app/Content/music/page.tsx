@@ -55,7 +55,10 @@ export default function MoodMusicPage() {
       setIsLoadingTracks(false);
     }
   };
-
+/**
+   * Xử lý xác nhận tạo nhạc từ Modal.
+   * Gọi API sáng tác và cập nhật lại danh sách bài hát ngay lập tức.
+   */
   const handleCreateTrack = async (title: string, prompt: string) => {
     if (!selectedMood) return;
     try {

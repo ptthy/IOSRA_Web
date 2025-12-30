@@ -8,7 +8,6 @@ import { HistoryPage } from "./components/history-page";
 import { Poppins } from "next/font/google";
 import { ReviewDetail } from "./components/review-detail";
 
-
 // Import font Poppins từ Google Fonts
 const poppins = Poppins({
   subsets: ["latin"],
@@ -46,9 +45,11 @@ export default function ReviewPage() {
   return (
     <div className={`flex min-h-screen ${poppins.className} bg-background`}>
       {/* Sidebar (bên trái) */}
-      
 
-      {/* Nội dung chính */}
+      {/* // Luồng hiển thị 3 tầng: 
+  // 1. Nếu tab là 'history' -> Hiện trang Lịch sử.
+  // 2. Nếu có 'selectedContent' -> Hiện trang Chi tiết (ReviewDetail).
+  // 3. Mặc định -> Hiện danh sách chờ duyệt (ContentList). */}
       <main className="flex-1 p-6 relative">
         {currentPage === "history" ? (
           <HistoryPage />
@@ -60,9 +61,6 @@ export default function ReviewPage() {
         ) : (
           <ContentList onReview={(content) => setSelectedContent(content)} />
         )}
-
-      
-       
       </main>
     </div>
   );

@@ -1,9 +1,16 @@
-// File: app/Content/layout.tsx
+/**
+ * @layout ContentLayout
+ * @description Layout bao quanh toàn bộ khu vực Admin/Moderator.
+ * Chức năng:
+ * 1. Cấu hình Font Roboto (hỗ trợ tiếng Việt tốt hơn mặc định).
+ * 2. Cấu hình Theme (Dark/Light mode) lưu vào LocalStorage.
+ * 3. Cung cấp Context (ModerationProvider) để chia sẻ số lượng thông báo (badge count) toàn ứng dụng.
+ */
 "use client";
 
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { Roboto } from "next/font/google"; // 👈 1. Import Font
+import { Roboto } from "next/font/google";
 import {
   SidebarProvider,
   Sidebar,
@@ -12,11 +19,10 @@ import {
 import { EnhancedSidebar } from "./dashboard/components/enhanced-sidebar";
 import { ModerationProvider } from "@/context/ModerationContext";
 
-// 👈 2. Cấu hình Font Roboto
 const roboto = Roboto({
-  subsets: ["latin", "vietnamese"], // Hỗ trợ tiếng Việt
-  weight: ["100", "300", "400", "500", "700", "900"], // Các độ đậm cần dùng
-  variable: "--font-roboto", // (Tuỳ chọn) Dùng cho CSS variable nếu cần
+  subsets: ["latin", "vietnamese"],
+  weight: ["100", "300", "400", "500", "700", "900"],
+  variable: "--font-roboto",
 });
 
 export default function ContentLayout({

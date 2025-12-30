@@ -25,8 +25,11 @@ export default function TagManagementPage() {
   // --- STATE MODAL (Chỉ dùng 1 bộ state duy nhất) ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTag, setEditingTag] = useState<TagPagedItem | null>(null); 
-  // editingTag = null => Thêm mới
-  // editingTag = object => Chỉnh sửa
+ /**
+   * Logic xử lý lưu (Save) chung:
+   * - Nếu editingTag có giá trị: Gọi API updateTag (Cập nhật).
+   * - Nếu editingTag là null: Gọi API createTag (Thêm mới).
+   */
 
   const fetchTags = async () => {
     try {

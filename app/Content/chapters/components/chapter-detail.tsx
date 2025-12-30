@@ -1,3 +1,7 @@
+/**
+ * @component ChapterDetail
+ * @description Giao diện đọc nội dung chương truyện và thực hiện thao tác Phê duyệt/Từ chối.
+ */
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -68,7 +72,10 @@ export function ChapterDetail({ content: initialContent, onBack }: ChapterDetail
     }
   };
 
-  // --- 2. LOGIC TẢI NỘI DUNG (Giữ nguyên logic của bạn) ---
+ /**
+   * tải nội dung từ Cloud Storage (R2).
+   * Nội dung chương thường được lưu dưới dạng file .txt 
+   */
   useEffect(() => {
     async function fetchContent() {
       // Nếu dữ liệu API không có đường dẫn file
@@ -83,7 +90,7 @@ export function ChapterDetail({ content: initialContent, onBack }: ChapterDetail
         // A. Xử lý URL: Ghép R2 Base URL nếu contentPath là đường dẫn tương đối
         let fileUrl = content.contentPath;
         if (!fileUrl.startsWith("http")) {
-            // Xóa dấu / ở đầu nếu có
+           
             const cleanPath = fileUrl.startsWith("/") ? fileUrl.slice(1) : fileUrl;
             fileUrl = `${R2_BASE_URL}/${cleanPath}`;
         }
@@ -100,7 +107,7 @@ export function ChapterDetail({ content: initialContent, onBack }: ChapterDetail
             throw new Error(`Không thể tải file (HTTP ${response.status})`);
         }
 
-        // D. Lấy text
+      // downloadChapterText sẽ fetch trực tiếp từ R2 URL
         const text = await response.text();
         setChapterText(text);
 

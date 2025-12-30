@@ -29,7 +29,7 @@ export function TrackList({
   onUpdateTrack 
 }: TrackListProps) {
   
-  // Audio State
+  // State quản lý việc bài nào đang được phát (ID) để đổi icon Play/Pause
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -43,7 +43,11 @@ export function TrackList({
     cancelEdit(); // Reset edit khi đổi mood
   }, [selectedMood]);
 
-  // Audio Logic
+  /**
+   * Logic điều khiển trình phát nhạc.
+   * Nếu bấm bài đang phát -> Dừng.
+   * Nếu bấm bài khác -> Chuyển nguồn (src) và phát bài mới.
+   */
   const togglePlay = (track: Track) => {
     if (playingTrackId === track.trackId) {
       stopAudio();

@@ -1,4 +1,4 @@
-// File: app/Content/moderation/components/report-action-modal.tsx
+
 "use client";
 
 import { useState, useEffect } from "react"; 
@@ -16,10 +16,10 @@ import {
     updateAccountStrikeStatus 
 } from "@/services/moderationApi";
 
-// ... (Giữ nguyên phần constants và interfaces như cũ) ...
+
 const R2_BASE_URL = "https://pub-15618311c0ec468282718f80c66bcc13.r2.dev";
 
-// ... (Giữ nguyên các Interface StoryDetails, ChapterDetails, v.v...) ...
+
 
 interface StoryDetails {
   storyId: string;
@@ -73,7 +73,6 @@ interface ReportActionModalProps {
   onSuccess: () => void;
 }
 
-// ... (Giữ nguyên các hàm utils: calculateBanDate, reasonMapping) ...
 
 const calculateBanDate = (level: string): string => {
     const l = parseInt(level);
@@ -100,8 +99,8 @@ const reasonMapping: Record<string, string> = {
   ip_infringement: "Vi phạm bản quyền",
 };
 
-// ================= MAIN COMPONENT =================
 
+// Mức độ xử phạt (0: Không phạt, 1-4: Các cấp độ đánh gậy)
 export function ReportActionModal({ report, isOpen, onClose, onSuccess }: ReportActionModalProps) {
   const [loading, setLoading] = useState(false);
   const [strikeLevel, setStrikeLevel] = useState<string>("0"); 
@@ -158,7 +157,6 @@ export function ReportActionModal({ report, isOpen, onClose, onSuccess }: Report
 
   if (!report) return null;
 
-  // ✨ CHANGE: Xác định xem báo cáo có đang chờ xử lý hay không
   const isPending = report.status === 'pending';
 
   const reportedTargetName = 
@@ -168,7 +166,7 @@ export function ReportActionModal({ report, isOpen, onClose, onSuccess }: Report
       "User ID: " + report.targetAccountId;
 
   const renderContentPreview = () => {
-    // ... (Giữ nguyên logic render content preview như cũ) ...
+    
     if (report.targetType === 'story' && report.story) {
         return (
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mt-2 space-y-2">
@@ -279,9 +277,18 @@ export function ReportActionModal({ report, isOpen, onClose, onSuccess }: Report
     const apiStatus = (targetType === 'comment' ? 'hidden' : 'hidden'); 
     await updateContentStatus(targetType as 'story' | 'chapter' | 'comment', targetId, apiStatus as any);
   };
-  
+  /**
+   * QUY TRÌNH XỬ LÝ BÁO CÁO ĐÚNG:
+   * 1. Cập nhật trạng thái nội dung (Story/Chapter/Comment) sang 'hidden' (Ẩn khỏi người dùng).
+   * 2. Nếu có chọn mức phạt -> Cập nhật Strike Status cho tài khoản chủ sở hữu.
+   * 3. Cuối cùng, đánh dấu báo cáo là 'resolved' để hoàn tất.
+   */
   const handleResolve = async () => {
-    // ... (Giữ nguyên logic xử lý)
+ // Luồng gọi API tuần tự
+    // step 1: updateContentStatus(targetType, targetId, 'hidden')
+    // step 2: updateAccountStrikeStatus(accountId, strikeLevel)
+    // step 3: updateReportStatus(reportId, 'resolved')
+    
     const level = parseInt(strikeLevel);
     if (!confirm("Xác nhận báo cáo ĐÚNG?")) return;
     setLoading(true);
@@ -303,7 +310,7 @@ export function ReportActionModal({ report, isOpen, onClose, onSuccess }: Report
   };
 
   const handleReject = async () => {
-    // ... (Giữ nguyên logic từ chối)
+
     if (!confirm("Xác nhận báo cáo SAI/SPAM?")) return;
     setLoading(true);
     try {
@@ -363,7 +370,7 @@ export function ReportActionModal({ report, isOpen, onClose, onSuccess }: Report
                {renderContentPreview()}
           </div>
 
-          {/* 3. FORM XỬ LÝ (ACTION) - ✨ CHANGE: Chỉ hiện khi trạng thái là pending */}
+          {/* 3. FORM XỬ LÝ (ACTION)  Chỉ hiện khi trạng thái là pending */}
           {isPending && (
             <div className="bg-slate-100 p-4 rounded-lg border border-slate-200">
                 <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
@@ -421,7 +428,7 @@ export function ReportActionModal({ report, isOpen, onClose, onSuccess }: Report
             Đóng
           </Button>
           
-          {/* ✨ CHANGE: Chỉ hiện các nút xử lý khi trạng thái là pending */}
+          {/*Chỉ hiện các nút xử lý khi trạng thái là pending */}
           {isPending && (
             <div className="flex gap-2">
                 <Button

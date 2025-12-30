@@ -1,3 +1,8 @@
+/**
+ * @component ChapterList
+ * @description Hiển thị bảng danh sách các chương truyện đang chờ phê duyệt.
+ * Hỗ trợ lọc theo trạng thái và hiển thị cảnh báo từ AI.
+ */
 "use client";
 
 import React, { useState, useEffect } from "react";

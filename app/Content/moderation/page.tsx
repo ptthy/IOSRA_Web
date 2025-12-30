@@ -14,7 +14,9 @@ import { toast } from "sonner"; // Import toast để dùng
 export default function ModerationPage() {
   const [isApprovalOpen, setIsApprovalOpen] = useState(false);
   const [isRejectOpen, setIsRejectOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"reports" | "sent-back">("reports");
+  const [activeTab, setActiveTab] = useState<"reports" | "sent-back">(
+    "reports"
+  );
   const searchParams = useSearchParams();
   const [selectedStory, setSelectedStory] = useState<any | null>(null);
 
@@ -54,11 +56,10 @@ export default function ModerationPage() {
   return (
     <div className="space-y-6">
       {/* Reports */}
-      {/* ✅ SỬA 3: Xóa prop 'onHandle' */}
+      {/* ReportsList tự quản lý việc mở Modal chi tiết báo cáo bên trong nó */}
       {activeTab === "reports" && <ReportsList />}
 
-    
-      {/* Sent back — chi tiết 1 item (Giữ nguyên) */}
+      {/* Hiển thị chi tiết nội dung khiếu nại nếu có selectedStory */}
       {activeTab === "sent-back" && selectedStory && (
         <div className="bg-[var(--card)] text-[var(--foreground)] p-6 rounded-xl shadow-sm border border-[var(--border)]">
           <h2 className="text-2xl font-semibold mb-3">{selectedStory.title}</h2>
@@ -66,11 +67,15 @@ export default function ModerationPage() {
           <div className="mb-4 space-y-2">
             <p>
               <strong className="mr-1">Tác giả:</strong>
-              <span className="text-[var(--primary)]">{selectedStory.author}</span>
+              <span className="text-[var(--primary)]">
+                {selectedStory.author}
+              </span>
             </p>
             <p>
               <strong className="mr-1">Thể loại:</strong>
-              <span className="text-[var(--muted-foreground)]">{selectedStory.genre}</span>
+              <span className="text-[var(--muted-foreground)]">
+                {selectedStory.genre}
+              </span>
             </p>
             <p className="text-[var(--muted-foreground)] mt-2">
               {selectedStory.authorRevision?.message ?? ""}

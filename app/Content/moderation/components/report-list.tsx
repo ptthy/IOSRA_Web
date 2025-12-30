@@ -24,13 +24,13 @@ import { cn } from "@/lib/utils";
 
 // ========================= MAP LÝ DO VI PHẠM =========================
 const REASON_MAP: { [key: string]: string } = {
-  "spam": "Spam/Quảng cáo",
-  "negative_content": "Nội dung tiêu cực",
-  "misinformation": "Thông tin sai lệch",
-  "ip_infringement": "Vi phạm bản quyền",
-  "harassment": "Quấy rối",
-  "hate_speech": "Ngôn từ thù ghét",
-  "other": "Khác"
+  spam: "Spam/Quảng cáo",
+  negative_content: "Nội dung tiêu cực",
+  misinformation: "Thông tin sai lệch",
+  ip_infringement: "Vi phạm bản quyền",
+  harassment: "Quấy rối",
+  hate_speech: "Ngôn từ thù ghét",
+  other: "Khác",
 };
 
 const getTranslatedReason = (rawReason: string) => {
@@ -41,13 +41,13 @@ const getTranslatedReason = (rawReason: string) => {
 // ========================= HELPER LẤY TRẠNG THÁI TARGET =========================
 const getTargetStatusInfo = (report: ReportItem) => {
   let status = "";
-  
+
   // Fix lỗi TS: Ép kiểu as any vì type gốc có thể thiếu field status
-  if (report.targetType === 'story' && report.story) {
+  if (report.targetType === "story" && report.story) {
     status = (report.story as any).status || "published";
-  } else if (report.targetType === 'chapter' && report.chapter) {
-    status = (report.chapter as any).status || "published"; 
-  } else if (report.targetType === 'comment' && report.comment) {
+  } else if (report.targetType === "chapter" && report.chapter) {
+    status = (report.chapter as any).status || "published";
+  } else if (report.targetType === "comment" && report.comment) {
     status = (report.comment as any).status || "visible";
   }
 
@@ -56,28 +56,27 @@ const getTargetStatusInfo = (report: ReportItem) => {
     case "hidden":
     case "deleted":
     case "removed":
-      return { 
-        label: "Đã ẩn", 
-        color: "bg-red-100 text-red-700 border-red-200", 
-        icon: <EyeOff className="w-3 h-3 mr-1" /> 
+      return {
+        label: "Đã ẩn",
+        color: "bg-red-100 text-red-700 border-red-200",
+        icon: <EyeOff className="w-3 h-3 mr-1" />,
       };
     case "published":
     case "visible":
-      return { 
-        label: "Đang hiện", 
-        color: "bg-green-100 text-green-700 border-green-200", 
-        icon: <Globe className="w-3 h-3 mr-1" /> 
+      return {
+        label: "Đang hiện",
+        color: "bg-green-100 text-green-700 border-green-200",
+        icon: <Globe className="w-3 h-3 mr-1" />,
       };
     default:
-      return { 
-        label: status || "N/A", 
-        color: "bg-gray-100 text-gray-700 border-gray-200", 
-        icon: null 
+      return {
+        label: status || "N/A",
+        color: "bg-gray-100 text-gray-700 border-gray-200",
+        icon: null,
       };
   }
 };
 
-// ========================= MOTION VARIANTS =========================
 const tabContentVariants: Variants = {
   hidden: { opacity: 0, y: 15 },
   visible: {
@@ -87,17 +86,13 @@ const tabContentVariants: Variants = {
   },
 };
 
-// ========================= MAIN COMPONENT =========================
-
 export function ReportsList() {
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Tab mặc định
   const [activeTab, setActiveTab] = useState<string>("pending");
 
-  // Modal
   const [selectedReport, setSelectedReport] = useState<ReportItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -112,7 +107,6 @@ export function ReportsList() {
       const response = await getHandlingReports(apiStatus, null, 1, 50);
       const dataItems = response.items || [];
       setReports(dataItems);
-      
     } catch (err: any) {
       console.error("Fetch error:", err);
       setError(err.message || "Có lỗi xảy ra");
@@ -140,7 +134,9 @@ export function ReportsList() {
     if (!data || data.length === 0) {
       return (
         <div className="flex justify-center items-center min-h-[300px]">
-          <p className="text-lg text-gray-500">Không có báo cáo nào trong mục này.</p>
+          <p className="text-lg text-gray-500">
+            Không có báo cáo nào trong mục này.
+          </p>
         </div>
       );
     }
@@ -153,8 +149,10 @@ export function ReportsList() {
               <TableHead className="py-4 px-6 w-[100px]">Loại</TableHead>
               <TableHead className="py-4 px-6 w-[200px]">Lý do</TableHead>
               <TableHead className="py-4 px-6">Chi tiết</TableHead>
-              <TableHead className="py-4 px-6 w-[150px]">Trạng thái xử lý</TableHead>
-              
+              <TableHead className="py-4 px-6 w-[150px]">
+                Trạng thái xử lý
+              </TableHead>
+
               {/* Cột cuối cùng luôn hiện, nhưng tiêu đề thay đổi */}
               <TableHead className="py-4 px-6 text-center w-[180px]">
                 {isPendingTab ? "Hành động" : "Chi tiết"}
@@ -164,9 +162,9 @@ export function ReportsList() {
 
           <TableBody>
             {data.map((report) => {
-               const targetStatus = getTargetStatusInfo(report);
+              const targetStatus = getTargetStatusInfo(report);
 
-               return (
+              return (
                 <TableRow
                   key={report.reportId}
                   className="border-b hover:bg-[var(--muted)]/20 transition-colors"
@@ -198,17 +196,19 @@ export function ReportsList() {
                         "whitespace-nowrap",
                         report.status === "pending" &&
                           "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
-                        (report.status === "approved" || report.status === "resolved") &&
+                        (report.status === "approved" ||
+                          report.status === "resolved") &&
                           "bg-green-100 text-green-800 hover:bg-green-200",
                         report.status === "rejected" &&
                           "bg-gray-100 text-gray-800 hover:bg-gray-200"
                       )}
                     >
-                      {report.status === "resolved" || report.status === "approved" 
-                        ? "Đã xử phạt" 
-                        : report.status === "rejected" 
-                          ? "Đã từ chối" 
-                          : "Chờ xử lý"}
+                      {report.status === "resolved" ||
+                      report.status === "approved"
+                        ? "Đã xử phạt"
+                        : report.status === "rejected"
+                        ? "Đã từ chối"
+                        : "Chờ xử lý"}
                     </Badge>
                   </TableCell>
 
@@ -216,7 +216,10 @@ export function ReportsList() {
                   <TableCell className="py-4 px-6 text-center">
                     {isPendingTab ? (
                       // === Tab Chờ xử lý: Chỉ hiện nút Xử lý ===
-                      <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      <motion.div
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
                         <Button
                           size="sm"
                           onClick={() => handleOpenProcess(report)}
@@ -230,15 +233,21 @@ export function ReportsList() {
                       <div className="flex flex-col items-center gap-2">
                         {/* Nếu là tab Approved thì hiện thêm trạng thái nội dung (Đã ẩn/Hiện) */}
                         {isApprovedTab && (
-                          <Badge variant="outline" className={cn("flex items-center w-fit px-2 py-0.5 text-[10px]", targetStatus.color)}>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "flex items-center w-fit px-2 py-0.5 text-[10px]",
+                              targetStatus.color
+                            )}
+                          >
                             {targetStatus.icon} {targetStatus.label}
                           </Badge>
                         )}
-                        
+
                         {/* Cả Approved và Rejected đều có nút này */}
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="h-7 text-xs text-muted-foreground hover:text-primary hover:bg-blue-50"
                           onClick={() => handleOpenProcess(report)}
                         >
@@ -288,7 +297,11 @@ export function ReportsList() {
           "'Poppins', 'Poppins Vietnamese', 'Noto Sans Vietnamese', 'Segoe UI', sans-serif",
       }}
     >
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-8"
+      >
         <h1 className="text-3xl font-bold text-[var(--primary)] mb-2">
           Xử Lý Báo Cáo Vi Phạm
         </h1>
@@ -335,7 +348,12 @@ export function ReportsList() {
           </TabsList>
         </div>
 
-        <motion.div key={activeTab} variants={tabContentVariants} initial="hidden" animate="visible">
+        <motion.div
+          key={activeTab}
+          variants={tabContentVariants}
+          initial="hidden"
+          animate="visible"
+        >
           <TabsContent value={activeTab} forceMount>
             <ReportsTable data={reports} />
           </TabsContent>

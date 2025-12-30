@@ -122,16 +122,17 @@ export default function ManageRevenuePage() {
     fetchData();
   }, [period]);
 
-  // Xử lý nút Xuất Excel
+// --- EXPORT EXCEL HANDLER ---
+// Tạo yêu cầu xuất báo cáo, nhận dữ liệu dưới dạng Blob và kích hoạt trình duyệt tải xuống.
   const handleExport = async () => {
     try {
       setIsExporting(true);
       let apiPeriod = "month";
       if (period === "daily") apiPeriod = "day";
       if (period === "yearly") apiPeriod = "year";
-
+// Gọi service lấy file stream (Blob)
       const blob = await exportSystemRevenue(apiPeriod);
-
+// Tạo URL tạm thời để trình duyệt có thể thực hiện hành động 'Save As'
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -140,6 +141,12 @@ export default function ManageRevenuePage() {
       }.xlsx`;
       document.body.appendChild(a);
       a.click();
+     
+// 1. URL.createObjectURL tạo ra một 'đường dẫn ảo' trỏ thẳng vào vùng RAM chứa dữ liệu file (Blob).
+// 2. Trình duyệt sẽ KHÔNG THỂ giải phóng vùng RAM này (Garbage Collection bị chặn) chừng nào URL còn tồn tại.
+// 3. Sau khi a.click() thực thi, trình duyệt đã bắt đầu tiến trình copy dữ liệu xuống ổ cứng.
+// 4. revokeObjectURL sẽ hủy 'đường dẫn ảo' này, cho phép trình duyệt dọn dẹp vùng RAM đó ngay lập tức.
+// => Tránh lỗi tràn bộ nhớ (Memory Leak) nếu người dùng xuất báo cáo nhiều lần.
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
@@ -151,7 +158,7 @@ export default function ManageRevenuePage() {
       setIsExporting(false);
     }
   };
-
+// PieData: Chỉ lấy các nguồn thu có giá trị > 0 để tránh hiển thị nhãn trống trên biểu đồ tròn
   const pieData = revenueData
     ? [
         { name: "Nạp Kim Cương", value: revenueData.diaTopup },
@@ -159,7 +166,7 @@ export default function ManageRevenuePage() {
         { name: "Voice Topup", value: revenueData.voiceTopup },
       ].filter((i) => i.value > 0)
     : [];
-
+// BarData: Ánh xạ các điểm dữ liệu (points) theo nhãn thời gian (ngày/tháng/năm)
   const barData =
     revenueData?.points?.map((p: any) => ({
       name: p.periodLabel,

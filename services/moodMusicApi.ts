@@ -1,4 +1,8 @@
-// File: src/services/moodMusicApi.ts
+/**
+ * @file moodMusicApi.ts
+ * @description Service quản lý các yêu cầu API liên quan đến nhạc nền AI (Mood Music).
+ * Sử dụng Cloud Storage R2 để lưu trữ và truy xuất file âm thanh (.mp3).
+ */
 import apiClient from "@/services/apiClient";
 
 // 1. CẤU HÌNH URL CLOUD STORAGE (R2)
@@ -19,7 +23,7 @@ export interface Track {
   moodName?: string;
   title: string;
   durationSeconds: number;
-  publicUrl: string; // Link file mp3 (đã được xử lý full link)
+  publicUrl: string; // URL đầy đủ dẫn đến file MP3
   createdAt: string;
 }
 
@@ -47,19 +51,19 @@ function resolveR2Url(path: string): string {
 // --- API Functions ---
 
 export const moodMusicApi = {
-  // 1. Lấy danh sách Mood
+// Lấy danh sách các loại tâm trạng/thể loại nhạc
   getMoods: async (): Promise<Mood[]> => {
     const response = await apiClient.get("/api/ContentModMoodMusic/moods");
     return response.data;
   },
 
-  // 2. Lấy danh sách nhạc theo Mood (ĐÃ SỬA URL)
+ // Lấy danh sách các bài nhạc thuộc một mã tâm trạng cụ thể
   getTracks: async (moodCode: string): Promise<Track[]> => {
     const response = await apiClient.get("/api/ContentModMoodMusic/tracks", {
       params: { moodCode },
     });
 
-    // Map qua từng bài nhạc để sửa lại publicUrl
+    // Duyệt qua danh sách để đảm bảo mọi bài nhạc đều có URL hợp lệ
     const tracks = response.data.map((track: any) => ({
       ...track,
       publicUrl: resolveR2Url(track.publicUrl) // <--- QUAN TRỌNG: Ghép link tại đây
@@ -67,13 +71,11 @@ export const moodMusicApi = {
 
     return tracks;
   },
-
-  // 3. Tạo nhạc mới bằng AI (ĐÃ SỬA URL)
+  
+// Gửi yêu cầu cho AI sáng tác bài nhạc mới dựa trên prompt (mô tả)
   generateTrack: async (data: GenerateTrackRequest): Promise<Track> => {
     const response = await apiClient.post("/api/ContentModMoodMusic/tracks", data);
     const track = response.data;
-    
-    // Sửa link cho bài vừa tạo xong
     return {
       ...track,
       publicUrl: resolveR2Url(track.publicUrl)

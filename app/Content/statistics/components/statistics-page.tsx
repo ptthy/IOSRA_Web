@@ -1,4 +1,8 @@
-// File: app/content/statistics/page.tsx
+/**
+ * @page StatisticsPage
+ * @description Trang báo cáo số liệu bằng biểu đồ.
+ * Sử dụng thư viện Recharts để hiển thị xu hướng kiểm duyệt và phân loại vi phạm.
+ */
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
@@ -54,6 +58,7 @@ const PERIODS: { label: string; value: Period }[] = [
 const PIE_COLORS = ["#8B5FBF", "#5D3FD3", "#A97FE3", "#E0D4EE", "#B6A77B", "#FF7F50", "#4682B4", "#3CB371"];
 
 export default function StatisticsPage(): JSX.Element {
+  // Lấy dữ liệu Breakdown (Biểu đồ tròn) để xem lý do vi phạm nào chiếm đa số
   const [endpoint, setEndpoint] = useState<Endpoint>("stories");
   const [period, setPeriod] = useState<Period>("day");
   const [from, setFrom] = useState<string | undefined>(undefined);
@@ -107,7 +112,10 @@ export default function StatisticsPage(): JSX.Element {
     fetchViolation();
   }, [fetchSeries, fetchViolation]);
 
-  // Hàm xử lý xuất file Excel
+  /**
+   * Hàm xuất file báo cáo (Excel/CSV).
+   * Dữ liệu nhận về là một Blob (nhị phân), sau đó tạo link ảo để trình duyệt tải về.
+   */
   const handleExport = async () => {
     setIsExporting(true);
     try {
