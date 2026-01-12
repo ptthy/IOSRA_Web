@@ -1,3 +1,5 @@
+//services/aiChatService.ts
+
 import apiClient from "./apiClient";
 
 export interface AIChatMessage {

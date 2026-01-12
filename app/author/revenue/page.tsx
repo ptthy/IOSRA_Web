@@ -1,4 +1,23 @@
 //app/author/revenue/page.tsx
+
+/*
+MỤC ĐÍCH: Trang quản lý doanh thu và đối soát của tác giả
+CHỨC NĂNG CHÍNH:
+- Hiển thị tổng quan doanh thu (số dư khả dụng, đang chờ xử lý, đã đối soát, tổng lũy kế)
+- Cho phép tác giả tạo yêu cầu đối soát (rút tiền) với form nhập thông tin ngân hàng
+- Hiển thị biểu đồ doanh thu theo thời gian (sử dụng Recharts)
+- Hiển thị danh sách giao dịch chi tiết (mua chương, tạo giọng đọc AI, đối soát)
+- Hiển thị lịch sử yêu cầu đối soát với trạng thái (pending, approved, rejected, confirmed)
+- Hiển thị hóa đơn đối soát đã được admin approved (cần tác giả xác nhận đã nhận tiền)
+- Modal xem chi tiết cho từng giao dịch/yêu cầu đối soát
+ĐỐI TƯỢNG SỬ DỤNG: Tác giả (Author) muốn theo dõi thu nhập và thực hiện đối soát
+FLOW XỬ LÝ CHÍNH:
+1. Load tổng quan doanh thu, lịch sử giao dịch, lịch sử đối soát
+2. Tính toán dữ liệu cho biểu đồ từ giao dịch
+3. Xử lý form đối soát với validation chi tiết
+4. Phân trang cho bảng giao dịch và đối soát
+5. Xử lý xác nhận đã nhận tiền cho bill đã approved
+*/
 "use client";
 import React, { useEffect, useState, useRef } from "react";
 import {
@@ -57,12 +76,32 @@ import {
 } from "@/services/authorRevenueService";
 
 // --- HELPERS ---
-// 1. Chỉ format số, BỎ chữ "AP"
+
+/**
+ * HELPER FORMAT SỐ THEO ĐỊNH DẠNG VIỆT NAM:
+ * @param amount - Số cần format (number)
+ * @returns Chuỗi số đã format với dấu chấm phân cách hàng nghìn
+ *
+ * Ví dụ: 1000000 -> "1.000.000"
+ * Lưu ý: Bỏ chữ "AP" so với trước đây, thay bằng icon Gem (dias)
+ */
 const formatNumber = (amount: number) => {
   return new Intl.NumberFormat("vi-VN").format(amount);
 };
 
-// 2. Component hiển thị Số + Icon Gem (Dùng cái này thay thế cho text AP)
+/**
+ * COMPONENT HIỂN THỊ SỐ TIỀN VỚI ICON GEM (Dias):
+ * @param value - Giá trị số cần hiển thị
+ * @param className - CSS class tùy chỉnh thêm
+ * @param iconSize - Kích thước icon Gem (mặc định 14)
+ * @param showPlus - Có hiển thị dấu "+" trước số dương không (dùng cho giao dịch cộng tiền)
+ *
+ * LOGIC HIỂN THỊ:
+ * - Format số theo định dạng Việt Nam với dấu chấm phân cách
+ * - Hiển thị icon Gem màu xanh dương với dấu sao vàng (*) phía trên
+ * - Tự động thêm dấu "+" nếu số dương và showPlus=true
+ * - Màu sắc: đỏ nếu âm, xanh lá nếu dương (khi showPlus), mặc định theo class
+ */
 const APDisplay = ({
   value,
   className = "",
@@ -78,10 +117,10 @@ const APDisplay = ({
   // Màu mặc định: Xanh lá nếu dương (khi showPlus), Đỏ nếu âm, hoặc theo class truyền vào
   const defaultColor =
     value < 0
-      ? "text-red-600"
+      ? "text-red-600" // Âm: màu đỏ
       : showPlus && isPositive
-      ? "text-green-600"
-      : "text-[var(--foreground)]";
+      ? "text-green-600" // Dương và showPlus: màu xanh lá
+      : "text-[var(--foreground)]"; // Mặc định: màu chữ thông thường
 
   return (
     <span
@@ -90,6 +129,7 @@ const APDisplay = ({
       }`}
     >
       {showPlus && isPositive ? "+" : ""}
+      {/* Thêm dấu + nếu cần */}
       {formatNumber(value)}
       {/* Icon Gem màu xanh dương */}
       <div className="relative inline-flex items-center">
@@ -101,6 +141,11 @@ const APDisplay = ({
     </span>
   );
 };
+/**
+ * HELPER FORMAT DATE ĐẦY ĐỦ (ngày + giờ):
+ * @param dateString - Chuỗi date ISO từ API
+ * @returns Chuỗi date đã format theo định dạng Việt Nam: "dd/mm/yyyy, hh:mm"
+ */
 const formatDate = (dateString: string) => {
   if (!dateString) return "N/A";
   return new Date(dateString).toLocaleString("vi-VN", {
@@ -111,27 +156,56 @@ const formatDate = (dateString: string) => {
     minute: "2-digit",
   });
 };
-
+/**
+ * HELPER FORMAT DATE NGẮN (cho biểu đồ):
+ * @param dateString - Chuỗi date ISO
+ * @returns Chuỗi date ngắn chỉ có "dd/mm" (bỏ năm)
+ */
 const formatShortDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString("vi-VN", {
     day: "2-digit",
     month: "2-digit",
   });
 };
-// Format số có dấu chấm (hiển thị)
+/**
+ * HELPER FORMAT SỐ NHẬP LIỆU (có dấu chấm phân cách khi nhập):
+ * @param value - Chuỗi nhập vào từ input
+ * @returns Chuỗi đã format với dấu chấm phân cách hàng nghìn
+ *
+ * LOGIC:
+ * 1. Xóa tất cả ký tự không phải số (0-9) khỏi chuỗi nhập
+ * 2. Convert string số -> number -> format theo VN với dấu chấm
+ * Ví dụ: "1000000" -> "1.000.000"
+ */
 const formatNumberInput = (value: string): string => {
-  const numbers = value.replace(/\D/g, "");
-  if (!numbers) return "";
-  return Number(numbers).toLocaleString("vi-VN");
+  const numbers = value.replace(/\D/g, ""); // Chỉ giữ lại số
+  if (!numbers) return ""; // Nếu không có số -> trả về rỗng
+  return Number(numbers).toLocaleString("vi-VN"); // Format với dấu chấm
 };
 
-// Chuyển về số nguyên để gửi API
+/**
+ * HELPER PARSE SỐ NHẬP LIỆU (chuyển về số nguyên):
+ * @param value - Chuỗi đã format có dấu chấm phân cách
+ * @returns Số nguyên (number)
+ *
+ * LOGIC: Xóa dấu chấm phân cách -> chuyển thành number
+ * Ví dụ: "1.000.000" -> 1000000
+ */
 const parseNumberInput = (value: string): number => {
-  return Number(value.replace(/\D/g, "")) || 0;
+  return Number(value.replace(/\D/g, "")) || 0; // Xóa tất cả non-digit
 };
 
 // --- COMPONENTS: DETAIL MODAL (TRANSACTIONS & WITHDRAW) ---
-// Cấu hình Việt hóa tên trường
+
+/**
+ * MAPPING LABEL VIỆT HÓA CHO CÁC FIELD TỪ API:
+ * Mapping key API (có thể viết hoa/viết thường) thành label tiếng Việt cho giao diện
+ *
+ * TẠI SAO CẦN MAPPING:
+ * - Backend có thể trả về key tiếng Anh hoặc mixed case
+ * - Cần hiển thị tiếng Việt cho người dùng
+ * - Xử lý cả trường hợp viết hoa và viết thường để phòng backend trả về khác nhau
+ */
 const LABELS_MAP: Record<string, string> = {
   // --- TÀI CHÍNH ---
   grossAmount: "Doanh thu ban đầu ",
@@ -167,7 +241,10 @@ const LABELS_MAP: Record<string, string> = {
   requestId: "Mã yêu cầu",
 };
 
-// 2. Danh sách ẨN (Đã thêm ChapterId và VoiceIds để ẩn đi)
+/**
+ * DANH SÁCH TRƯỜNG ẨN:
+ * Các trường không cần hiển thị trong modal detail
+ */
 const HIDDEN_FIELDS = [
   "chapterId",
   "voiceIds",
@@ -175,6 +252,22 @@ const HIDDEN_FIELDS = [
   "purchaseLogId",
 ];
 
+/**
+ * COMPONENT MODAL CHI TIẾT:
+ * Hiển thị chi tiết của transaction hoặc withdraw request trong popup
+ *
+ * PROPS:
+ * - isOpen: Boolean kiểm soát hiển thị modal (true/false)
+ * - onClose: Hàm đóng modal (set selectedItem = null)
+ * - data: Dữ liệu chi tiết của item được chọn
+ * - type: Loại modal ('transaction' hoặc 'withdraw') để hiển thị title phù hợp
+ *
+ * UI STRUCTURE:
+ * 1. Header với tiêu đề và mã ID chính
+ * 2. Card hiển thị số tiền và thời gian
+ * 3. Bảng chi tiết với các field từ metadata
+ * 4. Nút đóng modal
+ */
 const DetailModal = ({
   isOpen,
   onClose,
@@ -186,11 +279,13 @@ const DetailModal = ({
   data: any;
   type: "transaction" | "withdraw";
 }) => {
+  // Early return nếu modal không mở hoặc không có data
   if (!isOpen || !data) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative animate-in zoom-in-95 duration-200">
+        {/* Nút đóng modal (X) ở góc phải */}
         <button
           onClick={onClose}
           className="absolute right-4 top-4 p-2 rounded-full hover:bg-[var(--muted)] text-[var(--muted-foreground)] transition-colors"
@@ -199,7 +294,7 @@ const DetailModal = ({
         </button>
 
         <div className="p-6 space-y-6">
-          {/* HEADER MODAL */}
+          {/* HEADER MODAL với tiêu đề và mã ID */}
           <div className="border-b border-[var(--border)] pb-4">
             <h2 className="text-2xl font-bold text-[var(--primary)]">
               {type === "transaction"
@@ -214,7 +309,7 @@ const DetailModal = ({
             </p>
           </div>
 
-          {/* SỐ TIỀN & THỜI GIAN */}
+          {/* SỐ TIỀN & THỜI GIAN - hiển thị trong 2 ô card */}
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 bg-[var(--muted)]/30 rounded-lg border border-[var(--border)]">
               <span className="text-sm font-medium text-[var(--muted-foreground)] flex items-center gap-1">
@@ -237,10 +332,11 @@ const DetailModal = ({
                     data.amount > 0 ? "text-green-600" : "text-red-600"
                   }`}
                   iconSize={20}
-                  showPlus={type === "transaction"}
+                  showPlus={type === "transaction"} // Chỉ show + cho transaction (doanh thu)
                 />
               </div>
             </div>
+            {/* Card thời gian */}
             <div className="p-4 bg-[var(--muted)]/30 rounded-lg border border-[var(--border)] flex flex-col justify-center">
               <span className="text-sm font-medium text-[var(--muted-foreground)]">
                 Thời gian
@@ -250,8 +346,7 @@ const DetailModal = ({
               </div>
             </div>
           </div>
-
-          {/* BẢNG CHI TIẾT */}
+          {/* BẢNG CHI TIẾT CÁC FIELD TỪ METADATA */}
           <div className="space-y-3">
             <h3 className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
               <FileText className="w-5 h-5 text-[var(--primary)]" /> Thông tin
@@ -261,9 +356,9 @@ const DetailModal = ({
             <div className="bg-[var(--background)] rounded-lg border border-[var(--border)] overflow-hidden">
               <Table>
                 <TableBody>
-                  {/* --- PHẦN 1: TÊN CHƯƠNG & GIỌNG ĐỌC (Hiện Text thường) --- */}
+                  {/* --- PHẦN 1: TÊN CHƯƠNG & GIỌNG ĐỌC (Hiện Text thường không qua metadata) --- */}
 
-                  {/* 1.1 Tên Chương */}
+                  {/* 1.1 Tên Chương - nếu có trong data root (không phải metadata) */}
                   {data.chapterTitle && (
                     <TableRow className="hover:bg-transparent">
                       <TableCell className="font-bold text-[var(--muted-foreground)] w-[160px] bg-[var(--muted)]/20">
@@ -275,7 +370,7 @@ const DetailModal = ({
                     </TableRow>
                   )}
 
-                  {/* 1.2 Tên Giọng Đọc */}
+                  {/* 1.2 Tên Giọng Đọc (array) - nếu có trong data root */}
                   {data.voiceNames &&
                     Array.isArray(data.voiceNames) &&
                     data.voiceNames.length > 0 && (
@@ -289,38 +384,41 @@ const DetailModal = ({
                         </TableCell>
                       </TableRow>
                     )}
-
-                  {/* --- PHẦN 2: METADATA CÒN LẠI --- */}
+                  {/* --- PHẦN 2: METADATA CÒN LẠI (nếu có metadata object) --- */}
                   {data.metadata
                     ? Object.entries(data.metadata).map(([key, value]) => {
-                        // 1. Ẩn ID trong danh sách HIDDEN_FIELDS
+                        // 1. Ẩn ID trong danh sách HIDDEN_FIELDS (không cần hiển thị)
                         if (HIDDEN_FIELDS.includes(key)) return null;
 
                         // 2. Ẩn chapterTitle/voiceNames nếu lỡ trùng trong metadata (vì đã hiện ở trên rồi)
                         if (key === "chapterTitle" || key === "voiceNames")
                           return null;
 
-                        // 3. Hiển thị thông thường
+                        // 3. Hiển thị thông thường các field còn lại
                         return (
                           <TableRow key={key} className="hover:bg-transparent">
-                            {/* Cột Trái: Tên trường (Việt hóa) */}
+                            {/* Cột Trái: Tên trường (Việt hóa qua LABELS_MAP hoặc tự format) */}
                             <TableCell className="font-bold text-[var(--muted-foreground)] w-[160px] bg-[var(--muted)]/20">
                               {LABELS_MAP[key] ||
                                 key.replace(/([A-Z])/g, " $1").trim()}
+                              {/* Convert camelCase to space */}
                             </TableCell>
 
-                            {/* Cột Phải: Giá trị */}
+                            {/* Cột Phải: Giá trị (format tùy loại data) */}
                             <TableCell className="text-[var(--foreground)] break-all">
                               {(key === "grossAmount" ||
                                 key.toLowerCase().includes("price") ||
                                 key.toLowerCase().includes("cost")) &&
                               typeof value === "number" ? (
+                                // Hiển thị số tiền với APDisplay component
                                 <APDisplay value={Number(value)} />
-                              ) : Array.isArray(value) ? ( // Logic cũ giữ nguyên
+                              ) : Array.isArray(value) ? ( // Nếu là array -> join thành string
                                 value.join(", ")
                               ) : typeof value === "object" ? (
+                                // Nếu là object -> stringify (hiếm)
                                 JSON.stringify(value)
                               ) : (
+                                // Các trường hợp còn lại: convert to string
                                 String(value)
                               )}
                             </TableCell>
@@ -330,7 +428,7 @@ const DetailModal = ({
                     : null}
 
                   {/* --- PHẦN 3: THÔNG TIN RÚT TIỀN (Chỉ dùng nếu metadata không có) --- */}
-                  {/* Đoạn này giữ lại để fallback, nhưng thực tế metadata của bạn đã chứa thông tin Bank rồi */}
+                  {/* Fallback cho trường hợp cũ, thực tế metadata của bạn đã chứa thông tin Bank rồi */}
                   {type === "withdraw" && !data.metadata && (
                     <>
                       <TableRow>
@@ -369,7 +467,7 @@ const DetailModal = ({
               </Table>
             </div>
           </div>
-
+          {/* NÚT ĐÓNG MODAL */}
           <div className="flex justify-end pt-4">
             <Button
               onClick={onClose}
@@ -383,9 +481,20 @@ const DetailModal = ({
     </div>
   );
 };
-
+/**
+ * COMPONENT CHÍNH: AuthorRevenuePage
+ * Trang quản lý doanh thu và đối soát cho tác giả
+ */
 export default function AuthorRevenuePage() {
-  // --- STATE ---
+  // --- STATE QUẢN LÝ DỮ LIỆU CHÍNH ---
+
+  /**
+   * STATE DATA CHÍNH:
+   * - summary: Tổng quan doanh thu (RevenueSummary object từ API)
+   * - transactions: Danh sách giao dịch (mua chương, tạo giọng AI, đối soát)
+   * - withdrawHistory: Lịch sử yêu cầu đối soát (rút tiền)
+   * - loading: Trạng thái loading khi fetch data lần đầu
+   */
   const [summary, setSummary] = useState<RevenueSummary | null>(null);
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
   const [transactionPage, setTransactionPage] = useState(1);
@@ -395,8 +504,11 @@ export default function AuthorRevenuePage() {
   const [withdrawPage, setWithdrawPage] = useState(1);
   const [loading, setLoading] = useState(true);
 
-  const amountInputRef = useRef<HTMLInputElement>(null);
-
+  /**
+   * STATE MODAL CHI TIẾT:
+   * - selectedItem: Item được chọn để xem chi tiết (transaction hoặc withdraw)
+   * - modalType: Loại modal ('transaction' hoặc 'withdraw') để hiển thị đúng UI
+   */
   const [selectedItem, setSelectedItem] = useState<
     TransactionItem | WithdrawRequestItem | null
   >(null);
@@ -404,25 +516,46 @@ export default function AuthorRevenuePage() {
     null
   );
   [];
-
+  /**
+   * STATE BIỂU ĐỒ DOANH THU:
+   * - chartData: Dữ liệu cho biểu đồ line chart (doanh thu theo ngày)
+   * Format: [{ date: "dd/mm", revenue: number }, ...]
+   */
   const [chartData, setChartData] = useState<
     { date: string; revenue: number }[]
   >([]);
 
-  // Pagination State
+  /**
+   * STATE PAGINATION CHO BẢNG:
+   * - txPage: Trang hiện tại của bảng transactions
+   * - wdPage: Trang hiện tại của bảng withdraws
+   * - itemsPerPage: Số item mỗi trang (mặc định 10)
+   */
   const [txPage, setTxPage] = useState(1);
   const [wdPage, setWdPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Modal State
-
-  // Form Withdraw State
+  /**
+   * STATE FORM RÚT TIỀN (WITHDRAW REQUEST):
+   * - withdrawAmount: Số tiền muốn rút (đã format có dấu chấm)
+   * - bankName: Tên ngân hàng (VD: Vietcombank, MB Bank)
+   * - bankAccount: Số tài khoản ngân hàng
+   * - accountHolder: Tên chủ tài khoản (viết hoa không dấu)
+   * - commitmentText: Lời cam kết của tác giả
+   * - isSubmitting: Trạng thái đang submit form (disable button)
+   * - amountInputRef: Ref đến input số tiền để điều khiển cursor
+   */
+  const amountInputRef = useRef<HTMLInputElement>(null);
   const [withdrawAmount, setWithdrawAmount] = useState<number | string>("");
   const [bankName, setBankName] = useState("");
   const [bankAccount, setBankAccount] = useState("");
   const [accountHolder, setAccountHolder] = useState("");
   const [commitmentText, setCommitmentText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  /**
+   * HELPER XỬ LÝ LỖI API (giống các file khác):
+   * Xử lý error response từ backend với ưu tiên: details -> message -> fallback
+   */
   const handleApiError = (error: any, defaultMessage: string) => {
     // 1. Check lỗi Validation/Logic từ Backend
     if (error.response && error.response.data && error.response.data.error) {
@@ -452,70 +585,106 @@ export default function AuthorRevenuePage() {
   };
   // -------------------
   // --- DATA FETCHING ---
+
+  /**
+   * HÀM FETCH TẤT CẢ DỮ LIỆU (tổng quan, giao dịch, đối soát):
+   * 1. Lấy tổng quan doanh thu (summary)
+   * 2. Lấy lịch sử giao dịch (transactions) - lấy nhiều (200) để tính biểu đồ
+   * 3. Tính toán dữ liệu cho biểu đồ từ transactions
+   * 4. Lấy lịch sử yêu cầu đối soát (withdrawHistory)
+   *
+   * LOGIC TÍNH BIỂU ĐỒ:
+   * - Chỉ tính các giao dịch có amount > 0 (doanh thu, không tính chi)
+   * - Gom nhóm giao dịch theo ngày (formatShortDate)
+   * - Tính tổng revenue cho mỗi ngày
+   * - Sort theo thời gian tăng dần
+   */
   const fetchAllData = async () => {
     try {
-      setLoading(true);
-
+      setLoading(true); // Bắt đầu loading
+      // 1. Lấy tổng quan doanh thu
       const summaryRes = await authorRevenueService.getSummary();
       setSummary(summaryRes.data);
-
+      // 2. Lấy lịch sử giao dịch (lấy nhiều item để tính biểu đồ)
       const transRes = await authorRevenueService.getTransactions({
-        PageSize: 200,
+        PageSize: 200, // Lấy 200 item để đủ data cho chart
       });
       setTransactions(transRes.data.items);
-
-      const chartMap = new Map<string, number>();
+      // 3. Tính toán dữ liệu biểu đồ từ transactions
+      const chartMap = new Map<string, number>(); // Map: dateString -> totalRevenue
+      // Sort transactions theo thời gian tăng dần (cũ -> mới)
       const sortedTrans = [...transRes.data.items].sort(
         (a, b) =>
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       );
+      // Duyệt qua từng transaction
       sortedTrans.forEach((item) => {
         if (item.amount > 0) {
-          const dateKey = formatShortDate(item.createdAt);
+          // Chỉ tính doanh thu (amount > 0), không tính chi
+          const dateKey = formatShortDate(item.createdAt); // "dd/mm"
           const currentVal = chartMap.get(dateKey) || 0;
-          chartMap.set(dateKey, currentVal + item.amount);
+          chartMap.set(dateKey, currentVal + item.amount); // Cộng dồn theo ngày
         }
       });
+      // Convert Map thành array cho Recharts
       setChartData(
         Array.from(chartMap.entries()).map(([date, revenue]) => ({
           date,
           revenue,
         }))
       );
-
+      // 4. Lấy lịch sử yêu cầu đối soát
       const withdrawRes = await authorRevenueService.getWithdrawHistory();
+      // Sort withdraw history mới -> cũ (theo createdAt giảm dần)
       setWithdrawHistory(
         withdrawRes.data.sort(
           (a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
       );
-      // } catch (error) {
-      //   console.error("Lỗi tải dữ liệu doanh thu:", error);
-      //   toast.error("Không thể tải dữ liệu.");
-      // } finally {
-      //   setLoading(false);
-      // }
     } catch (error: any) {
       console.error("Lỗi tải dữ liệu doanh thu:", error);
       // --- DÙNG HELPER ---
       handleApiError(error, "Không thể tải dữ liệu.");
     } finally {
-      setLoading(false);
+      setLoading(false); // Luôn tắt loading
     }
   };
-
+  /**
+   * EFFECT FETCH DATA KHI COMPONENT MOUNT:
+   * Chạy 1 lần khi component được mount lần đầu tiên
+   * Dependency array rỗng [] -> chỉ chạy 1 lần
+   */
   useEffect(() => {
     fetchAllData();
   }, []);
 
-  // --- ACTIONS ---
+  // --- ACTIONS (USER INTERACTIONS) ---
+
+  /**
+   * HÀM XỬ LÝ RÚT TIỀN (WITHDRAW REQUEST):
+   * @param e - React.FormEvent từ form submit
+   *
+   * FLOW XỬ LÝ CHI TIẾT:
+   * 1. Ngăn chặn form submit default behavior
+   * 2. Parse số tiền từ chuỗi format (bỏ dấu chấm)
+   * 3. Validate input:
+   *    - Số tiền tối thiểu 1.000 dias
+   *    - Số tiền không vượt quá số dư khả dụng
+   *    - Thông tin ngân hàng đầy đủ
+   *    - Cam kết không rỗng
+   * 4. Gọi API requestWithdraw với thông tin đã validate
+   * 5. Nếu thành công: reset form, refetch data, reset pagination
+   * 6. Xử lý lỗi với helper handleApiError
+   */
   const handleWithdraw = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!summary) return;
+    e.preventDefault(); // Ngăn reload page
+    if (!summary) return; // Nếu chưa có summary -> không làm gì
+    // Parse số tiền từ chuỗi format (bỏ dấu chấm phân cách)
     const rawAmountStr = String(withdrawAmount).replace(/\./g, "");
     const amountNum = Number(rawAmountStr);
 
+    // Validate số tiền
     if (!amountNum || amountNum < 1000) {
       toast.error(
         <div className="flex items-center gap-1">
@@ -528,6 +697,7 @@ export default function AuthorRevenuePage() {
       );
       return;
     }
+    // Kiểm tra số dư khả dụng
     if (amountNum > summary.revenueBalance) {
       toast.error(
         <div className="flex items-center gap-1">
@@ -540,61 +710,36 @@ export default function AuthorRevenuePage() {
       );
       return;
     }
+    // Validate thông tin ngân hàng
     if (!bankName || !bankAccount || !accountHolder) {
       toast.error("Vui lòng điền đầy đủ thông tin ngân hàng.");
       return;
     }
+    // Validate cam kết
     if (!commitmentText.trim()) {
       toast.error("Vui lòng nhập nội dung cam kết.");
       return;
     }
 
     try {
-      setIsSubmitting(true);
+      setIsSubmitting(true); // Bắt đầu submit
+      // Gọi API requestWithdraw với payload đầy đủ
       await authorRevenueService.requestWithdraw({
         amount: amountNum,
         bankName,
         bankAccountNumber: bankAccount,
-        accountHolderName: accountHolder.toUpperCase(),
+        accountHolderName: accountHolder.toUpperCase(), // Luôn uppercase
         commitment: commitmentText,
       });
 
       toast.success("Gửi yêu cầu đối soát thành công!");
+      // Reset form sau khi thành công
       setWithdrawAmount("");
       setCommitmentText("");
+      // Refetch data để cập nhật UI (số dư, lịch sử)
       await fetchAllData();
-      setWdPage(1);
-      // } catch (error: any) {
-      //   // Log lỗi để debug nếu cần
-      //   console.error("Lỗi rút tiền:", error);
-
-      //   // Lấy data response từ server
-      //   const resData = error.response?.data;
-      //   const status = error.response?.status;
-
-      //   // --- BẮT LỖI 409 (CONFLICT) ---
-      //   if (status === 409) {
-      //     // Kiểm tra mã lỗi cụ thể từ server
-      //     if (resData?.error?.code === "WithdrawPending") {
-      //       toast.error(
-      //         "Bạn đang có yêu cầu rút tiền đang chờ xử lý. Vui lòng đợi yêu cầu trước hoàn tất."
-      //       );
-      //       return;
-      //     }
-      //   }
-
-      //   // --- BẮT CÁC LỖI KHÁC ---
-      //   // Lưu ý: Cấu trúc JSON của bạn là { error: { message: "..." } }
-      //   // Nên cần lấy resData?.error?.message trước
-      //   const msg =
-      //     resData?.error?.message || // Lấy message trong object error
-      //     resData?.message || // Lấy message lỡ như nó nằm ngoài
-      //     "Có lỗi xảy ra, vui lòng thử lại.";
-
-      //   toast.error(msg);
-      // } finally {
-      //   setIsSubmitting(false);
-      // }
+      // Reset về trang 1 của bảng withdraws
+      setWdPage(1); // Reset về trang 1
     } catch (error: any) {
       console.error("Lỗi :", error);
       // --- DÙNG HELPER ---
@@ -604,38 +749,67 @@ export default function AuthorRevenuePage() {
       setIsSubmitting(false);
     }
   };
+  /**
+   * HÀM XÁC NHẬN ĐÃ NHẬN TIỀN (CHO BILL ĐÃ APPROVED):
+   * @param requestId - ID của yêu cầu đối soát (withdraw request)
+   *
+   * MỤC ĐÍCH: Sau khi admin approved và chuyển tiền, tác giả cần xác nhận đã nhận tiền
+   * để hoàn tất quy trình và cập nhật trạng thái thành "confirmed"
+   *
+   * FLOW:
+   * 1. Gọi API confirmWithdraw với requestId
+   * 2. Nếu thành công: thông báo, refetch data
+   * 3. Xử lý lỗi nếu có
+   */
   const handleConfirmReceipt = async (requestId: string) => {
     try {
-      setLoading(true);
+      setLoading(true); // Bật loading toàn page
       await authorRevenueService.confirmWithdraw(requestId);
 
       toast.success("Đã xác nhận thành công! Cảm ơn bạn.");
 
-      // Tải lại dữ liệu để cập nhật danh sách
+      // Tải lại dữ liệu để cập nhật danh sách (trạng thái từ approved -> confirmed)
       await fetchAllData();
     } catch (error: any) {
       console.error("Lỗi xác nhận:", error);
       handleApiError(error, "Xác nhận thất bại, vui lòng thử lại.");
     } finally {
-      setLoading(false);
+      setLoading(false); // Tắt loading
     }
   };
 
-  // --- PAGINATION COMPONENT ---
+  // --- PAGINATION COMPONENT (TÁI SỬ DỤNG) ---
+
+  /**
+   * COMPONENT PAGINATION TÁI SỬ DỤNG CHO CẢ 2 BẢNG:
+   * @param currentPage - Trang hiện tại
+   * @param setPage - Hàm set state trang (setTxPage hoặc setWdPage)
+   * @param totalItems - Tổng số item trong danh sách
+   *
+   * LOGIC HIỂN THỊ PAGINATION THÔNG MINH:
+   * - Hiển thị tối đa 5 nút trang (hoặc ít hơn nếu tổng trang ít)
+   * - Luôn hiển thị trang 1 và trang cuối cùng
+   * - Hiển thị trang hiện tại và 2 trang xung quanh (current-1, current+1)
+   * - Dùng "..." cho các trang bị ẩn giữa
+   * - Có nút previous/next với disable state
+   */
   const renderPagination = (
     currentPage: number,
     setPage: (p: number) => void,
     totalItems: number
   ) => {
     const totalPages = Math.ceil(totalItems / itemsPerPage);
-    if (totalPages <= 1) return null;
+    if (totalPages <= 1) return null; // Không hiển thị nếu chỉ có 1 trang
 
     return (
       <div className="flex items-center justify-between mt-4 py-2 border-t border-[var(--border)] pt-4">
+        {/* Hiển thị thông tin trang hiện tại/tổng */}
         <p className="text-xs text-[var(--muted-foreground)]">
           Trang {currentPage} / {totalPages}
         </p>
+        {/* Các nút trang */}
         <div className="flex items-center space-x-1">
+          {/* Nút Previous */}
           <Button
             variant="outline"
             size="icon"
@@ -645,7 +819,10 @@ export default function AuthorRevenuePage() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
+          {/* Các nút số trang */}
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) =>
+            // Logic hiển thị thông minh:
+            // - Hiển thị nếu: tổng trang <=5 HOẶC trang 1 HOẶC trang cuối HOẶC trang trong khoảng currentPage±1
             totalPages <= 5 ||
             page === 1 ||
             page === totalPages ||
@@ -664,11 +841,13 @@ export default function AuthorRevenuePage() {
                 {page}
               </Button>
             ) : page === 2 || page === totalPages - 1 ? (
+              // Hiển thị "..." cho khoảng trống
               <span key={page} className="px-1 text-[var(--muted-foreground)]">
                 ...
               </span>
             ) : null
           )}
+          {/* Nút Next */}
           <Button
             variant="outline"
             size="icon"
@@ -684,8 +863,28 @@ export default function AuthorRevenuePage() {
   };
 
   // --- RENDER HELPERS ---
+
+  /**
+   * HELPER HIỂN THỊ BADGE TRẠNG THÁI (CHO CẢ TRANSACTION VÀ WITHDRAW):
+   * @param status - Trạng thái cần hiển thị (string)
+   * @returns Component badge với màu sắc, icon và text phù hợp
+   *
+   * PHÂN LOẠI STATUS:
+   * A. Transaction Types (type field):
+   *    - withdraw_release: Hoàn lại vào (màu đỏ) - tiền được trả lại vào ví
+   *    - purchase: Cộng vào (màu xanh lá) - doanh thu từ mua chương
+   *    - voice_generation: Tạo giọng đọc AI (màu xanh dương) - chi phí tạo giọng AI
+   *    - withdraw_reserve: Luân chuyển khỏi (màu vàng) - tiền bị giữ khi request withdraw
+   *
+   * B. Withdraw Request Status (status field):
+   *    - approved: Thành công (màu xanh lá) - admin đã approved và chuyển tiền
+   *    - rejected: Từ chối (màu đỏ) - admin từ chối yêu cầu
+   *    - pending: Đang xử lý (màu cam) - chờ admin duyệt
+   *    - confirmed: Đã ký xác nhận (xanh lá đậm) - tác giả đã xác nhận nhận tiền
+   */
   const renderStatusBadge = (status: string) => {
     switch (status?.toLowerCase()) {
+      // --- TRANSACTION TYPES ---
       case "withdraw_release":
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium  bg-red-100 text-red-800 border border-red-200">
@@ -711,7 +910,7 @@ export default function AuthorRevenuePage() {
             <Clock className="w-3 h-3 mr-1" /> Luân chuyển khỏi
           </span>
         );
-      // 2. Trạng thái yêu cầu đối soát (Withdraw Request) - MỚI THÊM
+      // --- WITHDRAW REQUEST STATUS ---
       case "approved":
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
@@ -748,7 +947,15 @@ export default function AuthorRevenuePage() {
     }
   };
 
-  // Get current slices
+  // --- PAGINATION CALCULATIONS ---
+
+  /**
+   * TÍNH TOÁN DỮ LIỆU HIỆN TẠI CHO PHÂN TRANG:
+   * - currentTransactions: Slice transactions array theo trang hiện tại
+   * - currentWithdraws: Slice withdrawHistory array theo trang hiện tại
+   *
+   * CÔNG THỨC: (page-1)*itemsPerPage đến page*itemsPerPage
+   */
   const currentTransactions = transactions.slice(
     (txPage - 1) * itemsPerPage,
     txPage * itemsPerPage
@@ -758,6 +965,7 @@ export default function AuthorRevenuePage() {
     wdPage * itemsPerPage
   );
 
+  // Hiển thị loading state khi đang fetch data lần đầu
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -767,10 +975,10 @@ export default function AuthorRevenuePage() {
       </div>
     );
   }
-
+  // --- MAIN RENDER ---
   return (
     <div className="space-y-6 relative pb-10">
-      {/* Modal */}
+      {/* Modal chi tiết (hidden khi không có selectedItem) */}
       <DetailModal
         isOpen={!!selectedItem}
         onClose={() => setSelectedItem(null)}
@@ -778,7 +986,7 @@ export default function AuthorRevenuePage() {
         type={modalType || "transaction"}
       />
 
-      {/* HEADER */}
+      {/* HEADER với tiêu đề và thông tin hạng tác giả */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold text-[var(--primary)]">
@@ -789,6 +997,7 @@ export default function AuthorRevenuePage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Badge hiển thị hạng tác giả (rankName từ API) */}
           <div className="flex items-center px-4 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-sm">
             <span className="text-sm font-medium text-[var(--muted-foreground)] mr-2">
               Hạng:
@@ -797,6 +1006,7 @@ export default function AuthorRevenuePage() {
               {summary?.rankName || "N/A"}
             </span>
           </div>
+          {/* Badge hiển thị tỷ lệ chia sẻ (rankRewardRate từ API) */}
           <div className="flex items-center px-4 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-sm">
             <span className="text-sm font-medium text-[var(--muted-foreground)] mr-2">
               Chia sẻ:
@@ -808,7 +1018,10 @@ export default function AuthorRevenuePage() {
         </div>
       </div>
 
-      {/* STAT CARDS */}
+      {/* 
+        STAT CARDS (4 ô thống kê chính) - Grid responsive
+        Hiển thị: Số dias khả dụng, Đang chờ xử lý, Đã đối soát thành công, Tổng lũy kế
+      */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
           {
@@ -873,9 +1086,12 @@ export default function AuthorRevenuePage() {
         ))}
       </div>
 
-      {/* NEW LAYOUT: WITHDRAW FORM (LEFT) - CHART (RIGHT) */}
+      {/* 
+        NEW LAYOUT: WITHDRAW FORM (LEFT) - BILL SECTION (RIGHT)
+        Grid 12 cột: Form chiếm 5 cột, Bills chiếm 7 cột trên desktop
+      */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* WITHDRAW FORM */}
+        {/* WITHDRAW FORM - Cột trái (5/12) */}
         <Card className="lg:col-span-5 border border-[var(--border)] bg-[var(--card)] shadow-md h-fit">
           <CardHeader className="pb-3">
             <CardTitle className="text-[var(--primary)] flex items-center gap-2">
@@ -887,6 +1103,7 @@ export default function AuthorRevenuePage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleWithdraw} className="space-y-4">
+              {/* Input số tiền với format tự động */}
               <div className="space-y-1.5">
                 <Label>
                   Số lượng{" "}
@@ -918,6 +1135,7 @@ export default function AuthorRevenuePage() {
                   }}
                   className="font-mono text-lg tracking-wider text-right bg-[var(--background)] dark:border-[#f0ead6]"
                 />
+                {/* Hiển thị số dư khả dụng */}
                 <div className="text-[10px] text-right text-[var(--muted-foreground)]">
                   Khả dụng:{" "}
                   <APDisplay
@@ -926,7 +1144,7 @@ export default function AuthorRevenuePage() {
                   />
                 </div>
               </div>
-
+              {/* Input thông tin ngân hàng */}
               <div className="space-y-1.5">
                 <Label>
                   Tên Ngân Hàng <span className="text-red-500 ml-1">*</span>
@@ -977,7 +1195,7 @@ export default function AuthorRevenuePage() {
                   className="bg-[var(--background)] dark:border-[#f0ead6] italic"
                 />
               </div>
-
+              {/* Nút submit form */}
               <Button
                 type="submit"
                 className="w-full bg-[var(--primary)] hover:bg-[color-mix(in srgb,var(--primary)85%,black)] text-[var(--primary-foreground)] mt-2"
@@ -989,7 +1207,7 @@ export default function AuthorRevenuePage() {
           </CardContent>
         </Card>
 
-        {/* BILL */}
+        {/* BILL SECTION - Cột phải (7/12) hiển thị các bill đã approved cần xác nhận */}
         <Card className="lg:col-span-7 border-none shadow-none bg-transparent flex flex-col h-full">
           {/* Header nhỏ phía trên */}
           <div className="mb-4 flex items-center justify-between px-1">
@@ -1002,7 +1220,7 @@ export default function AuthorRevenuePage() {
                 Danh sách các khoản thanh toán đã được duyệt chi.
               </p>
             </div>
-            {/* Badge đếm số lượng */}
+            {/* Badge đếm số lượng bill cần xác nhận (status = approved) */}
             {withdrawHistory.filter((wd) => wd.status === "approved").length >
               0 && (
               <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse">
@@ -1014,10 +1232,11 @@ export default function AuthorRevenuePage() {
               </span>
             )}
           </div>
-
+          {/* Danh sách bills - scrollable nếu nhiều */}
           <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-6">
             {withdrawHistory.filter((wd) => wd.status === "approved").length >
             0 ? (
+              // Có bills cần xác nhận
               withdrawHistory
                 .filter((wd) => wd.status === "approved")
                 .map((wd) => (
@@ -1025,7 +1244,7 @@ export default function AuthorRevenuePage() {
                     key={wd.requestId}
                     className="group relative bg-white dark:bg-[#1e1e1e] border-2 border-dashed border-green-300 dark:border-green-800 rounded-xl p-0 overflow-hidden shadow-sm hover:shadow-md transition-all"
                   >
-                    {/* --- TOP: HEADER BILL --- */}
+                    {/* --- TOP: HEADER BILL với trạng thái APPROVED --- */}
                     <div className="bg-green-50 dark:bg-green-900/20 p-4 border-b border-dashed border-green-200 dark:border-green-800 flex justify-between items-start">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
@@ -1046,9 +1265,9 @@ export default function AuthorRevenuePage() {
                       </div>
                     </div>
 
-                    {/* --- MIDDLE: BILL BODY --- */}
+                    {/* --- MIDDLE: BILL BODY với thông tin chi tiết --- */}
                     <div className="p-5 space-y-4">
-                      {/* Thông tin người nhận (Bank) */}
+                      {/* Thông tin người nhận (Bank) grid 2 cột */}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <p className="text-[10px] uppercase text-[var(--muted-foreground)] font-semibold tracking-wider">
@@ -1069,7 +1288,7 @@ export default function AuthorRevenuePage() {
                         </div>
                       </div>
 
-                      {/* Admin Note (Nếu có) */}
+                      {/* Admin Note (Nếu có) - hiển thị ghi chú từ moderator */}
                       {wd.moderatorNote && (
                         <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 rounded-lg p-3">
                           <p className="text-[10px] text-orange-600 dark:text-orange-400 font-bold uppercase mb-1 flex items-center gap-1">
@@ -1082,10 +1301,10 @@ export default function AuthorRevenuePage() {
                         </div>
                       )}
 
-                      {/* Đường kẻ đứt ngăn cách tổng tiền */}
+                      {/* Đường kẻ đứt ngăn cách */}
                       <div className="border-t-2 border-dashed border-[var(--border)] my-2"></div>
 
-                      {/* --- BOTTOM: TOTAL & ACTION --- */}
+                      {/* --- BOTTOM: TOTAL & ACTION BUTTON --- */}
                       <div className="flex items-end justify-between">
                         <div>
                           <p className="text-[10px] uppercase text-[var(--muted-foreground)] font-semibold mb-0.5">
@@ -1099,7 +1318,7 @@ export default function AuthorRevenuePage() {
                             />
                           </div>
                         </div>
-
+                        {/* Nút xác nhận đã nhận tiền */}
                         <Button
                           onClick={() => handleConfirmReceipt(wd.requestId)}
                           className="bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-200 dark:shadow-none transition-all active:scale-95"
@@ -1137,7 +1356,7 @@ export default function AuthorRevenuePage() {
           </div>
         </Card>
       </div>
-      {/* TABLES SECTION (TABS) */}
+      {/* TABLES SECTION (TABS) cho Lịch sử giao dịch và Lịch sử đối soát */}
       <Tabs defaultValue="transactions" className="w-full">
         <TabsList className="grid w-full grid-cols-2 bg-[var(--muted)] mb-6">
           <TabsTrigger value="transactions">
@@ -1162,7 +1381,7 @@ export default function AuthorRevenuePage() {
             <CardContent>
               <Table>
                 <TableHeader>
-                  {/* FIX: Đưa màu nền vào TableRow để phủ kín cả hàng (kể cả ô rỗng góc phải) */}
+                  {/* Table header với màu nền đặc biệt */}
                   <TableRow className="bg-[var(--muted)]/50 hover:bg-[var(--muted)]/50 border-b border-[var(--border)]">
                     <TableHead className="w-[150px]">Thời gian</TableHead>
                     <TableHead>Loại GD</TableHead>
@@ -1170,7 +1389,7 @@ export default function AuthorRevenuePage() {
                       Mã giao dịch
                     </TableHead>
 
-                    {/* FIX: Căn lề phải chuẩn */}
+                    {/* Header cột số tiền với icon Gem */}
                     <TableHead className="text-right">
                       <div className="flex w-full items-center justify-end gap-1">
                         Số{" "}
@@ -1184,10 +1403,12 @@ export default function AuthorRevenuePage() {
                     </TableHead>
 
                     <TableHead className="w-[50px]"></TableHead>
+                    {/* Cột action (eye icon) */}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {currentTransactions.length > 0 ? (
+                    // Map qua các transaction của trang hiện tại
                     currentTransactions.map((tx) => (
                       <TableRow
                         key={tx.transactionId}
@@ -1205,9 +1426,10 @@ export default function AuthorRevenuePage() {
                         </TableCell>
 
                         <TableCell className="font-bold text-[var(--foreground)] text-right">
+                          {/* Hiển thị số tiền với dấu + nếu là doanh thu */}
                           <APDisplay value={tx.amount} showPlus={true} />
                         </TableCell>
-
+                        {/* Nút eye để xem chi tiết */}
                         <TableCell className="w-[50px]">
                           <Button
                             variant="ghost"
@@ -1224,6 +1446,7 @@ export default function AuthorRevenuePage() {
                       </TableRow>
                     ))
                   ) : (
+                    // Empty state khi không có giao dịch
                     <TableRow>
                       <TableCell
                         colSpan={5}
@@ -1276,6 +1499,7 @@ export default function AuthorRevenuePage() {
                 </TableHeader>
                 <TableBody>
                   {currentWithdraws.length > 0 ? (
+                    // Map qua các withdraw request của trang hiện tại
                     currentWithdraws.map((wd) => (
                       <TableRow
                         key={wd.requestId}
@@ -1295,6 +1519,7 @@ export default function AuthorRevenuePage() {
                         </TableCell>
                         <TableCell>{renderStatusBadge(wd.status)}</TableCell>
                         <TableCell>
+                          {/* Nút eye để xem chi tiết withdraw request */}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1310,6 +1535,7 @@ export default function AuthorRevenuePage() {
                       </TableRow>
                     ))
                   ) : (
+                    // Empty state khi không có yêu cầu nào
                     <TableRow>
                       <TableCell
                         colSpan={5}
@@ -1322,7 +1548,7 @@ export default function AuthorRevenuePage() {
                 </TableBody>
               </Table>
 
-              {/* Pagination for Withdraws */}
+              {/* Pagination cho Withdraws */}
               {renderPagination(wdPage, setWdPage, withdrawHistory.length)}
             </CardContent>
           </Card>

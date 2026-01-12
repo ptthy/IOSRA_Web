@@ -1,3 +1,5 @@
+//app/page.tsx
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -22,6 +24,24 @@ import {
 import { storyCatalogApi } from "@/services/storyCatalog";
 import { profileService } from "@/services/profileService"; // Import service lấy ví
 import type { Story, TopWeeklyStory } from "@/services/storyCatalog";
+/**
+ * HOMEPAGE - TRANG CHỦ
+ *
+ * MỤC ĐÍCH: Trang landing page chính của ứng dụng
+ * CHỨC NĂNG CHÍNH:
+ * 1. Hiển thị hero section (carousel/hero)
+ * 2. Hiển thị top truyện tuần (có rank badge)
+ * 3. Hiển thị truyện mới cập nhật
+ * 4. Hiển thị banner quảng cáo/upsell (nếu không phải premium)
+ * 5. Quản lý modal nạp tiền
+ * 6. Fetch và hiển thị số dư ví nếu đã đăng nhập
+ *
+ * FLOW DỮ LIỆU:
+ * 1. Fetch top weekly và latest stories khi trang load
+ * 2. Fetch số dư ví nếu user đã đăng nhập
+ * 3. Render các section với horizontal scroll
+ * 4. Xử lý click để điều hướng đến story detail
+ */
 
 export default function HomePage() {
   const router = useRouter();
@@ -41,7 +61,14 @@ export default function HomePage() {
   const weeklyScrollRef = useRef<HTMLDivElement | null>(null);
   const latestScrollRef = useRef<HTMLDivElement | null>(null);
 
-  // Hàm scroll
+  /**
+   * HÀM SCROLL HORIZONTAL
+   *
+   * LOGIC: Scroll container theo distance (pixel)
+   * - distance > 0: scroll sang phải
+   * - distance < 0: scroll sang trái
+   * - behavior: "smooth" để có hiệu ứng mượt
+   */
   const scrollWeeklyByDistance = (distance: number) => {
     if (!weeklyScrollRef.current) return;
     weeklyScrollRef.current.scrollBy({ left: distance, behavior: "smooth" });
@@ -52,7 +79,20 @@ export default function HomePage() {
     latestScrollRef.current.scrollBy({ left: distance, behavior: "smooth" });
   };
 
-  // 1. Fetch Dữ liệu Truyện (Chạy 1 lần khi load trang)
+  /**
+   * EFFECT 1: FETCH DỮ LIỆU TRUYỆN
+   *
+   * MỤC ĐÍCH: Load top weekly và latest stories khi trang load
+   *
+   * LOGIC:
+   * 1. Set loading = true
+   * 2. Gọi 2 API song song (Promise.all) để tối ưu performance
+   * 3. Xử lý response: Kiểm tra Array.isArray để đảm bảo type safety
+   * 4. Xử lý error: Set error message
+   * 5. Set loading = false
+   *
+   * CHẠY KHI: [] (chỉ chạy 1 lần khi component mount)
+   */
   useEffect(() => {
     const loadStories = async () => {
       setLoading(true);
@@ -76,7 +116,21 @@ export default function HomePage() {
     loadStories();
   }, []);
 
-  // 2. Fetch Số dư Ví (Chạy khi người dùng đã đăng nhập)
+  /**
+   * EFFECT 2: FETCH SỐ DƯ VÍ
+   *
+   * MỤC ĐÍCH: Lấy số dư kim cương của user nếu đã đăng nhập
+   *
+   * LOGIC:
+   * 1. Chỉ fetch nếu isAuthenticated = true
+   * 2. Gọi API getWallet từ profileService
+   * 3. Cập nhật state balance
+   * 4. Nếu không đăng nhập: reset balance về 0
+   *
+   * CHẠY KHI: isAuthenticated thay đổi
+   * - Khi user login/logout
+   * - Khi trang load và đã có session
+   */
   useEffect(() => {
     const loadWallet = async () => {
       if (isAuthenticated) {
@@ -96,12 +150,18 @@ export default function HomePage() {
 
     loadWallet();
   }, [isAuthenticated]); // Chạy lại khi trạng thái đăng nhập thay đổi
-
+  /**
+   * HÀM ĐIỀU HƯỚNG
+   *
+   * LOGIC:
+   * - Nếu có storyId: điều hướng đến trang story detail
+   * - Nếu không có: điều hướng đến trang chung (search)
+   */
   const handleNavigate = (page: string, storyId?: string) => {
     if (storyId) router.push(`/${page}/${storyId}`);
     else router.push(`/${page}`);
   };
-
+  // RENDER LOADING STATE
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center font-sans">
@@ -109,7 +169,7 @@ export default function HomePage() {
       </div>
     );
   }
-
+  // RENDER ERROR STATE
   if (error) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center font-sans">
@@ -120,20 +180,12 @@ export default function HomePage() {
     );
   }
 
-  // Style cho nút điều hướng
+  // Style cho nút điều hướng carousel (ẩn/hiện khi hover)
   const navigationButtonClass =
     "absolute top-1/2 -translate-y-1/2 z-20 w-10 h-10 flex items-center justify-center rounded-full " +
     "bg-card border border-border shadow-lg text-foreground/80 hover:text-primary hover:bg-accent hover:scale-110 transition-all " +
     "opacity-0 group-hover/carousel:opacity-100 disabled:opacity-0 cursor-pointer";
 
-  // return (
-  //   <div className="min-h-screen bg-background font-sans">
-  //     {/* Hero Carousel */}
-  //     <div className="animate-fade-in pt-4">
-  //       <div className="container mx-auto px-4">
-  //         <HeroCarousel />
-  //       </div>
-  //     </div>
   return (
     <div className="min-h-screen bg-background font-sans">
       {/* Hero Section - Updated  */}
@@ -164,7 +216,7 @@ export default function HomePage() {
               <ChevronRight className="h-3 w-3 md:h-4 md:w-4 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
-
+          {/* Carousel với nút điều hướng */}
           <div className="relative group/carousel">
             <button
               aria-label="Previous"
@@ -182,7 +234,7 @@ export default function HomePage() {
               <ChevronRight className="h-6 w-6" />
             </button>
 
-            {/* List Top Weekly */}
+            {/* List Top Weekly với horizontal scroll */}
             <div
               ref={weeklyScrollRef}
               className="flex overflow-x-auto gap-4 pb-4 pt-2 px-1 min-h-[380px] scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
@@ -204,7 +256,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Secondary Banner */}
+      {/* Secondary Banner - Chỉ hiển thị nếu không phải premium user */}
       {!isPremium && (
         <div className="container mx-auto px-4">
           <SecondaryBanner onClick={() => setShowTopUpModal(true)} />
@@ -233,7 +285,7 @@ export default function HomePage() {
               <ChevronRight className="h-3 w-3 md:h-4 md:w-4 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
-
+          {/* Carousel tương tự cho latest stories */}
           <div className="relative group/carousel">
             <button
               aria-label="Previous"

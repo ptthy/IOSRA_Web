@@ -1,5 +1,22 @@
 //app/email-change-modal/page.tsx
-
+/**
+ * FILE MÔ TẢ: Trang thay đổi email người dùng (2 bước)
+ *
+ * QUY TRÌNH 2 BƯỚC:
+ * 1. Nhập email mới → Gửi OTP đến email mới
+ * 2. Nhập OTP xác thực → Cập nhật email trong hệ thống
+ *
+ * CHỨC NĂNG:
+ * - Xác thực email hiện tại
+ * - Gửi OTP bảo mật đến email mới
+ * - Xác thực OTP và cập nhật thông tin user
+ * - Redirect về profile sau khi thành công
+ *
+ * LIÊN KẾT VỚI:
+ * - AuthContext: Lấy user hiện tại, cập nhật email mới
+ * - profileService: API thay đổi email
+ * - Next Router: Điều hướng trang
+ */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -12,22 +29,22 @@ import { useAuth } from "@/context/AuthContext";
 import { ArrowLeft, Mail, ShieldCheck, Clock, RefreshCw } from "lucide-react";
 
 import { profileService } from "@/services/profileService";
-
+// Component chính của trang thay đổi email
 export default function EmailChangePage() {
   const router = useRouter();
   const { user, updateUser, isLoading: authIsLoading } = useAuth();
-
+  // State quản lý các bước trong quy trình thay đổi email
   const [step, setStep] = useState<"email" | "otp">("email");
   const [newEmail, setNewEmail] = useState("");
-  const [otp, setOtp] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [countdown, setCountdown] = useState(0);
+  const [otp, setOtp] = useState(""); // OTP 6 số
+  const [isLoading, setIsLoading] = useState(false); // Loading khi gọi API
+  const [countdown, setCountdown] = useState(0); // Đếm ngược thời gian hiệu lực OTP
   const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(
     null
   );
-  const [imageError, setImageError] = useState(false);
+  const [imageError, setImageError] = useState(false); // Lỗi tải ảnh background
   const handleApiError = (error: any, defaultMessage: string) => {
-    // 1. Check lỗi Validation/Logic từ Backend
+    // 1. Check lỗi Validation/Logic từ Backend (cấu trúc nested)
     if (error.response && error.response.data && error.response.data.error) {
       const { message, details } = error.response.data.error;
 
@@ -42,30 +59,47 @@ export default function EmailChangePage() {
         }
       }
 
-      // Message từ Backend
+      // Hiển thị message chung từ Backend (nếu không có details)
       if (message) {
         toast.error(message);
         return;
       }
     }
 
-    // 2. Fallback
+    // 2. Fallback Hiển thị lỗi mạng hoặc lỗi không xác định
     const fallbackMsg = error.response?.data?.message || defaultMessage;
     toast.error(fallbackMsg);
   };
+  // Base64 encoded SVG fallback image khi ảnh Unsplash lỗi
   const ERROR_IMG_SRC =
     "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==";
 
+  /**
+   * useEffect: Kiểm tra authentication và cleanup timer
+   * Dependencies: [user, authIsLoading, router, timerInterval]
+   *
+   * LOGIC:
+   * 1. Nếu không có user (chưa login) → redirect đến /login
+   * 2. Cleanup: Xóa timer khi component unmount để tránh memory leak
+   */
   useEffect(() => {
+    // Nếu không có user (chưa đăng nhập) thì redirect về trang đăng nhập
     if (!authIsLoading && !user) {
       router.push("/login");
     }
-
+    // Cleanup: Xóa timer interval khi component unmount
     return () => {
       if (timerInterval) clearInterval(timerInterval);
     };
   }, [user, authIsLoading, router, timerInterval]);
-
+  /**
+   * HÀM GỬI OTP ĐẾN EMAIL MỚI
+   * Flow:
+   * 1. Validate email format
+   * 2. Gọi API requestEmailChange(email)
+   * 3. Nếu thành công: chuyển sang step "otp", bắt đầu countdown 5 phút
+   * 4. Nếu lỗi: hiển thị thông báo chi tiết
+   */
   const handleSendOTP = async () => {
     if (!newEmail || !newEmail.includes("@")) {
       toast.error("Vui lòng nhập email hợp lệ");
@@ -73,14 +107,16 @@ export default function EmailChangePage() {
     }
 
     setIsLoading(true);
+    // Xóa timer cũ nếu có
     if (timerInterval) clearInterval(timerInterval);
 
     try {
+      // Gọi API gửi yêu cầu thay đổi email
       await profileService.requestEmailChange(newEmail);
 
       toast.success("Mã OTP đã được gửi đến email mới");
-      setStep("otp");
-      setCountdown(300);
+      setStep("otp"); // Chuyển sang bước nhập OTP
+      setCountdown(300); // Đặt countdown 5 phút (300 giây)
 
       const timer = setInterval(() => {
         setCountdown((prev) => {
@@ -93,22 +129,24 @@ export default function EmailChangePage() {
         });
       }, 1000);
       setTimerInterval(timer);
-      // } catch (err: any) {
-      //   console.error("Error sending OTP:", err);
-      //   toast.error(err.response?.data?.message || "Không thể gửi mã OTP.");
-      // } finally {
-      //   setIsLoading(false);
-      // }
     } catch (error: any) {
       console.error("Error sending OTP:", error);
-      // --- SỬ DỤNG HELPER ---
+      // Xử lý lỗi chi tiết từ API
       handleApiError(error, "Không thể gửi mã OTP.");
     } finally {
       setIsLoading(false);
     }
   };
-
+  /**
+   * HÀM XÁC THỰC OTP VÀ CẬP NHẬT EMAIL
+   * Flow:
+   * 1. Validate OTP (6 số)
+   * 2. Gọi API verifyEmailChange(otp)
+   * 3. Nếu thành công: cập nhật user context, redirect về profile
+   * 4. Nếu lỗi: hiển thị thông báo
+   */
   const handleVerifyOTP = async () => {
+    // Validation OTP
     if (!otp || otp.length !== 6) {
       toast.error("Vui lòng nhập mã OTP gồm 6 chữ số");
       return;
@@ -116,26 +154,25 @@ export default function EmailChangePage() {
 
     setIsLoading(true);
     try {
+      // Gọi API xác thực OTP thay đổi email
       await profileService.verifyEmailChange(otp);
 
       toast.success("Email đã được cập nhật thành công");
+
+      // Cập nhật thông tin user trong AuthContext
       updateUser({ email: newEmail });
+
+      // Redirect về trang profile
       router.push("/profile");
-      // } catch (err: any) {
-      //   console.error("Error verifying OTP:", err);
-      //   toast.error(err.response?.data?.message || "Mã OTP không đúng.");
-      // } finally {
-      //   setIsLoading(false);
-      // }
     } catch (error: any) {
       console.error("Error verifying OTP:", error);
-      // --- SỬ DỤNG HELPER ---
+      // Xử lý lỗi chi tiết từ API
       handleApiError(error, "Mã OTP không đúng hoặc đã hết hạn.");
     } finally {
       setIsLoading(false);
     }
   };
-
+  // Hiển thị loading khi đang kiểm tra authentication
   if (authIsLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -165,7 +202,7 @@ export default function EmailChangePage() {
             src="https://images.unsplash.com/photo-1563986768609-322da13575f3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080"
             alt="Email verification"
             className="w-full h-full object-cover opacity-20"
-            onError={() => setImageError(true)}
+            onError={() => setImageError(true)} // Bắt sự kiện lỗi tải ảnh
           />
         )}
 
@@ -271,6 +308,7 @@ export default function EmailChangePage() {
 
           <div className="space-y-6">
             {step === "email" ? (
+              // BƯỚC 1: Nhập email mới
               <>
                 <div className="space-y-2">
                   <Label htmlFor="current-email">Email hiện tại</Label>
@@ -310,6 +348,7 @@ export default function EmailChangePage() {
                 </Button>
               </>
             ) : (
+              // BƯỚC 2: Nhập OTP xác thực
               <>
                 <div className="space-y-2">
                   <Label htmlFor="otp">Mã OTP (6 chữ số)</Label>
@@ -318,12 +357,13 @@ export default function EmailChangePage() {
                     placeholder="123456"
                     maxLength={6}
                     value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} // Chỉ cho phép nhập số
                     disabled={isLoading}
                     className="h-11 text-center text-2xl tracking-widest"
                   />
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
+                  {/* Nút gửi lại OTP (disabled khi countdown > 0) */}
                   <Button
                     onClick={handleSendOTP}
                     disabled={isLoading || countdown > 0}
@@ -332,6 +372,7 @@ export default function EmailChangePage() {
                   >
                     {countdown > 0 ? `Gửi lại (${countdown}s)` : "Gửi lại mã"}
                   </Button>
+                  {/* Nút xác nhận OTP */}
                   <Button
                     onClick={handleVerifyOTP}
                     disabled={isLoading || otp.length !== 6}

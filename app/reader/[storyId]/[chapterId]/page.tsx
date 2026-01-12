@@ -13,7 +13,7 @@ import {
   chapterCommentService,
   ChapterComment,
 } from "@/services/chapterCommentService";
-import { profileService } from "@/services/profileService"; // 🔥 THÊM IMPORT NÀY
+import { profileService } from "@/services/profileService"; //  THÊM IMPORT NÀY
 import {
   ReaderSettings,
   getReaderSettings,
@@ -36,6 +36,28 @@ import { ReaderContent } from "@/components/reader/ReaderContent";
 import { TopUpModal } from "@/components/payment/TopUpModal";
 import { subscriptionService } from "@/services/subscriptionService";
 import { toast } from "sonner";
+
+/**
+ * TRANG ĐỌC TRUYỆN CHÍNH - XỬ LÝ ĐỌC CHƯƠNG TRUYỆN
+ *
+ * MỤC ĐÍCH:
+ * - Hiển thị nội dung chương truyện với các tính năng: đọc, dịch, bình luận
+ * - Xử lý mua chương, mở khóa chương trả phí
+ * - Quản lý cài đặt đọc (theme, font, khoảng cách)
+ * - Tích hợp thanh toán và subscription
+ *
+ * FLOW CHÍNH:
+ * 1. Lấy params từ URL (storyId, chapterId)
+ * 2. Fetch thông tin chương và kiểm tra trạng thái (free/paid, đã mua/chưa)
+ * 3. Xác định hiển thị nội dung hay overlay khóa
+ * 4. Xử lý mở khóa chương và cập nhật UI
+ * 5. Quản lý bình luận và cài đặt đọc
+ *
+ * ĐIỂM QUAN TRỌNG:
+ * - Xử lý 3 case về quyền sở hữu chương (isOwned = true/false/undefined)
+ * - Đồng bộ số dư ví và trạng thái subscription
+ * - Debounce và caching cho nội dung chương
+ */
 export default function ReaderPage() {
   const router = useRouter();
   const params = useParams();
@@ -73,16 +95,31 @@ export default function ReaderPage() {
   const [autoPlayAfterUnlock, setAutoPlayAfterUnlock] = useState(false);
   //  THÊM STATE: Trạng thái gói cước
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
-  // --- FIX LỖI SCROLL: Luôn cuộn lên đầu khi đổi chương hoặc có nội dung mới ---
+  /**
+   * FIX LỖI SCROLL: Luôn cuộn lên đầu khi đổi chương hoặc có nội dung mới
+   *
+   * MỤC ĐÍCH: Đảm bảo user luôn bắt đầu đọc từ đầu chương
+   * TRIGGER: Khi chapterId thay đổi (đổi chương) hoặc content thay đổi (load xong nội dung)
+   */
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [chapterId, content]);
-
-  // --- HELPER: Xử lý lỗi API (Dùng chung) ---
+  /**
+   * HELPER: Xử lý lỗi API thống nhất cho toàn bộ component
+   *
+   * LOGIC XỬ LÝ LỖI THEO THỨ TỰ ƯU TIÊN:
+   * 1. Chi tiết validation error từ backend (details)
+   * 2. Message chung từ backend (message)
+   * 3. Fallback message mặc định
+   *
+   * @param err - Error object từ axios/catch
+   * @param defaultMessage - Message fallback nếu không parse được lỗi
+   */
   const handleApiError = (err: any, defaultMessage: string) => {
-    // 1. Check lỗi Validation (Details)
+    // 1. Check lỗi Validation (Details) - thường từ class-validator
     if (err.response && err.response.data && err.response.data.error) {
       const { message, details } = err.response.data.error;
+      // Ưu tiên hiển thị lỗi validation chi tiết
       if (details) {
         const firstKey = Object.keys(details)[0];
         if (firstKey && details[firstKey].length > 0) {
@@ -90,128 +127,39 @@ export default function ReaderPage() {
           return;
         }
       }
-      // 2. Message từ Backend
+      // 2. Message từ Backend nếu không có details
       if (message) {
         toast.error(message);
         return;
       }
     }
-    // 3. Fallback
+    // 3. Fallback: Lỗi chung hoặc lỗi mạng
     const fallbackMsg = err.response?.data?.message || defaultMessage;
     toast.error(fallbackMsg);
   };
-  // --- 1. LOAD DATA ---
-  // useEffect(() => {
-  //   const fetchData = async () => {
-  //     setLoading(true);
-  //     setError(null);
-  //     try {
-  //       // A. Lấy chi tiết chương
-  //       const detail = await chapterCatalogApi.getChapterDetail(chapterId);
-  //       setChapter(detail);
-  //       console.log("🔥 CHI TIẾT CHAPTER API TRẢ VỀ:", detail);
-  //       setOriginalContentUrl(detail.contentUrl);
-
-  //       // B. Lấy danh sách tất cả chương
-  //       const chaptersRes = await chapterCatalogApi.getChapters({
-  //         StoryId: storyId,
-  //         Page: 1,
-  //         PageSize: 100,
-  //       });
-  //       setAllChapters(chaptersRes.items);
-
-  //       //  LOGIC MỚI: XỬ LÝ THEO isOwned
-  //       console.log("🎯 Chapter data:", {
-  //         chapterId: detail.chapterId,
-  //         isLocked: detail.isLocked,
-  //         isOwned: detail.isOwned,
-  //         accessType: detail.accessType,
-  //         contentUrl: detail.contentUrl,
-  //       });
-
-  //       // CASE 1: isOwned = true -> ĐÃ SỞ HỮU, HIỂN THỊ NỘI DUNG
-  //       if (detail.isOwned === true) {
-  //         console.log("✅ Chapter đã được sở hữu, tải nội dung...");
-  //         if (detail.contentUrl) {
-  //           try {
-  //             const text = await chapterCatalogApi.getChapterContent(
-  //               detail.contentUrl
-  //             );
-  //             setContent(text);
-  //             console.log(
-  //               "✅ Đã tải nội dung thành công, độ dài:",
-  //               text.length
-  //             );
-  //           } catch (err) {
-  //             console.error("❌ Lỗi tải nội dung:", err);
-  //             setError("Không thể tải nội dung văn bản.");
-  //           }
-  //         }
-  //       }
-  //       // CASE 2: isOwned = false -> CHƯA SỞ HỮU
-  //       else if (detail.isOwned === false) {
-  //         console.log("🔒 Chapter chưa sở hữu, kiểm tra điều kiện mở khóa...");
-
-  //         // Nếu là chapter free và không bị khóa -> HIỂN THỊ NỘI DUNG
-  //         if (detail.accessType === "free" && !detail.isLocked) {
-  //           console.log("📖 Chapter free, tải nội dung...");
-  //           if (detail.contentUrl) {
-  //             try {
-  //               const text = await chapterCatalogApi.getChapterContent(
-  //                 detail.contentUrl
-  //               );
-  //               setContent(text);
-  //             } catch (err) {
-  //               console.error("❌ Lỗi tải nội dung free:", err);
-  //               setError("Không thể tải nội dung văn bản.");
-  //             }
-  //           }
-  //         }
-  //         // Nếu là chapter trả phí -> KHÔNG tải nội dung, hiện overlay khóa
-  //         else if (detail.accessType === "dias" && detail.isLocked) {
-  //           console.log("💰 Chapter trả phí chưa mua, hiện overlay khóa");
-  //           setContent(""); // Đảm bảo không hiện nội dung
-  //         }
-  //       }
-  //       // CASE 3: isOwned = undefined (API cũ) -> Fallback logic cũ
-  //       else {
-  //         console.log("🔄 Sử dụng logic cũ vì isOwned không xác định");
-  //         const shouldLoadContent = !detail.isLocked;
-  //         if (shouldLoadContent && detail.contentUrl) {
-  //           try {
-  //             const text = await chapterCatalogApi.getChapterContent(
-  //               detail.contentUrl
-  //             );
-  //             setContent(text);
-  //           } catch (err) {
-  //             console.error("❌ Lỗi tải text:", err);
-  //             setError("Không thể tải nội dung văn bản.");
-  //           }
-  //         } else if (detail.isLocked) {
-  //           setContent("");
-  //         }
-  //       }
-  //     } catch (err: any) {
-  //       console.error("Lỗi tải chương:", err);
-  //       setError("Không thể tải thông tin chương truyện.");
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-
-  //   if (storyId && chapterId) {
-  //     fetchData();
-  //   }
-  // }, [chapterId, storyId, refreshKey]);
+  /**
+   * EFFECT CHÍNH: Fetch dữ liệu chương truyện
+   *
+   * FLOW XỬ LÝ:
+   * 1. Lấy chi tiết chương từ API
+   * 2. Lấy danh sách tất cả chương để backup thông tin
+   * 3. Xử lý 3 TRƯỜNG HỢP về quyền sở hữu:
+   *    a. isOwned = true: Đã mua -> hiển thị nội dung
+   *    b. isOwned = false + free: Chương free -> hiển thị nội dung
+   *    c. isOwned = false + paid: Chương trả phí -> hiện overlay khóa
+   *    d. isOwned = undefined (API cũ): Fallback logic cũ
+   * 4. Fetch nội dung text từ URL nếu có quyền đọc
+   */
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
-        // A. Lấy chi tiết chương (Sử dụng Service đã cập nhật catch lỗi 403)
+        // A. Lấy chi tiết chương (Service đã xử lý catch lỗi 403)
         let detail = await chapterCatalogApi.getChapterDetail(chapterId);
 
         // B. Lấy danh sách tất cả chương để làm dữ liệu dự phòng
+        // Khi chương bị khóa, API có thể trả về title rỗng -> cần backup
         const chaptersRes = await chapterCatalogApi.getChapters({
           StoryId: storyId,
           Page: 1,
@@ -221,14 +169,16 @@ export default function ReaderPage() {
         setAllChapters(chapterList);
 
         // --- LOGIC BỔ SUNG: CẬP NHẬT THÔNG TIN HIỂN THỊ KHI BỊ KHÓA ---
-        // Nếu chương bị khóa và dữ liệu trả về từ API chi tiết bị trống (chapterNo = 0)
+        // Nếu chương bị khóa và dữ liệu trả về từ API chi tiết bị trống
         if (
           detail.isLocked &&
           (detail.chapterNo === 0 || detail.title === "Chương bị khóa")
         ) {
+          // Tìm thông tin chương từ danh sách backup
           const backupInfo = chapterList.find((c) => c.chapterId === chapterId);
           if (backupInfo) {
             detail = {
+              // Merge thông tin từ backup vào detail
               ...detail,
               chapterNo: backupInfo.chapterNo,
               title: backupInfo.title,
@@ -302,33 +252,19 @@ export default function ReaderPage() {
     if (storyId && chapterId) {
       fetchData();
     }
-  }, [chapterId, storyId, refreshKey]);
+  }, [chapterId, storyId, refreshKey]); // refreshKey để trigger reload sau khi mua chương
 
-  //  2. LOAD BALANCE KHI USER ĐÃ ĐĂNG NHẬP
+  /**
+   * EFFECT 2: LOAD BALANCE KHI USER ĐÃ ĐĂNG NHẬP
+   *
+   * MỤC ĐÍCH: Hiển thị số dư ví để user biết có đủ tiền mua chương không
+   * TRIGGER: Khi user.id thay đổi (login/logout)
+   */
   useEffect(() => {
     const loadWallet = async () => {
-      //     if (user?.id) {
-      //       try {
-      //         const res = await profileService.getWallet();
-      //         if (res.data) {
-      //           setBalance(res.data.diaBalance || 0);
-      //         }
-      //       } catch (error) {
-      //         console.error("Không thể tải thông tin ví:", error);
-      //         setBalance(0);
-      //       }
-      //     } else {
-      //       setBalance(0); // Reset về 0 nếu chưa đăng nhập
-      //     }
-      //   };
-
-      //   loadWallet();
-      // }, [user?.id]); // Chạy lại khi user thay đổi
       if (user?.id) {
         try {
-          // SỬA: Thay res bằng data, bỏ .data
-
-          const res: any = await profileService.getWallet(); // Đổi tên thành res cho đỡ lộn
+          const res: any = await profileService.getWallet();
 
           if (res && res.data) {
             // Lấy diaBalance từ trong res.data
@@ -345,15 +281,25 @@ export default function ReaderPage() {
 
     loadWallet();
   }, [user?.id]);
-
-  // --- 3. AUTO PLAY SAU KHI MỞ KHÓA ---
+  /**
+   * EFFECT 3: AUTO PLAY SAU KHI MỞ KHÓA
+   *
+   * MỤC ĐÍCH: Tự động bật chế độ đọc tự động (auto-play) sau khi mua chương thành công
+   * LOGIC: Khi autoPlayAfterUnlock = true và chapter không còn bị khóa -> reset state
+   */
   useEffect(() => {
     if (autoPlayAfterUnlock && chapter && !chapter.isLocked) {
       setAutoPlayAfterUnlock(false);
     }
   }, [autoPlayAfterUnlock, chapter]);
 
-  // THÊM: useEffect kiểm tra Subscription
+  /**
+   * EFFECT 4: KIỂM TRA SUBSCRIPTION STATUS
+   *
+   * MỤC ĐÍCH: Xác định user có active subscription không
+   * SUBSCRIPTION: Gói cước premium cho phép đọc không giới hạn
+   * ẢNH HƯỞNG: Có thể ảnh hưởng đến giá chương hoặc hiển thị nút mua
+   */
   useEffect(() => {
     const checkSubscription = async () => {
       if (user?.id) {
@@ -370,13 +316,28 @@ export default function ReaderPage() {
     checkSubscription();
   }, [user?.id]);
 
-  // --- 4. LOAD COMMENTS ---
+  /**
+   * EFFECT 5: LOAD COMMENTS KHI CHUYỂN TAB
+   *
+   * MỤC ĐÍCH: Chỉ load comments khi user click vào tab bình luận
+   * OPTIMIZATION: Tránh load không cần thiết khi chỉ đọc nội dung
+   */
   useEffect(() => {
     if (chapterId && activeTab === "comments") {
       loadComments(1);
     }
   }, [chapterId, activeTab]);
-
+  /**
+   * HÀM LOAD COMMENTS VỚI PHÂN TRANG
+   *
+   * FLOW:
+   * 1. Set loading state
+   * 2. Gọi API lấy comments theo page
+   * 3. Xử lý phân trang:
+   *    - Page 1: Replace toàn bộ comments
+   *    - Page > 1: Append thêm vào cuối
+   * 4. Kiểm tra hasMore (nếu trả về đủ 20 items = còn tiếp)
+   */
   const loadComments = async (page: number = 1) => {
     if (!chapterId) return;
     setCommentsLoading(true);
@@ -387,11 +348,14 @@ export default function ReaderPage() {
         20
       );
       if (page === 1) {
+        // Trang đầu: reset comments
         setComments(response.items);
         setTotalComments(response.total || response.items.length);
       } else {
+        // Trang tiếp: append comments
         setComments((prev) => [...prev, ...response.items]);
       }
+      // Kiểm tra còn dữ liệu không (dựa trên số items trả về)
       setHasMoreComments(response.items.length === 20);
       setCommentsPage(page);
     } catch (error) {
@@ -401,7 +365,15 @@ export default function ReaderPage() {
     }
   };
 
-  // --- COMMENT HANDLERS ---
+  /**
+   * COMMENT HANDLER: THÊM BÌNH LUẬN MỚI
+   *
+   * XỬ LÝ 2 TRƯỜNG HỢP:
+   * 1. Bình luận gốc (parentCommentId = undefined): Thêm vào đầu danh sách
+   * 2. Reply comment (có parentCommentId): Thêm vào replies của comment cha
+   *
+   * THUẬT TOÁN: Dùng đệ quy để tìm đúng comment cha trong tree structure
+   */
   const handleAddComment = async (
     content: string,
     parentCommentId?: string
@@ -414,10 +386,12 @@ export default function ReaderPage() {
       });
 
       if (!parentCommentId) {
+        // Bình luận gốc: thêm vào đầu
         setComments((prev) => [newComment, ...prev]);
         setTotalComments((prev) => prev + 1);
       } else {
         const addReplyRecursive = (
+          // Reply: tìm comment cha và add vào replies
           list: ChapterComment[]
         ): ChapterComment[] => {
           return list.map((c) => {
@@ -432,24 +406,23 @@ export default function ReaderPage() {
         setComments((prev) => addReplyRecursive(prev));
       }
       return newComment;
-      // } catch (error) {
-      //   console.error(error);
-      //   throw error;
-      // }
     } catch (error: any) {
       //  Gọi hàm xử lý lỗi
       handleApiError(error, "Gửi bình luận thất bại.");
       throw error;
     }
   };
-
+  /**
+   * COMMENT HANDLER: UPDATE COMMENT
+   *
+   * LOGIC: Gọi API update -> toast success
+   * LƯU Ý: UI sẽ tự cập nhật thông qua state management của CommentSection component
+   */
   const handleUpdateComment = async (id: string, content: string) => {
     if (!chapterId) return;
     try {
       await chapterCommentService.updateComment(chapterId, id, { content });
-      // } catch (e) {
-      //   console.error(e);
-      // }
+
       toast.success("Đã chỉnh sửa bình luận.");
     } catch (e: any) {
       //  Gọi hàm xử lý lỗi
@@ -457,31 +430,43 @@ export default function ReaderPage() {
       throw e;
     }
   };
-
+  /**
+   * COMMENT HANDLER: DELETE COMMENT
+   *
+   * FLOW: Gọi API delete -> toast success
+   * LƯU Ý: CommentSection sẽ tự xử lý xóa trên UI
+   */
   const handleDeleteComment = async (id: string) => {
     if (!chapterId) return;
     try {
       await chapterCommentService.deleteComment(chapterId, id);
-      // } catch (e) {}
+
       toast.success("Đã xóa bình luận.");
     } catch (e: any) {
       //  Gọi hàm xử lý lỗi
       handleApiError(e, "Xóa bình luận thất bại.");
     }
   };
-
+  /**
+   * COMMENT HANDLER: LIKE COMMENT
+   *
+   * FLOW: Gọi API like -> reload comments để cập nhật số like
+   * OPTIMIZATION: Có thể optimize bằng cách update local state thay vì reload
+   */
   const handleLikeComment = async (id: string) => {
     try {
       await chapterCommentService.likeComment(chapterId, id);
-      //loadComments(1);
+
       loadComments(commentsPage); // Reload lại trang hiện tại để cập nhật số like
     } catch (e: any) {
       handleApiError(e, "Không thể Like bình luận.");
     }
   };
+  /**
+   * COMMENT HANDLER: DISLIKE COMMENT
+   * Tương tự như like nhưng gọi API dislike
+   */
   const handleDislikeComment = async (id: string) => {
-    // await chapterCommentService.dislikeComment(chapterId, id);
-    // loadComments(1);
     try {
       await chapterCommentService.dislikeComment(chapterId, id);
       loadComments(commentsPage);
@@ -489,9 +474,11 @@ export default function ReaderPage() {
       handleApiError(e, "Không thể Dislike bình luận.");
     }
   };
+  /**
+   * COMMENT HANDLER: REMOVE REACTION
+   * Xóa cả like/dislike đã thực hiện trước đó
+   */
   const handleRemoveReaction = async (id: string) => {
-    // await chapterCommentService.removeCommentReaction(chapterId, id);
-    // loadComments(1);
     try {
       await chapterCommentService.removeCommentReaction(chapterId, id);
       loadComments(commentsPage);
@@ -501,21 +488,37 @@ export default function ReaderPage() {
   };
   const handleLoadMoreComments = () => loadComments(commentsPage + 1);
 
-  // --- SCROLL ---
+  /**
+   * EFFECT 6: THEO DÕI SCROLL POSITION
+   *
+   * MỤC ĐÍCH:
+   * 1. Hiển thị progress bar trên cùng
+   * 2. Hiển thị nút "scroll to top" khi scroll xuống sâu
+   *
+   * CÔNG THỨC TÍNH PROGRESS:
+   * scrollProgress = (scrollTop / (docHeight - windowHeight)) * 100
+   */
   useEffect(() => {
     const handleScroll = () => {
       const scrollTop = window.scrollY;
       const docHeight =
         document.documentElement.scrollHeight - window.innerHeight;
       const progress = (scrollTop / docHeight) * 100;
-      setScrollProgress(Math.min(progress, 100));
-      setShowScrollTop(scrollTop > 500);
+      setScrollProgress(Math.min(progress, 100)); // Clamp max 100%
+      setShowScrollTop(scrollTop > 500); // Hiện nút khi scroll > 500px
     };
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // --- HELPERS ---
+  /**
+   * HELPER: NAVIGATE GIỮA CÁC TRANG
+   *
+   * XỬ LÝ 3 LOẠI NAVIGATION:
+   * 1. Về trang chi tiết truyện
+   * 2. Đổi chương khác trong cùng truyện
+   * 3. Về trang chủ
+   */
   const handleNavigate = (path: string, sId?: string, cId?: string) => {
     if (path === "/story" && sId) router.push(`/story/${sId}`);
     else if (path === "/reader" && sId && cId)
@@ -523,13 +526,25 @@ export default function ReaderPage() {
     else router.push("/");
   };
 
-  //  CALLBACK KHI MỞ KHÓA CHAPTER THÀNH CÔNG
+  /**
+   * CALLBACK KHI MỞ KHÓA CHAPTER THÀNH CÔNG
+   *
+   * FLOW SAU KHI MUA CHƯƠNG:
+   * 1. Tăng refreshKey -> trigger reload data
+   * 2. Set autoPlayAfterUnlock = true -> bật chế độ đọc tự động
+   * 3. Component sẽ tự động fetch lại chapter với trạng thái mới (isOwned = true)
+   */
   const handleChapterUnlockSuccess = () => {
     console.log("🎯 Chapter unlocked, refreshing data...");
     setRefreshKey((prev) => prev + 1);
     setAutoPlayAfterUnlock(true);
   };
-
+  /**
+   * XỬ LÝ THEME VÀ STYLING
+   *
+   * themeConfigs: Object chứa config cho các theme (light, dark-blue, transparent)
+   * getBorder(): Tính toán màu border dựa trên theme hiện tại
+   */
   const theme = themeConfigs[settings.theme] || themeConfigs.light;
   const isDarkTheme = settings.theme === "dark-blue";
   const isTransparent = settings.theme === "transparent";
@@ -540,7 +555,15 @@ export default function ReaderPage() {
       ? "rgba(0, 65, 106, 0.1)"
       : "rgba(0, 65, 106, 0.08)";
 
-  //  LOGIC HIỂN THỊ CHÍNH THEO isOwned
+  /**
+   * LOGIC HIỂN THỊ CHÍNH: QUYẾT ĐỊNH CÓ HIỆN OVERLAY KHÓA HAY KHÔNG
+   *
+   * 4 CASE XỬ LÝ:
+   * 1. ĐÃ SỞ HỮU (isOwned = true) -> KHÔNG hiện overlay
+   * 2. CHƯA SỞ HỮU + Chapter trả phí -> HIỆN overlay
+   * 3. Free chapter -> KHÔNG hiện overlay
+   * 4. Fallback cho API cũ (isOwned = undefined)
+   */
   const shouldShowLockedOverlay = () => {
     if (!chapter) return false;
 
@@ -566,12 +589,20 @@ export default function ReaderPage() {
     // CASE 4: Fallback cho API cũ
     return chapter.isLocked && chapter.isOwned === false;
   };
+  /**
+   * HIỂN THỊ LOADING STATE
+   * Khi đang fetch dữ liệu chương
+   */
   if (loading)
     return (
       <div className="flex h-screen justify-center items-center bg-background">
         <Loader2 className="animate-spin h-10 w-10 text-primary" />
       </div>
     );
+  /**
+   * HIỂN THỊ ERROR STATE
+   * Khi không tìm thấy chương
+   */
   if (!chapter)
     return (
       <div className="flex h-screen justify-center items-center flex-col gap-4">
@@ -579,12 +610,31 @@ export default function ReaderPage() {
         <Button onClick={() => router.back()}>Quay lại</Button>
       </div>
     );
-
+  /**
+   * TÍNH GIÁ THỰC TẾ CỦA CHƯƠNG
+   *
+   * LOGIC ƯU TIÊN:
+   * 1. Lấy từ currentChapterSummary (danh sách chương) nếu có
+   * 2. Fallback: lấy từ chapter detail
+   * 3. Default: 0
+   */
   const currentChapterSummary = allChapters.find(
     (c) => c.chapterId === chapterId
   );
   const realPrice = currentChapterSummary?.priceDias ?? chapter.priceDias ?? 0;
-
+  /**
+   * RENDER CHÍNH CỦA COMPONENT
+   *
+   * CẤU TRÚC GIAO DIỆN:
+   * 1. Progress bar (top)
+   * 2. Toolbar với navigation và settings
+   * 3. Tabs (Content/Comments)
+   * 4. Nội dung chính:
+   *    - LockedOverlay nếu chương bị khóa
+   *    - ReaderContent nếu có quyền đọc
+   * 5. Scroll-to-top button
+   * 6. Settings dialog và Top-up modal
+   */
   return (
     <div
       className="min-h-screen relative transition-colors duration-300 pb-24"
@@ -600,7 +650,7 @@ export default function ReaderPage() {
         }}
       />
 
-      {/* Toolbar */}
+      {/* Toolbar - Thanh công cụ đọc truyện */}
       <ReaderToolbar
         chapterNo={chapter.chapterNo}
         chapterTitle={chapter.title}
@@ -619,6 +669,7 @@ export default function ReaderPage() {
         languageCode={chapter.languageCode}
         hasActiveSubscription={hasActiveSubscription}
       >
+        {/* Translation Control - Chỉ hiện khi có quyền đọc */}
         {!shouldShowLockedOverlay() && (
           <TranslationControl
             chapterId={chapterId}
@@ -630,12 +681,13 @@ export default function ReaderPage() {
         )}
       </ReaderToolbar>
 
-      {/* Main Tabs */}
+      {/* Main Tabs - Tab nội dung và bình luận */}
       <Tabs
         value={activeTab}
         onValueChange={(v) => setActiveTab(v as any)}
         className="w-full"
       >
+        {/* Sticky Tab Header */}
         <div
           className="sticky z-40 backdrop-blur-xl transition-all duration-300"
           style={{
@@ -681,7 +733,7 @@ export default function ReaderPage() {
             </TabsList>
           </div>
         </div>
-
+        {/* Tab Content */}
         <div className="w-full px-4 py-8 md:py-12">
           <TabsContent value="content" className="m-0 p-0 focus-visible:ring-0">
             {/* LOGIC HIỂN THỊ CHÍNH */}
@@ -743,7 +795,7 @@ export default function ReaderPage() {
           </TabsContent>
         </div>
       </Tabs>
-
+      {/* Scroll to Top Button */}
       {showScrollTop && (
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}

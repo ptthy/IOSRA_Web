@@ -32,16 +32,40 @@ import type {
   AdvanceFilterParams,
 } from "@/services/apiTypes";
 import { StorySummary } from "@/lib/types";
+/**
+ * TRANG TÌM KIẾM TRUYỆN VỚI ADVANCED FILTERS
+ *
+ * MỤC ĐÍCH:
+ * - Cung cấp giao diện tìm kiếm và lọc truyện nâng cao
+ * - Hiển thị kết quả với phân trang
+ * - Quản lý nhiều bộ lọc đồng thời (tag, ngôn ngữ, rating, premium...)
+ *
+ * TÍNH NĂNG NỔI BẬT:
+ * 1. Debounce search: Tránh gọi API quá nhiều khi user đang gõ
+ * 2. Advanced filtering: 7+ tiêu chí lọc khác nhau
+ * 3. Real-time filter badges: Hiển thị và xóa từng filter
+ * 4. Smart pagination: Tự động reset page khi filter thay đổi
+ * 5. Error handling chi tiết từ backend
+ *
+ * FLOW CHÍNH:
+ * 1. Load top tags khi component mount
+ * 2. Debounce search query để tìm tags
+ * 3. Khi filter thay đổi -> reset page về 1
+ * 4. Gọi API với tất cả filters và pagination
+ * 5. Hiển thị kết quả với phân trang thông minh
+ */
 export default function SearchPage() {
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [selectedTag, setSelectedTag] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<string>("Newest");
-  const [sortDir, setSortDir] = useState<string | null>(null);
-  const [isPremium, setIsPremium] = useState<string>("all");
-  const [minAvgRating, setMinAvgRating] = useState<string>("0");
-  const [languageCode, setLanguageCode] = useState<string>("all");
-  const [page, setPage] = useState(1);
+  // --- STATE QUẢN LÝ FILTERS ---
+  const [query, setQuery] = useState(""); // Từ khóa tìm kiếm
+  const [selectedTag, setSelectedTag] = useState<string>("all"); // Tag đã chọn
+  const [sortBy, setSortBy] = useState<string>("Newest"); // Tiêu chí sắp xếp
+  const [sortDir, setSortDir] = useState<string | null>(null); // Hướng sắp xếp
+  const [isPremium, setIsPremium] = useState<string>("all"); // Lọc premium/free
+  const [minAvgRating, setMinAvgRating] = useState<string>("0"); // Rating tối thiểu
+  const [languageCode, setLanguageCode] = useState<string>("all"); // Ngôn ngữ
+  const [page, setPage] = useState(1); // Trang hiện tại
+  // --- STATE QUẢN LÝ DATA VÀ TRẠNG THÁI ---
   const [data, setData] = useState<PaginatedResponse<Story> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,11 +74,24 @@ export default function SearchPage() {
   const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
   const [loadingTags, setLoadingTags] = useState(false);
 
-  // Load top tags khi component mount
+  /**
+   * EFFECT 1: LOAD TOP TAGS KHI COMPONENT MOUNT
+   *
+   * MỤC ĐÍCH: Load danh sách tag phổ biến để hiển thị trong dropdown
+   * OPTIMIZATION: Chỉ chạy 1 lần khi component mount (empty dependency array)
+   */
   useEffect(() => {
     loadTopTags();
   }, []);
-
+  /**
+   * HÀM LOAD TOP TAGS (10 tags phổ biến nhất)
+   *
+   * LOGIC:
+   * 1. Set loading state cho tags
+   * 2. Gọi API getTopTags(10)
+   * 3. Update tagOptions state
+   * 4. Xử lý lỗi nếu có
+   */
   const loadTopTags = async () => {
     setLoadingTags(true);
     try {
@@ -62,13 +99,22 @@ export default function SearchPage() {
       setTagOptions(tags);
     } catch (error) {
       console.error("Error loading top tags:", error);
-      setTagOptions([]);
+      setTagOptions([]); // Fallback: empty array
     } finally {
       setLoadingTags(false);
     }
   };
-
-  // Debounce search cho tags
+  /**
+   * EFFECT 2: DEBOUNCE SEARCH CHO TAGS
+   *
+   * MỤC ĐÍCH: Tìm kiếm tag theo từ khóa nhưng tránh gọi API quá nhiều
+   * DEBOUNCE TECHNIQUE: Sử dụng setTimeout + clearTimeout
+   *
+   * LOGIC:
+   * - Nếu query không rỗng: Search tags theo query
+   * - Nếu query rỗng: Load lại top tags
+   * - Debounce 300ms: Chờ user ngừng gõ
+   */
   useEffect(() => {
     const timeoutId = setTimeout(async () => {
       if (query.trim()) {
@@ -83,39 +129,24 @@ export default function SearchPage() {
           setLoadingTags(false);
         }
       } else {
+        // Query rỗng: load top tags
         loadTopTags();
       }
-    }, 300);
+    }, 300); // Debounce 300ms
 
     return () => clearTimeout(timeoutId);
   }, [query]);
 
-  // // Debounce cho main search
-  // useEffect(() => {
-  //   const timeoutId = setTimeout(() => {
-  //     if (page === 1) {
-  //       loadStories();
-  //     } else {
-  //       setPage(1);
-  //     }
-  //   }, 500);
-
-  //   return () => clearTimeout(timeoutId);
-  // }, [
-  //   query,
-  //   selectedTag,
-  //   sortBy,
-  //   sortDir,
-  //   isPremium,
-  //   minAvgRating,
-  //   languageCode,
-  // ]);
-
-  // useEffect(() => {
-  //   loadStories();
-  // }, [page]);
-  // 1. Debounce cho các bộ lọc: Khi filter thay đổi thì reset về trang 1
-  // 1. CHỈ useEffect này chịu trách nhiệm gọi API loadStories
+  /**
+   * EFFECT 3: EFFECT CHÍNH ĐỂ GỌI API LOAD STORIES
+   *
+   * KỸ THUẬT DOUBLE DEBOUNCE:
+   * 1. Debounce 500ms để chờ user ngừng thao tác
+   * 2. Gọi loadStories() với tất cả filters hiện tại
+   *
+   * DEPENDENCY ARRAY: Bao gồm TẤT CẢ filters và page
+   * -> Mỗi khi filter thay đổi hoặc đổi trang sẽ trigger reload
+   */
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       loadStories();
@@ -134,10 +165,19 @@ export default function SearchPage() {
     languageCode,
   ]);
 
-  // 2. Một useEffect phụ CHỈ để reset page về 1 khi các bộ lọc thay đổi
+  /**
+   * EFFECT 4: RESET PAGE VỀ 1 KHI FILTERS THAY ĐỔI
+   *
+   * VẤN ĐỀ CẦN GIẢI QUYẾT:
+   * - User đang ở page 5, thay đổi filter -> kết quả mới có thể không có 5 trang
+   * - Cần reset về page 1 để hiển thị kết quả đúng
+   *
+   * LƯU Ý QUAN TRỌNG: Không cho page vào dependency array
+   * - Nếu cho page vào -> infinite loop: page change -> reset page -> page change...
+   */
   useEffect(() => {
     if (page !== 1) {
-      setPage(1);
+      setPage(1); // Reset về trang đầu khi filter thay đổi
     }
     // Không cho page vào dependency ở đây để tránh lặp vô tận
   }, [
@@ -150,6 +190,20 @@ export default function SearchPage() {
     languageCode,
   ]);
 
+  /**
+   * HÀM CHÍNH: LOAD STORIES VỚI ADVANCED FILTERS
+   *
+   * FLOW CHI TIẾT:
+   * 1. Set loading state và reset error
+   * 2. Build params object với định dạng VIẾT HOA (theo backend requirement)
+   * 3. Gọi API getAdvancedFilter với params
+   * 4. Cuộn lên đầu trang sau khi có data mới
+   * 5. Xử lý lỗi chi tiết từ backend
+   *
+   * API PARAMS FORMAT:
+   * - VIẾT HOA: Page, PageSize, Query, TagId, LanguageCode, SortBy, SortDir...
+   * - undefined cho các filter "all" hoặc "default"
+   */
   const loadStories = async () => {
     setLoading(true);
     setError(null);
@@ -158,7 +212,7 @@ export default function SearchPage() {
       const params: AdvanceFilterParams = {
         Page: page,
         PageSize: 20,
-        Query: query || undefined,
+        Query: query || undefined, // undefined nếu query rỗng
         TagId: selectedTag !== "all" ? selectedTag : undefined,
         LanguageCode: languageCode !== "all" ? languageCode : undefined,
         SortBy: sortBy as
@@ -175,25 +229,8 @@ export default function SearchPage() {
       console.log("🎯 Using ADVANCE filter with params:", params);
       const result = await storyCatalogApi.getAdvancedFilter(params);
       setData(result);
-      // Cuộn lên đầu ngay sau khi có dữ liệu mới
+      // UX IMPROVEMENT: Cuộn lên đầu ngay sau khi có dữ liệu mới
       window.scrollTo({ top: 0, behavior: "instant" });
-      // } catch (error: any) {
-      //   console.error("Error loading stories:", error);
-
-      //   if (error.response?.data?.error?.details) {
-      //     const errorDetails = error.response.data.error.details;
-      //     const errorMessages = Object.values(errorDetails).flat().join(", ");
-      //     setError(`Lỗi từ server: ${errorMessages}`);
-      //   } else if (error.response?.data?.error?.message) {
-      //     setError(`Lỗi từ server: ${error.response.data.error.message}`);
-      //   } else if (error.response?.status === 400) {
-      //     setError("Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại.");
-      //   } else {
-      //     setError("Không thể tải danh sách truyện. Vui lòng thử lại sau.");
-      //   }
-      // } finally {
-      //   setLoading(false);
-      // }
     } catch (error: any) {
       console.error("Error loading stories:", error);
 
@@ -229,11 +266,28 @@ export default function SearchPage() {
       setLoading(false);
     }
   };
-
+  /**
+   * HANDLER: CLICK VÀO STORY CARD
+   *
+   * NAVIGATION: Điều hướng đến trang chi tiết truyện
+   * @param storyId - ID của truyện được click
+   */
   const handleStoryClick = (storyId: string) => {
     router.push(`/story/${storyId}`);
   };
-
+  /**
+   * HANDLER: CLEAR ALL FILTERS
+   *
+   * RESET tất cả filters về giá trị mặc định:
+   * - Query: ""
+   * - SelectedTag: "all"
+   * - SortBy: "Newest"
+   * - SortDir: null
+   * - IsPremium: "all"
+   * - MinAvgRating: "0"
+   * - LanguageCode: "all"
+   * - Page: 1
+   */
   const handleClearFilters = () => {
     setQuery("");
     setSelectedTag("all");
@@ -244,14 +298,23 @@ export default function SearchPage() {
     setLanguageCode("all");
     setPage(1);
   };
-
+  /**
+   * HELPER: GET DISPLAY NAME CHO SELECTED TAG
+   *
+   * Tìm tên hiển thị của tag dựa trên value
+   * @returns Tên tag hoặc "" nếu là "all"
+   */
   const getSelectedTagName = () => {
     if (selectedTag === "all") return "";
     return (
       tagOptions.find((tag) => tag.value === selectedTag)?.label || selectedTag
     );
   };
-
+  /**
+   * HELPER: GET DISPLAY NAME CHO SORT BY
+   *
+   * Chuyển đổi internal value thành tên hiển thị tiếng Việt
+   */
   const getSortByDisplayName = () => {
     switch (sortBy) {
       case "Newest":
@@ -266,7 +329,9 @@ export default function SearchPage() {
         return sortBy;
     }
   };
-
+  /**
+   * HELPER: GET DISPLAY NAME CHO SORT DIRECTION
+   */
   const getSortDirDisplayName = () => {
     switch (sortDir) {
       case "Asc":
@@ -277,7 +342,9 @@ export default function SearchPage() {
         return "Mặc định";
     }
   };
-
+  /**
+   * HELPER: GET DISPLAY NAME CHO PREMIUM FILTER
+   */
   const getPremiumDisplayName = () => {
     switch (isPremium) {
       case "true":
@@ -288,7 +355,9 @@ export default function SearchPage() {
         return "Tất cả";
     }
   };
-
+  /**
+   * HELPER: GET DISPLAY NAME CHO RATING FILTER
+   */
   const getRatingDisplayName = () => {
     switch (minAvgRating) {
       case "0":
@@ -305,6 +374,9 @@ export default function SearchPage() {
         return `${minAvgRating}★ trở lên`;
     }
   };
+  /**
+   * HELPER: GET DISPLAY NAME CHO LANGUAGE FILTER
+   */
   const getLanguageDisplayName = () => {
     switch (languageCode) {
       case "vi-VN":
@@ -319,6 +391,12 @@ export default function SearchPage() {
         return languageCode;
     }
   };
+  /**
+   * CHECK: CÓ ACTIVE FILTERS KHÔNG?
+   *
+   * Kiểm tra xem có filter nào khác giá trị mặc định không
+   * Dùng để hiển thị/ẩn active filters section
+   */
   const hasActiveFilters =
     query ||
     selectedTag !== "all" ||
@@ -327,6 +405,16 @@ export default function SearchPage() {
     sortDir !== null ||
     isPremium !== "all" ||
     minAvgRating !== "0";
+  /**
+   * HELPER: CONVERT API STORY TO STORY SUMMARY
+   *
+   * CHUYỂN ĐỔI DỮ LIỆU: Từ API response format sang format của StoryCard component
+   *
+   * LÝ DO CẦN CONVERT:
+   * - API trả về format khác với StoryCard yêu cầu
+   * - Đảm bảo type safety và consistency
+   * - Xử lý missing data với fallback values
+   */
   const convertToStorySummary = (story: any): StorySummary => {
     return {
       storyId: story.storyId || "",
@@ -346,8 +434,24 @@ export default function SearchPage() {
         : [],
     };
   };
-  const totalPages = data ? Math.ceil(data.total / data.pageSize) : 1;
 
+  /**
+   * CALCULATE: TOTAL PAGES
+   *
+   * CÔNG THỨC: totalPages = ceil(total / pageSize)
+   * Dùng cho pagination controls
+   */
+  const totalPages = data ? Math.ceil(data.total / data.pageSize) : 1;
+  /**
+   * RENDER CHÍNH CỦA COMPONENT
+   *
+   * CẤU TRÚC GIAO DIỆN:
+   * 1. Header với title và description
+   * 2. Filter area với search và các bộ lọc
+   * 3. Active filters badges (nếu có)
+   * 4. Results area với loading/error/empty/data states
+   * 5. Pagination controls (nếu có nhiều trang)
+   */
   return (
     <div className="min-h-screen">
       <div className="max-w-7xl mx-auto space-y-8 pb-16 pt-6 px-4">
@@ -359,7 +463,7 @@ export default function SearchPage() {
           </p>
         </div>
 
-        {/* Filter Area */}
+        {/* Filter Area - Card chứa tất cả bộ lọc */}
         <div className="bg-card border border-border/50 rounded-xl p-6 shadow-lg space-y-4">
           {/* Search Input - ĐÃ XÓA NÚT X */}
           <div className="relative">
@@ -435,18 +539,7 @@ export default function SearchPage() {
                 <SelectItem value="Asc">Tăng dần</SelectItem>
               </SelectContent>
             </Select>
-
-            {/* Premium Filter - ĐÃ XÓA NÚT X */}
-            {/* <Select value={isPremium} onValueChange={setIsPremium}>
-              <SelectTrigger className="w-[140px] bg-background/50">
-                <SelectValue placeholder="Trạng thái" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả</SelectItem>
-                <SelectItem value="true">Premium</SelectItem>
-                <SelectItem value="false">Miễn phí</SelectItem>
-              </SelectContent>
-            </Select> */}
+            {/* Language Dropdown */}
             <Select value={languageCode} onValueChange={setLanguageCode}>
               <SelectTrigger className="w-[150px] bg-background/50">
                 <SelectValue placeholder="Ngôn ngữ" />
@@ -475,7 +568,7 @@ export default function SearchPage() {
             </Select>
           </div>
 
-          {/* Active Filters */}
+          {/* Active Filters Section - Hiển thị các filter đang active */}
           {hasActiveFilters && (
             <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
               <span className="text-sm font-medium text-muted-foreground">
@@ -488,7 +581,7 @@ export default function SearchPage() {
                   "{query}"
                   <button
                     onClick={(e) => {
-                      e.stopPropagation();
+                      e.stopPropagation(); // Ngăn event bubbling
                       setQuery("");
                     }}
                     className="hover:text-destructive"
@@ -627,7 +720,7 @@ export default function SearchPage() {
               </p>
             )}
           </div>
-
+          {/* Conditional Rendering: Error State */}
           {error ? (
             <div className="text-center py-20 border-2 border-dashed rounded-xl">
               <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
@@ -640,12 +733,15 @@ export default function SearchPage() {
               <Button onClick={loadStories}>Thử lại</Button>
             </div>
           ) : loading ? (
+            // Loading State
             <div className="flex flex-col items-center justify-center min-h-[40vh]">
               <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
               <p className="text-muted-foreground">Đang tìm kiếm...</p>
             </div>
           ) : data && data.items.length > 0 ? (
+            // Success State: Có dữ liệu
             <>
+              {/* Grid hiển thị Story Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-5">
                 {data.items.map((story) => (
                   <StoryCard
@@ -656,11 +752,12 @@ export default function SearchPage() {
                   />
                 ))}
               </div>
-
+              {/* Pagination Controls - Chỉ hiện khi có nhiều trang */}
               {totalPages > 1 && (
                 <div className="mt-12 flex justify-center">
                   <Pagination>
                     <PaginationContent>
+                      {/* Previous Page Button */}
                       <PaginationItem>
                         <PaginationPrevious
                           onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -673,18 +770,23 @@ export default function SearchPage() {
                           Trang trước
                         </PaginationPrevious>
                       </PaginationItem>
-
+                      {/* Page Numbers với Smart Range Display */}
                       {Array.from(
                         { length: Math.min(5, totalPages) },
                         (_, i) => {
                           let pageNum;
+                          // Logic hiển thị 5 trang với current page ở giữa
                           if (totalPages <= 5) {
+                            // Tổng ≤ 5 trang: hiển thị tất cả
                             pageNum = i + 1;
                           } else if (page <= 3) {
+                            // Ở đầu: hiển thị trang 1-5
                             pageNum = i + 1;
                           } else if (page >= totalPages - 2) {
+                            // Ở đầu: hiển thị trang 1-5
                             pageNum = totalPages - 4 + i;
                           } else {
+                            // Ở giữa: hiển thị current page ±2
                             pageNum = page - 2 + i;
                           }
 
@@ -701,7 +803,7 @@ export default function SearchPage() {
                           );
                         }
                       )}
-
+                      {/* Next Page Button */}
                       <PaginationItem>
                         <PaginationNext
                           onClick={() =>
@@ -722,6 +824,7 @@ export default function SearchPage() {
               )}
             </>
           ) : (
+            // Empty State: Không có kết quả
             <div className="text-center py-20 border-2 border-dashed rounded-xl">
               <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
                 <Search className="h-10 w-10 text-muted-foreground" />

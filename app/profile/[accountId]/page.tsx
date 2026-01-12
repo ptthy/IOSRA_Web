@@ -48,7 +48,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { tagService, type TagOption } from "@/services/tagService";
-// Component phân trang tái sử dụng
+// --- COMPONENT PHÂN TRANG TÁI SỬ DỤNG ---
+/**
+ * Component PaginationControls: Phân trang chung cho toàn bộ tab
+ * Nhận props:
+ * - currentPage: trang hiện tại
+ * - totalItems: tổng số item
+ * - pageSize: số item mỗi trang
+ * - onPageChange: callback khi đổi trang
+ *
+ * Logic: Tính totalPages = Math.ceil(totalItems / pageSize)
+ * Chỉ render khi totalPages > 1
+ */
 interface PaginationProps {
   currentPage: number;
   totalItems: number;
@@ -90,43 +101,68 @@ const PaginationControls = ({
     </div>
   );
 };
+
+// --- COMPONENT CHÍNH: PUBLIC PROFILE PAGE ---
+/**
+ * Component PublicProfilePage: Hiển thị profile công khai của người dùng
+ * Có 3 tab chính: Truyện đã xuất bản, Người theo dõi, Đang theo dõi
+ * Logic phức tạp với nhiều API calls và state management
+ */
 export default function PublicProfilePage() {
-  const params = useParams();
-  const router = useRouter();
-  const { user } = useAuth();
-  const accountId = params.accountId as string;
-  const [followedAuthors, setFollowedAuthors] = useState<FollowedAuthor[]>([]);
-  const [loadingFollowed, setLoadingFollowed] = useState(false);
-  const [followingCount, setFollowingCount] = useState(0);
+  // --- HOOKS & PARAMS ---
+  const params = useParams(); // Lấy params từ URL (accountId)
+  const router = useRouter(); // Router để điều hướng
+  const { user } = useAuth(); // User context để check chính chủ
+  const accountId = params.accountId as string; // accountId từ URL
+  // --- STATE QUẢN LÝ DỮ LIỆU --
+  const [followedAuthors, setFollowedAuthors] = useState<FollowedAuthor[]>([]); // Danh sách đang theo dõi
+  const [loadingFollowed, setLoadingFollowed] = useState(false); // Loading cho tab following
+  const [followingCount, setFollowingCount] = useState(0); // Số lượng đang theo dõi
+
   // Biến tiện ích để check xem có phải profile chính chủ không
+  // So sánh user?.id (từ AuthContext) với accountId (từ URL)
   const isOwnProfile = user?.id === accountId;
-  const [profile, setProfile] = useState<PublicProfile | null>(null);
-  const [stories, setStories] = useState<Story[]>([]);
-  const [followers, setFollowers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [followLoading, setFollowLoading] = useState(false);
-  const [notificationLoading, setNotificationLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("stories");
+
+  const [profile, setProfile] = useState<PublicProfile | null>(null); // Thông tin profile
+  const [stories, setStories] = useState<Story[]>([]); // Danh sách truyện
+  const [followers, setFollowers] = useState<any[]>([]); // Danh sách người theo dõi
+  const [loading, setLoading] = useState(true); // Loading chính
+  const [followLoading, setFollowLoading] = useState(false); // Loading follow/unfollow
+  const [notificationLoading, setNotificationLoading] = useState(false); // Loading toggle notification
+  const [activeTab, setActiveTab] = useState("stories"); // Tab đang active
+  // --- HELPER: SCROLL TO TOP ---
+  /**
+   * Hàm scroll mượt lên đầu trang
+   * Dùng window.scrollTo với behavior: "smooth"
+   * Gọi khi chuyển tab hoặc đổi trang
+   */
   const scrollToTop = () => {
     window.scrollTo({
       top: 0,
       behavior: "smooth",
     });
   };
-  // Filter states
-  const [query, setQuery] = useState("");
-  const [selectedTag, setSelectedTag] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<string>("Newest");
-  const [sortDir, setSortDir] = useState<string | null>(null);
-  const [isPremium, setIsPremium] = useState<string>("all");
-  const [languageCode, setLanguageCode] = useState<string>("all"); // <--- THÊM
-  const [minAvgRating, setMinAvgRating] = useState<string>("0");
+  // --- STATE CHO FILTER TRUYỆN (Tab Stories) ---
+  const [query, setQuery] = useState(""); // Tìm kiếm theo tên
+  const [selectedTag, setSelectedTag] = useState<string>("all"); // Tag filter
+  const [sortBy, setSortBy] = useState<string>("Newest"); // Tag filter
+  const [sortDir, setSortDir] = useState<string | null>(null); // Hướng sắp xếp
+  const [isPremium, setIsPremium] = useState<string>("all"); // Filter premium/free
+  const [languageCode, setLanguageCode] = useState<string>("all"); // Filter ngôn ngữ
+  const [minAvgRating, setMinAvgRating] = useState<string>("0"); // Filter rating tối thiểu
 
   // Tag options
-  const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
-  const [loadingTags, setLoadingTags] = useState(false);
+  const [tagOptions, setTagOptions] = useState<TagOption[]>([]); // Danh sách tag options
+  const [loadingTags, setLoadingTags] = useState(false); // Loading tags
 
   // --- STATE PHÂN TRANG MỚI ---
+  /**
+   * Mỗi tab có state phân trang riêng:
+   * - storiesPage: trang hiện tại của tab stories
+   * - totalStories: tổng số truyện từ API
+   * - followersPage/totalFollowers: cho tab followers
+   * - followingPage/totalFollowing: cho tab following
+   */
   const [storiesPage, setStoriesPage] = useState(1);
   const [totalStories, setTotalStories] = useState(0);
 
@@ -136,9 +172,13 @@ export default function PublicProfilePage() {
   const [followingPage, setFollowingPage] = useState(1);
   const [totalFollowing, setTotalFollowing] = useState(0);
 
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 10; // Số item mỗi trang (cố định cho tất cả tab)
 
   // --- HELPER: Xử lý lỗi API (Dùng chung) ---
+  /**
+   * Hàm xử lý lỗi API thống nhất (giống các  file khác)
+   * Ưu tiên: Validation errors → Backend message → Fallback
+   */
   const handleApiError = (err: any, defaultMessage: string) => {
     // 1. Check lỗi Validation/Logic từ Backend
     if (err.response && err.response.data && err.response.data.error) {
@@ -162,11 +202,20 @@ export default function PublicProfilePage() {
     const fallbackMsg = err.response?.data?.message || defaultMessage;
     toast.error(fallbackMsg);
   };
-  // Load top tags khi component mount
+  // --- EFFECT: Load top tags khi component mount ---
+  /**
+   * useEffect chạy 1 lần khi component mount
+   * Mục đích: Load top 10 tags để hiển thị trong filter
+   * Gọi tagService.getTopTags(10)
+   */
   useEffect(() => {
     loadTopTags();
   }, []);
-
+  // --- HÀM LOAD TOP TAGS ---
+  /**
+   * Hàm gọi API lấy top tags
+   * Flow: bật loading → gọi API → cập nhật state → tắt loading
+   */
   const loadTopTags = async () => {
     setLoadingTags(true);
     try {
@@ -180,7 +229,13 @@ export default function PublicProfilePage() {
     }
   };
 
-  // Debounce search cho tags
+  // --- EFFECT: Debounce search cho tags ---
+  /**
+   * useEffect với dependency [query]
+   * Mục đích: Tìm kiếm tags khi user nhập từ khóa
+   * Debounce 300ms để tránh gọi API quá nhiều
+   * Logic: Nếu query có nội dung → search tags, ngược lại → load top tags
+   */
   useEffect(() => {
     const timeoutId = setTimeout(async () => {
       if (query.trim()) {
@@ -195,14 +250,18 @@ export default function PublicProfilePage() {
           setLoadingTags(false);
         }
       } else {
-        loadTopTags();
+        loadTopTags(); // Nếu query rỗng, load top tags
       }
     }, 300);
 
-    return () => clearTimeout(timeoutId);
+    return () => clearTimeout(timeoutId); // Cleanup timeout
   }, [query]);
 
-  // Function to reload profile data (chỉ profile, không reload stories)
+  // --- HÀM RELOAD PROFILE (CHỈ THÔNG TIN) ---
+  /**
+   * Hàm reload profile data (không bao gồm stories)
+   * Dùng để cập nhật thông tin profile sau khi follow/unfollow
+   */
   const reloadProfile = async () => {
     try {
       const profileData = await publicProfileService.getPublicProfile(
@@ -214,31 +273,13 @@ export default function PublicProfilePage() {
     }
   };
 
-  // // Function to reload followers list
-  // const reloadFollowers = async () => {
-  //   if (!profile?.isAuthor) return;
-
-  //   try {
-  //     const followersData = await authorFollowService.getAuthorFollowers(
-  //       profile.author!.authorId,
-  //       //  { page: 1, pageSize: 10 }
-  //       { page: followersPage, pageSize: PAGE_SIZE } // <--- SỬA
-  //     );
-
-  //     // Đảm bảo không có duplicates
-  //     const uniqueFollowers = followersData.data.items.filter(
-  //       (follower, index, array) =>
-  //         array.findIndex((f) => f.followerId === follower.followerId) === index
-  //     );
-
-  //     //  setFollowers(uniqueFollowers);
-  //     setFollowers(followersData.data.items);
-  //     setTotalFollowers(followersData.data.total);
-  //   } catch (error) {
-  //     console.error("Error reloading followers:", error);
-  //   }
-  // };
-  // Tìm đến hàm reloadFollowers trong page.tsx
+  // --- HÀM RELOAD FOLLOWERS (TAB FOLLOWERS) ---
+  /**
+   * Hàm tải danh sách người theo dõi (followers) của tác giả
+   * Chỉ gọi khi profile là tác giả và có authorId
+   * Sử dụng pagination state: followersPage, PAGE_SIZE
+   * Gọi API: authorFollowService.getAuthorFollowers()
+   */
   const reloadFollowers = async () => {
     // 1. Kiểm tra xem profile đã tải xong và có phải là tác giả không
     if (!profile?.isAuthor || !profile.author?.authorId) return;
@@ -257,14 +298,29 @@ export default function PublicProfilePage() {
       console.error("Lỗi khi tải danh sách người theo dõi:", error);
     }
   };
-  // QUAN TRỌNG: Thêm useEffect lắng nghe followersPage
+
+  // --- EFFECT: Reload followers khi page thay đổi ---
+  /**
+   * useEffect với dependencies [followersPage, activeTab]
+   * Chạy khi: 1) followersPage thay đổi, 2) activeTab chuyển sang "followers"
+   * Mục đích: Cập nhật danh sách followers khi phân trang hoặc chuyển tab
+   */
   useEffect(() => {
     if (activeTab === "followers") {
       reloadFollowers();
-      scrollToTop(); // Thêm vào đây
+      scrollToTop(); // Scroll lên đầu khi load data mới
     }
   }, [followersPage, activeTab]);
-  // Function to reload all profile data với filters
+  // --- HÀM RELOAD ALL PROFILE DATA VỚI FILTERS ---
+  /**
+   * Hàm chính để load toàn bộ dữ liệu profile:
+   * 1. Thông tin profile (publicProfileService.getPublicProfile)
+   * 2. Danh sách truyện với filters (publicProfileService.getPublicStories)
+   * 3. Số lượng đang theo dõi (authorFollowService.getFollowedAuthors)
+   *
+   * Sử dụng Promise.all để gọi song song 3 API
+   * Truyền filters vào API stories: query, tag, language, sort, premium, rating
+   */
   const reloadProfileData = async () => {
     try {
       const [profileData, storiesData, followingData] = await Promise.all([
@@ -272,8 +328,8 @@ export default function PublicProfilePage() {
 
         publicProfileService.getPublicProfile(accountId),
         publicProfileService.getPublicStories(accountId, {
-          Page: storiesPage, // <--- SỬA: Dùng state page
-          PageSize: PAGE_SIZE, // <--- SỬA: Dùng pageSize
+          Page: storiesPage,
+          PageSize: PAGE_SIZE,
           Query: query || undefined,
           TagId: selectedTag !== "all" ? selectedTag : undefined,
           LanguageCode: languageCode !== "all" ? languageCode : undefined, // <--- THÊM
@@ -308,12 +364,21 @@ export default function PublicProfilePage() {
     }
   };
 
-  // QUAN TRỌNG: Thêm useEffect lắng nghe sự thay đổi của storiesPage
+  // --- EFFECT: Reload profile data khi storiesPage thay đổi ---
+  /**
+   * useEffect với dependency [storiesPage]
+   * Chạy mỗi khi storiesPage thay đổi (phân trang truyện)
+   * Gọi reloadProfileData() và scrollToTop()
+   */
   useEffect(() => {
     if (accountId) reloadProfileData();
-    scrollToTop(); // Thêm vào đây
+    scrollToTop();
   }, [storiesPage]);
-  // Load profile data
+  // --- EFFECT: Load profile data khi accountId thay đổi ---
+  /**
+   * useEffect chính: load toàn bộ dữ liệu khi component mount hoặc accountId thay đổi
+   * Flow: bật loading → gọi reloadProfileData() → tắt loading
+   */
   useEffect(() => {
     const loadProfileData = async () => {
       setLoading(true);
@@ -331,7 +396,13 @@ export default function PublicProfilePage() {
     }
   }, [accountId]);
 
-  // Debounce cho filter changes
+  // --- EFFECT: Debounce cho filter changes (Tab Stories) ---
+  /**
+   * useEffect với dependencies là tất cả filter states
+   * Mục đích: Tự động reload stories khi filter thay đổi
+   * Debounce 500ms để tránh gọi API quá nhiều khi user đang nhập
+   * Chỉ chạy khi activeTab === "stories"
+   */
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (activeTab === "stories") {
@@ -350,14 +421,28 @@ export default function PublicProfilePage() {
     languageCode,
   ]);
 
-  // Refresh followers khi activeTab thay đổi
+  // --- EFFECT: Refresh followers khi activeTab thay đổi ---
+  /**
+   * Chạy khi activeTab thay đổi hoặc profile thay đổi
+   * Nếu chuyển sang tab "followers" và profile là tác giả → reload followers
+   */
   useEffect(() => {
     if (profile?.isAuthor && activeTab === "followers") {
       reloadFollowers();
     }
   }, [activeTab, profile]);
 
-  // Handle follow/unfollow - SỬA LẠI ĐỂ ĐỒNG BỘ FOLLOWER COUNT
+  // --- HÀM HANDLE FOLLOW/UNFOLLOW ---
+  /**
+   * Hàm xử lý follow/unfollow tác giả
+   * Flow phức tạp với Optimistic Updates:
+   * 1. Check điều kiện (không tự follow chính mình)
+   * 2. Optimistic update: cập nhật UI ngay (followerCount, followState)
+   * 3. Gọi API follow/unfollow
+   * 4. Nếu thành công: reload data sau 2s để đồng bộ server
+   * 5. Nếu lỗi: Revert UI changes (quay lại state cũ)
+   * 6. Xử lý lỗi với handleApiError()
+   */
   const handleFollowToggle = async () => {
     if (!profile?.isAuthor) return;
 
@@ -372,7 +457,7 @@ export default function PublicProfilePage() {
       const currentFollowerCount = profile.author?.followerCount || 0;
 
       if (wasFollowing) {
-        // UNFOLLOW: Giảm follower count ngay lập tức
+        // UNFOLLOW: Giảm follower count ngay lập tức (Optimistic Update)
         const newFollowerCount = Math.max(0, currentFollowerCount - 1);
 
         setProfile((prev) => {
@@ -387,7 +472,7 @@ export default function PublicProfilePage() {
           };
         });
 
-        // Xóa user khỏi followers list
+        // Xóa user khỏi followers list (UI)
         setFollowers((prev) =>
           prev.filter((follower) => follower.followerId !== user?.id)
         );
@@ -395,7 +480,7 @@ export default function PublicProfilePage() {
         await authorFollowService.unfollowAuthor(profile.author!.authorId);
         toast.success(`Bạn đã bỏ theo dõi ${profile.username}`);
       } else {
-        // FOLLOW: Tăng follower count ngay lập tức
+        // FOLLOW: Tăng follower count ngay lập tức (Optimistic Update)
         const newFollowerCount = currentFollowerCount + 1;
 
         setProfile((prev) => {
@@ -414,7 +499,7 @@ export default function PublicProfilePage() {
           };
         });
 
-        // Thêm user vào followers list
+        // Thêm user vào followers list (UI)
         if (user) {
           const newFollower = {
             followerId: user.id,
@@ -484,31 +569,19 @@ export default function PublicProfilePage() {
           prev.filter((follower) => follower.followerId !== user.id)
         );
       }
-      // --- 2. HIỂN THỊ LỖI (Dùng hàm mới gọn hơn) ---
+
       // Hàm này sẽ tự lo việc check lỗi 400 hay message từ backend
       handleApiError(error, "Không thể thực hiện thao tác (Follow/Unfollow).");
-
-      // if (error.response?.status === 400) {
-      //   const errorMessage =
-      //     error.response?.data?.error?.message ||
-      //     "Không thể thực hiện thao tác này";
-
-      //   if (
-      //     errorMessage.includes("FollowSelfNotAllowed") ||
-      //     errorMessage.includes("tự theo dõi")
-      //   ) {
-      //     toast.error("Bạn không thể tự theo dõi chính mình.");
-      //   } else {
-      //     toast.error(errorMessage);
-      //   }
-      // } else {
-      //   toast.error("Đã có lỗi xảy ra khi thực hiện thao tác");
-      // }
     } finally {
       setFollowLoading(false);
     }
   };
-  // Handle notification toggle - Endpoint Patch
+  // --- HÀM HANDLE NOTIFICATION TOGGLE ---
+  /**
+   * Hàm bật/tắt thông báo cho tác giả đang theo dõi
+   * Sử dụng PATCH API thay vì unfollow/follow lại
+   * Optimistic Update: cập nhật UI ngay → gọi API → revert nếu lỗi
+   */
   const handleNotificationToggle = async () => {
     if (!profile?.isAuthor || !profile.followState?.isFollowing) {
       toast.error("Bạn chưa theo dõi tác giả này");
@@ -551,7 +624,7 @@ export default function PublicProfilePage() {
         );
       }
 
-      // 2. Gọi API PATCH thay vì Unfollow/Follow
+      // 2. Gọi API PATCH (toggleNotification)
       await authorFollowService.toggleNotification(
         profile.author.authorId,
         newNotificationState
@@ -604,7 +677,13 @@ export default function PublicProfilePage() {
       setNotificationLoading(false);
     }
   };
-  // --- THÊM: Load số lượng đang theo dõi (chỉ cho chính mình) ---
+  // --- EFFECT: Load số lượng đang theo dõi (chỉ cho chính mình) ---
+  /**
+   * useEffect với dependency [isOwnProfile]
+   * Chạy khi isOwnProfile thay đổi (khi user login/logout hoặc xem profile khác)
+   * Mục đích: Load số lượng đang theo dõi cho tab "Đang theo dõi"
+   * Gọi API với pageSize = 1 chỉ để lấy total count
+   */
   useEffect(() => {
     const loadFollowingCount = async () => {
       if (isOwnProfile) {
@@ -623,26 +702,13 @@ export default function PublicProfilePage() {
 
     loadFollowingCount();
   }, [isOwnProfile]);
-  // --- THÊM: Hàm load danh sách đang theo dõi ---
-  // const reloadFollowedAuthors = async () => {
-  //   if (!isOwnProfile) return;
-
-  //   setLoadingFollowed(true);
-  //   try {
-  //     const response = await authorFollowService.getFollowedAuthors({
-  //       // page: 1,
-  //       // pageSize: 50,
-  //       page: followingPage, // <--- SỬA
-  //       pageSize: PAGE_SIZE,
-  //     });
-  //     setFollowedAuthors(response.data.items);
-  //     setTotalFollowing(response.data.total); // <--- THÊM
-  //   } catch (error) {
-  //     console.error("Error loading followed authors:", error);
-  //   } finally {
-  //     setLoadingFollowed(false);
-  //   }
-  // };
+  // --- HÀM RELOAD FOLLOWED AUTHORS (TAB FOLLOWING) ---
+  /**
+   * Hàm tải danh sách các tác giả mà user đang theo dõi
+   * Có thể gọi cho cả chính chủ và khách xem
+   * Sử dụng accountId từ params để lấy danh sách của profile đang xem
+   * Phân trang: followingPage, PAGE_SIZE
+   */
   const reloadFollowedAuthors = async () => {
     // XÓA BỎ DÒNG CHẶN: if (!isOwnProfile) return; <--- Đây là nguyên nhân khiến khách xem bị hiện số 0
 
@@ -666,13 +732,12 @@ export default function PublicProfilePage() {
     }
   };
 
-  // // --- THÊM: Effect để load dữ liệu khi bấm qua tab 'following' ---
-  // useEffect(() => {
-  //   if (activeTab === "following" && isOwnProfile) {
-  //     reloadFollowedAuthors();
-  //   }
-  // }, [activeTab, isOwnProfile]);
-  // --- CẬP NHẬT: Effect để tự động load lại dữ liệu khi đổi Tab hoặc đổi Account ---
+  // --- EFFECT: Tự động load lại dữ liệu khi đổi Tab hoặc đổi Account ---
+  /**
+   * useEffect với dependencies [activeTab, followingPage, accountId]
+   * Chạy khi: chuyển sang tab 'following', đổi trang following, hoặc đổi accountId
+   * Mục đích: Load danh sách followed authors khi cần thiết
+   */
   useEffect(() => {
     // Khi chuyển sang tab 'following' HOẶC ID người dùng thay đổi, tự động load danh sách
     if (activeTab === "following" && accountId) {
@@ -681,7 +746,12 @@ export default function PublicProfilePage() {
     }
   }, [activeTab, followingPage, accountId]); // Thêm accountId
 
-  // --- THÊM: Xử lý Hủy theo dõi (từ trong danh sách) ---
+  // --- HÀM HỦY THEO DÕI (TỪ TRONG DANH SÁCH) ---
+  /**
+   * Hàm xử lý hủy theo dõi từ danh sách Following
+   * Chỉ dành cho chính chủ (isOwnProfile = true)
+   * Flow: Confirm → gọi API → xóa khỏi UI ngay → toast
+   */
   const handleUnfollowFromList = async (
     targetAuthorId: string,
     targetUsername: string
@@ -702,7 +772,12 @@ export default function PublicProfilePage() {
     }
   };
 
-  // --- THÊM: Xử lý Bật/Tắt thông báo (từ trong danh sách) ---
+  // --- HÀM BẬT/TẮT THÔNG BÁO (TỪ TRONG DANH SÁCH) ---
+  /**
+   * Hàm toggle notification từ danh sách Following
+   * Chỉ dành cho chính chủ
+   * Optimistic Update: cập nhật UI ngay → gọi API → revert nếu lỗi
+   */
   const handleToggleNotifyFromList = async (targetAuthor: FollowedAuthor) => {
     const newState = !targetAuthor.notificationsEnabled;
 
@@ -733,21 +808,34 @@ export default function PublicProfilePage() {
       toast.error("Lỗi cập nhật thông báo");
     }
   };
-
+  // --- HÀM XỬ LÝ CLICK TRUYỆN ---
+  /**
+   * Hàm điều hướng đến trang chi tiết truyện
+   * Sử dụng router.push với path /story/{storyId}
+   */
   const handleStoryClick = (storyId: string) => {
     router.push(`/story/${storyId}`);
   };
-
+  // --- HÀM CLEAR FILTERS ---
+  /**
+   * Hàm reset tất cả filters về giá trị mặc định
+   * Gọi khi user click nút "Xóa bộ lọc"
+   */
   const handleClearFilters = () => {
     setQuery("");
     setSelectedTag("all");
-    setLanguageCode("all"); // <--- THÊM
+    setLanguageCode("all");
     setSortBy("Newest");
     setSortDir(null);
     setIsPremium("all");
     setMinAvgRating("0");
   };
-
+  // --- HELPER FUNCTIONS: Hiển thị tên filter ---
+  /**
+   * Các hàm helper để hiển thị tên filter thân thiện
+   * Ví dụ: "true" → "Premium", "Newest" → "Mới nhất"
+   * Dùng trong UI để hiển thị filter đang active
+   */
   const getSelectedTagName = () => {
     if (selectedTag === "all") return "";
     return (
@@ -808,7 +896,11 @@ export default function PublicProfilePage() {
         return `${minAvgRating}★ trở lên`;
     }
   };
-
+  // --- KIỂM TRA CÓ FILTER ACTIVE KHÔNG ---
+  /**
+   * Biến kiểm tra xem có filter nào đang active không
+   * Dùng để hiển thị nút "Xóa bộ lọc" và thông báo empty state
+   */
   const hasActiveFilters =
     query ||
     selectedTag !== "all" ||
@@ -817,7 +909,12 @@ export default function PublicProfilePage() {
     isPremium !== "all" ||
     minAvgRating !== "0";
 
-  // Convert Story to StorySummary for StoryCard component
+  // --- HÀM CONVERT STORY TO STORYSUMMARY ---
+  /**
+   * Hàm convert từ Story (API response) sang StorySummary (dùng cho StoryCard)
+   * StoryCard component yêu cầu định dạng StorySummary
+   * Xử lý các trường có thể undefined/null
+   */
   const convertToStorySummary = (story: any): StorySummary => {
     return {
       storyId: story.storyId || "",
@@ -837,7 +934,11 @@ export default function PublicProfilePage() {
         : [],
     };
   };
-
+  // --- LOADING STATE ---
+  /**
+   * Hiển thị khi đang tải dữ liệu profile
+   * Spinner + text "Đang tải..."
+   */
   if (loading) {
     return (
       <div className="min-h-screen">
@@ -850,7 +951,11 @@ export default function PublicProfilePage() {
       </div>
     );
   }
-
+  // --- NOT FOUND STATE ---
+  /**
+   * Hiển thị khi không tìm thấy profile
+   * Icon Users + text "Không tìm thấy hồ sơ" + nút Quay lại
+   */
   if (!profile) {
     return (
       <div className="min-h-screen">
@@ -862,7 +967,7 @@ export default function PublicProfilePage() {
       </div>
     );
   }
-
+  // --- MAIN RENDER ---
   return (
     <div className="min-h-screen">
       <div className="max-w-6xl mx-auto space-y-6 pb-16 pt-6 px-4">
@@ -876,7 +981,7 @@ export default function PublicProfilePage() {
         <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-card via-card to-muted/20">
           <CardContent className="p-0">
             <div className="flex flex-col md:flex-row gap-8 p-6 md:p-8">
-              {/* Avatar */}
+              {/* Avatar Section */}
               <div className="flex-shrink-0">
                 <div className="relative">
                   <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-border bg-card shadow-2xl">
@@ -894,7 +999,7 @@ export default function PublicProfilePage() {
                       </div>
                     )}
                   </div>
-                  {/* Verified Badge */}
+                  {/* Verified Badge (chỉ cho tác giả đã xác thực) */}
                   {profile.author?.isVerified && (
                     <Badge className="absolute -bottom-2 -right-2 bg-green-500 text-white px-2 py-1">
                       Đã xác thực
@@ -903,7 +1008,7 @@ export default function PublicProfilePage() {
                 </div>
               </div>
 
-              {/* Profile Info */}
+              {/* Profile Info Section */}
               <div className="flex-1 space-y-4">
                 <div>
                   <h1 className="text-3xl md:text-4xl font-bold mb-2">
@@ -916,7 +1021,7 @@ export default function PublicProfilePage() {
                   )}
                 </div>
 
-                {/* Stats */}
+                {/* Stats Row */}
                 <div className="flex items-center gap-6 py-4 border-y border-border/50">
                   <div className="flex items-center gap-2 text-sm">
                     <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -934,6 +1039,7 @@ export default function PublicProfilePage() {
 
                   {profile.isAuthor && profile.author && (
                     <>
+                      {/* Published Stories Count */}
                       <div className="flex items-center gap-2 text-sm">
                         <div className="w-10 h-10 rounded-full bg-secondary/60 flex items-center justify-center">
                           <BookOpen className="h-5 w-5 text-secondary-foreground" />
@@ -942,9 +1048,7 @@ export default function PublicProfilePage() {
                           <p className="text-xs text-muted-foreground">
                             Truyện
                           </p>
-                          {/* <p className="font-semibold">
-                            {profile.author.publishedStoryCount}
-                          </p> */}
+
                           {/* SỬA: Thêm onClick để chuyển tab stories và scroll xuống */}
                           <p
                             className="font-semibold cursor-pointer hover:underline hover:text-primary transition-colors"
@@ -962,7 +1066,7 @@ export default function PublicProfilePage() {
                           </p>
                         </div>
                       </div>
-
+                      {/* Followers Count */}
                       <div className="flex items-center gap-2 text-sm">
                         <div className="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center">
                           <Users className="h-5 w-5 text-yellow-600" />
@@ -1030,7 +1134,7 @@ export default function PublicProfilePage() {
                   )}
                 </div>
 
-                {/* Action Buttons */}
+                {/* Action Buttons (chỉ hiển thị nếu là tác giả) */}
                 {profile.isAuthor && (
                   <div className="flex flex-wrap gap-3">
                     {/* Nút Theo dõi/Đã theo dõi */}
@@ -1052,7 +1156,7 @@ export default function PublicProfilePage() {
                         ? "Đã theo dõi"
                         : "Theo dõi"}
                     </Button>
-
+                    {/* Nút Bật/Tắt thông báo (chỉ khi đã theo dõi) */}
                     {profile.followState?.isFollowing &&
                       user?.id !== accountId && (
                         <Button
@@ -1084,12 +1188,13 @@ export default function PublicProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Tabs Section */}
+        {/* Tabs Section (chỉ hiển thị nếu là tác giả) */}
         {profile.isAuthor && (
           <Card className="shadow-lg">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <CardHeader className="border-b pb-0">
                 <TabsList className="w-full justify-start h-auto p-0 bg-transparent">
+                  {/* Tab 1: Truyện đã xuất bản */}
                   <TabsTrigger
                     value="stories"
                     className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 py-3"
@@ -1100,6 +1205,7 @@ export default function PublicProfilePage() {
                       {stories.length}
                     </Badge>
                   </TabsTrigger>
+                  {/* Tab 2: Người theo dõi */}
                   <TabsTrigger
                     value="followers"
                     className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 py-3"
@@ -1111,22 +1217,8 @@ export default function PublicProfilePage() {
                       {profile.author?.followerCount || 0}
                     </Badge>
                   </TabsTrigger>
-                  {/* --- THÊM MỚI: Tab Đang theo dõi (Following) --- */}
-                  {/* Chỉ hiện tab này nếu là Chính chủ
-                  {isOwnProfile && (
-                    <TabsTrigger
-                      value="following"
-                      className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 py-3"
-                    >
-                      <Users className="mr-2 h-4 w-4 text-green-600" />
-                      Đang theo dõi
-                      <Badge variant="secondary" className="ml-2">
-                        {followingCount}
-                      </Badge>
-                    </TabsTrigger>
-                    
-                  )}
-                   */}
+
+                  {/* Tab 3: Đang theo dõi */}
                   <TabsTrigger
                     value="following"
                     className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 py-3"
@@ -1142,6 +1234,7 @@ export default function PublicProfilePage() {
               </CardHeader>
 
               <CardContent className="p-6">
+                {/* Tab Content 1: Stories */}
                 <TabsContent value="stories" className="m-0 space-y-4">
                   {/* Stories List */}
                   {stories.length > 0 ? (
@@ -1177,7 +1270,7 @@ export default function PublicProfilePage() {
                       )}
                     </div>
                   )}
-                  {/* --- DÁN ĐOẠN CODE PHÂN TRANG VÀO ĐÂY --- */}
+                  {/* Pagination cho Stories */}
                   {stories.length > 0 && (
                     <PaginationControls
                       currentPage={storiesPage}
@@ -1187,6 +1280,7 @@ export default function PublicProfilePage() {
                     />
                   )}
                 </TabsContent>
+                {/* Tab Content 2: Followers */}
                 <TabsContent value="followers" className="m-0">
                   {followers.length > 0 ? (
                     <div className="space-y-3">
@@ -1247,125 +1341,7 @@ export default function PublicProfilePage() {
                     />
                   )}
                 </TabsContent>
-                {/* --- THÊM MỚI: Content 3: Following (Danh sách mình đang follow) 
-                {isOwnProfile && (
-                  <TabsContent value="following" className="m-0">
-                    {loadingFollowed ? (
-                      <div className="flex justify-center py-10">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      </div>
-                    ) : followedAuthors.length > 0 ? (
-                      <div className="space-y-3">
-                        {followedAuthors.map((author) => (
-                          <div
-                            key={author.authorId}
-                            className="flex items-center justify-between gap-4 p-4 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors"
-                          >
-                            {/* Thông tin Author (Click để qua profile) 
-                            <div
-                              className="flex items-center gap-4 cursor-pointer flex-1"
-                              onClick={() =>
-                                router.push(`/profile/${author.authorId}`)
-                              }
-                            >
-                              <div className="w-12 h-12 rounded-full overflow-hidden bg-muted flex-shrink-0 border">
-                                {author.avatarUrl ? (
-                                  <img
-                                    src={author.avatarUrl}
-                                    alt={author.username}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center bg-primary/10">
-                                    <span className="text-lg font-bold text-primary">
-                                      {author.username.charAt(0).toUpperCase()}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                              <div>
-                                <p className="font-semibold text-base">
-                                  {author.username}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  Đã theo dõi:{" "}
-                                  {new Date(
-                                    author.followedAt
-                                  ).toLocaleDateString("vi-VN")}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Nút hành động 
-                            <div className="flex items-center gap-2">
-                              {/* Nút chuông 
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() =>
-                                  handleToggleNotifyFromList(author)
-                                }
-                                title={
-                                  author.notificationsEnabled
-                                    ? "Tắt thông báo"
-                                    : "Bật thông báo"
-                                }
-                              >
-                                {author.notificationsEnabled ? (
-                                  <Bell className="h-5 w-5 text-yellow-500 fill-yellow-500" />
-                                ) : (
-                                  <BellOff className="h-5 w-5 text-muted-foreground" />
-                                )}
-                              </Button>
-
-                              {/* Nút hủy theo dõi 
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                onClick={() =>
-                                  handleUnfollowFromList(
-                                    author.authorId,
-                                    author.username
-                                  )
-                                }
-                                title="Hủy theo dõi"
-                              >
-                                <Trash2 className="h-5 w-5" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-16">
-                        <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
-                          <Users className="h-10 w-10 text-muted-foreground" />
-                        </div>
-                        <p className="text-muted-foreground mb-2">
-                          Bạn chưa theo dõi tác giả nào.
-                        </p>
-                        <Button
-                          variant="outline"
-                          onClick={() => router.push("/")}
-                          className="mt-2"
-                        >
-                          Khám phá ngay
-                        </Button>
-                      </div>
-                    )}
-                    {/* --- DÁN ĐOẠN CODE PHÂN TRANG VÀO ĐÂY 
-                    {followedAuthors.length > 0 && (
-                      <PaginationControls
-                        currentPage={followingPage}
-                        totalItems={totalFollowing}
-                        pageSize={PAGE_SIZE}
-                        onPageChange={setFollowingPage}
-                      />
-                    )}
-                    {/* ---------------------------
-                  </TabsContent>
-                  --- */}
+                {/* Tab Content 3: Following */}
                 <TabsContent value="following" className="m-0">
                   {loadingFollowed ? (
                     <div className="flex justify-center py-10">
@@ -1456,7 +1432,7 @@ export default function PublicProfilePage() {
                       </p>
                     </div>
                   )}
-
+                  {/* Phân trang cho Following */}
                   {followedAuthors.length > 0 && (
                     <PaginationControls
                       currentPage={followingPage}

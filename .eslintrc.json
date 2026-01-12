@@ -1,19 +1,55 @@
 {
+  /**
+   * root: Đánh dấu file config gốc, ESLint sẽ không tìm config cha
+   */
   "root": true,
+  /**
+   * extends: Kế thừa config từ các preset có sẵn
+   * - next/core-web-vitals: Rules cho Next.js Core Web Vitals
+   * - next/typescript: Rules cho TypeScript trong Next.js
+   */
   "extends": ["next/core-web-vitals", "next/typescript"],
+  /**
+   * rules: Ghi đè hoặc thêm rules tùy chỉnh
+   * Cấu hình này tắt một số rules nghiêm ngặt để development nhanh hơn
+   */
   "rules": {
+    /**
+     * Tắt cảnh báo khi sử dụng 'any' type
+     * Trong development, đôi khi cần dùng any cho prototype
+     */
     "@typescript-eslint/no-explicit-any": "off",
+    /**
+     * Tắt cảnh báo biến không sử dụng
+     * Hữu ích khi đang phát triển, chưa sử dụng hết biến
+     */
     "@typescript-eslint/no-unused-vars": "off",
 
+    /**
+     * Tắt cảnh báo ký tự đặc biệt không escape trong JSX
+     * Ví dụ: dấu nháy đơn trong text
+     */
     "react/no-unescaped-entities": "off",
+    /**
+     * Tắt cảnh báo sử dụng thẻ <img> thay vì <Image> của Next.js
+     * Cần thiết khi dùng thư viện bên ngoài yêu cầu thẻ img
+     */
     "@next/next/no-img-element": "off",
+    /**
+     * Cảnh báo (không phải lỗi) khi thiếu dependencies trong useEffect
+     * "warn" giúp nhắc nhở nhưng không break build
+     */
     "react-hooks/exhaustive-deps": "warn"
   },
+  /**
+   * ignorePatterns: Các file/thư mục ESLint bỏ qua
+   * Tránh kiểm tra code trong thư viện và build output
+   */
   "ignorePatterns": [
-    "node_modules/**",
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts"
+    "node_modules/**", // Thư viện bên ngoài
+    ".next/**", // Thư mục build Next.js
+    "out/**", // Thư mục output (nếu dùng export)
+    "build/**", // Thư mục build (nếu có)
+    "next-env.d.ts" // File type definitions tự động
   ]
 }

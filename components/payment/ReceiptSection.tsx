@@ -1,4 +1,16 @@
 //components/payment/ReceiptSection.tsx
+/**
+ * MỤC ĐÍCH: Hiển thị biên lai thanh toán với đầy đủ thông tin giao dịch
+ * CHỨC NĂNG CHÍNH:
+ * - Hiển thị trạng thái giao dịch (thành công/hủy) với visual feedback
+ * - Hiển thị chi tiết: mã đơn hàng, mã giao dịch, thời gian
+ * - Hiển thị con dấu "SUCCESS" hoặc "CANCEL" với hiệu ứng xoay
+ * - Trang trí mã vạch và cảnh báo khi cần thiết
+ * LOGIC XỬ LÝ:
+ * - Xác định màu sắc và icon dựa trên status (success/cancel)
+ * - Format ngày giờ theo định dạng Việt Nam
+ * - Xử lý fallback khi thiếu dữ liệu (orderCode, date)
+ */
 import React from "react";
 import { CheckCircle, XCircle } from "lucide-react";
 
@@ -17,6 +29,11 @@ export function ReceiptSection({
   transactionId,
   date,
 }: ReceiptSectionProps) {
+  /**
+   * Xác định trạng thái và style tương ứng
+   * - success: Màu xanh, icon CheckCircle
+   * - cancel: Màu đỏ, icon XCircle
+   */
   const isSuccess = status === "success";
   const colorClass = isSuccess ? "text-green-600" : "text-red-600";
   const bgClass = isSuccess ? "bg-green-50" : "bg-red-50";

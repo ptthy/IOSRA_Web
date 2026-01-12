@@ -1,4 +1,30 @@
 // app/author/author-upgrade-rank/page.tsx
+
+/* 
+MỤC ĐÍCH: Trang quản lý và nâng cấp hạng tác giả cho user đã là tác giả
+CHỨC NĂNG CHÍNH:
+- Hiển thị thông tin hạng hiện tại và hạng mục tiêu
+- Theo dõi tiến độ đạt điều kiện nâng hạng (số followers)
+- Gửi yêu cầu nâng cấp hạng với cơ chế cam kết (copy text)
+- Hiển thị lịch sử và trạng thái các yêu cầu nâng hạng
+- Thông báo khi đạt hạng cao nhất (Diamond)
+- UI phong phú với card, biểu đồ tiến độ và styling theo từng hạng
+
+QUAN HỆ VỚI CÁC FILE KHÁC:
+- Kế thừa layout từ: app/author/layout.tsx (sidebar tác giả)
+- Sử dụng service: @/services/authorUpgradeService
+- Sử dụng components UI: @/components/ui/*
+- Khác với: app/author-upgrade/page.tsx (trang đăng ký trở thành tác giả lần đầu)
+
+LOGIC CHÍNH:
+1. Khi vào trang: fetch 2 API (rank-status và requests)
+2. Kiểm tra điều kiện nâng hạng: số followers >= yêu cầu
+3. Nếu đủ điều kiện: hiện form cam kết (user phải copy đúng text)
+4. Nếu đang có request pending: hiện trạng thái chờ
+5. Nếu bị từ chối: hiện lý do và nút gửi lại
+6. Nếu đã approved: reset về "none" để nâng hạng tiếp
+*/
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -40,17 +66,25 @@ import {
 } from "@/services/authorUpgradeService";
 
 // --- CẤU HÌNH UI CHO TỪNG RANK ---
+/**
+ * OBJECT CẤU HÌNH MÀU SẮC VÀ HIỆU ỨNG CHO TỪNG RANK
+ * LÝ DO DÙNG OBJECT CONFIG:
+ * - Tập trung hóa styling: dễ thay đổi theme
+ * - Đảm bảo UI nhất quán: mỗi rank có màu riêng
+ * - Tái sử dụng: dùng chung ở nhiều component (RankIcon, Card, v.v.)
+ * - Dễ mở rộng: thêm rank mới chỉ cần thêm config
+ */
 const RANK_STYLES: Record<
   string,
   {
-    color: string;
-    bg: string;
-    iconColor: string;
-    gradient: string;
-    shadow: string;
-    glow: string;
-    badgeGradient: string;
-    borderGlow: string;
+    color: string; // Màu chữ
+    bg: string; // Màu nền gradient
+    iconColor: string; // Màu icon
+    gradient: string; // Gradient cho badge
+    shadow: string; // Shadow cho card
+    glow: string; // Glow effect
+    badgeGradient: string; // Gradient cho badge
+    borderGlow: string; // Border glow khi hover
   }
 > = {
   Casual: {
@@ -101,9 +135,17 @@ const RANK_STYLES: Record<
   },
 };
 
-// Icon cho từng rank
+/**
+ * COMPONENT RankIcon: Hiển thị icon tương ứng với mỗi rank
+ * LOGIC XỬ LÝ:
+ * - Nhận prop rank (tên rank) và size (kích thước)
+ * - Dựa vào tên rank (không phân biệt hoa thường) để chọn icon phù hợp
+ * - Mỗi rank có icon và màu sắc riêng
+ * - Fallback: Shield với màu mặc định nếu không match
+ */
 const RankIcon = ({ rank, size = 8 }: { rank: string; size?: number }) => {
-  const r = (rank || "").toLowerCase();
+  const r = (rank || "").toLowerCase(); // Chuẩn hóa về lowercase để so sánh
+  // Priority matching: Diamond -> Gold -> Bronze -> Casual
   if (r.includes("diamond") || r.includes("kim cương")) {
     return (
       <Gem className={`w-${size} h-${size} text-cyan-500 fill-cyan-100`} />
@@ -123,22 +165,38 @@ const RankIcon = ({ rank, size = 8 }: { rank: string; size?: number }) => {
       />
     );
   }
+  // Fallback: Casual hoặc rank không xác định
   return (
     <Shield className={`w-${size} h-${size} text-slate-400 fill-slate-100`} />
   );
 };
-
+/**
+ * TEXT CAM KẾT BẮT BUỘC USER PHẢI COPY ĐÚNG
+ * LÝ DO THIẾT KẾ:
+ * - Đảm bảo user đọc và hiểu cam kết (không spam click)
+ * - Tạo rào cản tâm lý: user phải chủ động gõ lại
+ * - Giảm thiểu yêu cầu nâng hạng thiếu suy nghĩ
+ */
 const COMMITMENT_TEXT =
   "Tôi cam kết duy trì chất lượng sáng tác để xứng đáng với cấp bậc này.";
 
 export default function AuthorRankDashboard() {
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Loading khi fetch data lần đầu
   // State lưu full lịch sử
-  const [allRequests, setAllRequests] = useState<RankUpgradeResponse[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [typedCommitment, setTypedCommitment] = useState("");
+  const [allRequests, setAllRequests] = useState<RankUpgradeResponse[]>([]); // Toàn bộ lịch sử requests
+  const [isSubmitting, setIsSubmitting] = useState(false); // Loading khi submit
+  const [typedCommitment, setTypedCommitment] = useState(""); // Text user đang gõ
 
-  // Dữ liệu từ API rank-status
+  /**
+   * STATE rankStatus: Lưu thông tin rank từ API /rank-status
+   * CẤU TRÚC:
+   * - currentRankName: rank hiện tại (Casual/Bronze/Gold/Diamond)
+   * - currentRewardRate: tỷ lệ thưởng hiện tại (%)
+   * - totalFollowers: số followers hiện có
+   * - nextRankName: rank tiếp theo muốn nâng lên
+   * - nextRankRewardRate: tỷ lệ thưởng của rank tiếp theo
+   * - nextRankMinFollowers: số followers tối thiểu để nâng rank
+   */
   const [rankStatus, setRankStatus] = useState<{
     currentRankName: string;
     currentRewardRate: number;
@@ -155,7 +213,14 @@ export default function AuthorRankDashboard() {
     nextRankMinFollowers: 5,
   });
 
-  // Dữ liệu từ API requests
+  /**
+   * STATE latestRequest: Lưu thông tin yêu cầu nâng cấp GẦN NHẤT
+   * LOGIC XỬ LÝ QUAN TRỌNG:
+   * - Nếu request đã approved → reset về "none" để user có thể yêu cầu rank tiếp theo
+   * - Nếu còn pending/rejected → giữ nguyên trạng thái để hiển thị
+   * - rejectionReason: lý do từ chối (nếu có, từ moderatorNote)
+   * - submittedDate: ngày gửi yêu cầu (format vi-VN)
+   */
   const [latestRequest, setLatestRequest] = useState<{
     status: "none" | "pending" | "approved" | "rejected";
     rejectionReason?: string;
@@ -163,6 +228,18 @@ export default function AuthorRankDashboard() {
   }>({
     status: "none",
   });
+  /**
+   * HÀM XỬ LÝ LỖI TỪ API MỘT CÁCH THỐNG NHẤT
+   * FLOW XỬ LÝ LỖI:
+   * 1. Ưu tiên lỗi Validation từ details (backend trả về field nào bị lỗi)
+   * 2. Nếu không có details → dùng message chung từ backend
+   * 3. Fallback: dùng message mặc định hoặc từ response.data.message
+   *
+   * LÝ DO TẠO HELPER:
+   * - Giảm code trùng lặp (dùng ở nhiều nơi trong component)
+   * - Xử lý structured error từ backend (Zod validation, business logic)
+   * - User thấy thông báo chi tiết, dễ hiểu
+   */
   const handleApiError = (error: any, defaultMessage: string) => {
     // 1. Check lỗi Validation/Logic từ Backend
     if (error.response && error.response.data && error.response.data.error) {
@@ -191,25 +268,44 @@ export default function AuthorRankDashboard() {
     toast.error(fallbackMsg);
   };
   // -------------------
-  // Fetch dữ liệu từ cả hai API
+  // FETCH DỮ LIỆU TỪ CẢ HAI API
+  /**
+   * HÀM fetchData: LẤY CẢ 2 LOẠI DỮ LIỆU TỪ API
+   * FLOW:
+   * 1. Gọi API rank-status → lấy thông tin rank hiện tại
+   * 2. Gọi API requests → lấy lịch sử yêu cầu
+   * 3. Xử lý logic: tìm request mới nhất, map trạng thái
+   * 4. Quan trọng: Nếu request đã approved → reset về "none"
+   *
+   * LÝ DO GỘP 2 API CALL:
+   * - Giảm số lần render (chỉ setLoading 1 lần)
+   * - Đảm bảo dữ liệu đồng bộ (rank status và request status hiển thị cùng lúc)
+   * - Dùng useCallback để tránh tạo hàm mới mỗi lần render (optimization)
+   */
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Gọi API rank-status
+      // 1. API rank-status: thông tin rank hiện tại và điều kiện nâng cấp
       const statusRes = await authorUpgradeService.getRankStatus();
       setRankStatus(statusRes.data);
 
-      // Gọi API requests để lấy trạng thái
+      // 2. API requests: lịch sử và trạng thái yêu cầu
       const requestsRes = await authorUpgradeService.getRankRequests();
       const requests = requestsRes.data || [];
       // Lưu lại toàn bộ danh sách để hiển thị lịch sử
       setAllRequests(requests);
-      // Sắp xếp lấy request mới nhất
+      // Sắp xếp lấy request mới nhất (theo thời gian tạo)
       const latest = requests.sort(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )[0];
-
+      )[0]; // Phần tử đầu tiên sau khi sort
+      /**
+       * LOGIC QUAN TRỌNG: Xử lý trạng thái request
+       * Case 1: Có request mới nhất
+       *   - Nếu status = "approved" → reset về "none" (đã nâng hạng xong)
+       *   - Nếu status khác → giữ nguyên và hiển thị
+       * Case 2: Không có request → "none"
+       */
       if (latest) {
         const currentStatus = latest.status.toLowerCase();
 
@@ -217,25 +313,21 @@ export default function AuthorRankDashboard() {
         // Nếu request gần nhất đã Approved, nghĩa là xong rồi -> Reset về "none"
         // để UI hiện Form cam kết cho Rank tiếp theo (nếu đủ điều kiện).
         if (currentStatus === "approved") {
-          setLatestRequest({ status: "none" });
+          setLatestRequest({ status: "none" }); // Reset để hiện form cho rank tiếp theo
         } else {
           setLatestRequest({
-            status: latest.status.toLowerCase() as any,
-            rejectionReason: latest.moderatorNote || undefined,
+            // Map dữ liệu từ API sang state UI
+            status: latest.status.toLowerCase() as any, // 'pending' | 'rejected'
+            rejectionReason: latest.moderatorNote || undefined, // Lý do từ chối
             submittedDate: new Date(latest.createdAt).toLocaleDateString(
               "vi-VN"
-            ),
+            ), // Format date VN
           });
         }
       } else {
+        // Không có request nào
         setLatestRequest({ status: "none" });
       }
-      // } catch (error) {
-      //   console.error("Error fetching rank data:", error);
-      //   toast.error("Lỗi tải dữ liệu Rank");
-      // } finally {
-      //   setIsLoading(false);
-      // }
     } catch (error: any) {
       console.error("Error fetching rank data:", error);
       // --- DÙNG HELPER ---
@@ -243,14 +335,31 @@ export default function AuthorRankDashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
-
+  }, []); // Dùng helper function để xử lý lỗi thống nhất
+  /**
+   * useEffect: FETCH DATA KHI COMPONENT MOUNT
+   * Chạy khi component vừa được render lần đầu tiên
+   * Dependency: [fetchData] - chỉ chạy lại nếu fetchData thay đổi
+   */ // Fetch data khi component mount (khi component vừa hiện lên lần đầu tiên)
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Xử lý nộp đơn thực tế
+  /**
+   * HÀM XỬ LÝ GỬI YÊU CẦU NÂNG HẠNG
+   * FLOW:
+   * 1. Validate: user đã gõ đúng cam kết chưa?
+   * 2. Set loading state (isSubmitting = true)
+   * 3. Gọi API submitRankRequest với commitment text
+   * 4. Nếu thành công: toast success, fetch lại data, reset input
+   * 5. Nếu lỗi: dùng handleApiError để hiển thị chi tiết
+   *
+   * LÝ DO KIỂM TRA KỸ:
+   * - Đảm bảo user đã đọc cam kết (chống spam click)
+   * - Handle lỗi business logic từ backend (chưa đủ điều kiện, đã có request pending)
+   */
   const handleSubmit = async () => {
+    // 1. VALIDATION: User phải copy đúng nguyên văn
     if (typedCommitment !== COMMITMENT_TEXT) {
       toast.error("Vui lòng nhập đúng câu cam kết.");
       return;
@@ -258,27 +367,19 @@ export default function AuthorRankDashboard() {
 
     setIsSubmitting(true);
     try {
+      // 2. GỬI API
       await authorUpgradeService.submitRankRequest({
-        commitment: COMMITMENT_TEXT,
+        commitment: COMMITMENT_TEXT, // Gửi text cam kết
       });
+      // 3. THÀNH CÔNG
       toast.success("Gửi yêu cầu thăng hạng thành công!");
+      // 4. FETCH LẠI DATA để cập nhật UI (chuyển sang trạng thái pending)
       await fetchData(); // Reload data sau khi submit
-      setTypedCommitment("");
-      // } catch (error: any) {
-      //   console.error("Submit error:", error);
-      //   if (error.response?.data?.error) {
-      //     toast.error(error.response.data.error.message || "Gửi thất bại");
-      //   } else {
-      //     toast.error(
-      //       "Gửi thất bại. Có thể bạn chưa đủ điều kiện hoặc đã có yêu cầu đang chờ."
-      //     );
-      //   }
-      // } finally {
-      //   setIsSubmitting(false);
-      // }
+      // 5. RESET INPUT về rỗng
+      setTypedCommitment(""); // Reset input
     } catch (error: any) {
       console.error("Submit error:", error);
-      // --- DÙNG HELPER ---
+      // Dùng helper để xử lý các loại lỗi
       handleApiError(
         error,
         "Gửi thất bại. Có thể bạn chưa đủ điều kiện hoặc đã có yêu cầu đang chờ."
@@ -287,7 +388,11 @@ export default function AuthorRankDashboard() {
       setIsSubmitting(false);
     }
   };
+  // ================ UI RENDERING LOGIC ================
 
+  /**
+   * LOADING STATE: Hiển thị khi đang fetch data lần đầu
+   */
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -299,7 +404,15 @@ export default function AuthorRankDashboard() {
     );
   }
 
-  // Tính toán Progress từ data thực tế
+  /**
+   * TÍNH TOÁN CÁC GIÁ TRỊ ĐỂ HIỂN THỊ
+   * 1. progressPercent: % tiến độ đạt followers
+   * 2. followersNeeded: còn thiếu bao nhiêu followers
+   * 3. isEligible: đã đủ điều kiện nâng hạng chưa?
+   * 4. isMaxRank: đã đạt rank cao nhất (Diamond) chưa?
+   * 5. currentRankStyle/nextRankStyle: style config cho UI
+   * 6. isCommitmentMatched: user đã gõ đúng cam kết chưa?
+   */
   const progressPercent = Math.min(
     (rankStatus.totalFollowers / rankStatus.nextRankMinFollowers) * 100,
     100
@@ -310,11 +423,15 @@ export default function AuthorRankDashboard() {
   );
   const isEligible =
     rankStatus.totalFollowers >= rankStatus.nextRankMinFollowers;
-  // THÊM DÒNG NÀY: Kiểm tra xem có phải rank Diamond không (hoặc check nextRankName rỗng)
+  /**
+   * KIỂM TRA MAX RANK:
+   * - Nếu là Diamond hoặc không có rank tiếp theo → ẩn form nâng cấp
+   * - Hiển thị thông báo chúc mừng thay vì form
+   */
   const isMaxRank =
     rankStatus.currentRankName === "Diamond" ||
     rankStatus.currentRankName === "Kim Cương" ||
-    !rankStatus.nextRankName; // Fallback nếu không có rank tiếp theo
+    !rankStatus.nextRankName; // Fallback: API không trả về nextRankName
   const currentRankStyle =
     RANK_STYLES[rankStatus.currentRankName] || RANK_STYLES["Casual"];
   const nextRankStyle =
@@ -347,6 +464,7 @@ export default function AuthorRankDashboard() {
               </div>
             </div>
           </div>
+          {/* Badge hiển thị khi có request đang pending */}
           {latestRequest.status === "pending" && (
             <div className="flex items-center gap-2 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 text-blue-700 dark:text-blue-300 px-5 py-3 rounded-2xl border border-blue-200 dark:border-blue-700 shadow-lg shadow-blue-200/50 dark:shadow-blue-900/30 animate-pulse">
               <Clock className="w-5 h-5" />
@@ -355,7 +473,11 @@ export default function AuthorRankDashboard() {
           )}
         </div>
 
-        {/* --- STATS CARDS --- */}
+        {/* --- STATS CARDS ---
+         * Layout thay đổi dựa trên isMaxRank:
+         * - Nếu là max rank: chỉ hiển thị 2 card (rank hiện tại và followers)
+         * - Nếu chưa max: hiển thị 3 card (thêm card rank mục tiêu)
+         */}
         <div
           className={`grid grid-cols-1 gap-6 ${
             isMaxRank ? "md:grid-cols-2 max-w-5xl mx-auto" : "md:grid-cols-3"
@@ -446,7 +568,7 @@ export default function AuthorRankDashboard() {
             </CardContent>
           </Card>
 
-          {/* Card 3: Rank Mục Tiêu */}
+          {/* Card 3: Rank Mục Tiêu - chỉ hiển thị khi chưa đạt max rank */}
           {!isMaxRank && (
             <Card
               className={`relative overflow-hidden border-2 transition-all duration-300 hover:scale-105 ${
@@ -521,7 +643,13 @@ export default function AuthorRankDashboard() {
           )}
         </div>
 
-        {/* --- FORM CAM KẾT NÂNG CẤP --- */}
+        {/* --- FORM CAM KẾT NÂNG CẤP ---
+         * Logic hiển thị form theo 3 trường hợp:
+         * 1. Đã đạt max rank -> Hiện thông báo chúc mừng
+         * 2. Chưa max rank + Đủ điều kiện + Không có request đang chờ -> Hiện form
+         * 3. Có request đang chờ/từ chối -> Hiện thông báo trạng thái
+         */}
+
         {/* CASE 1: Đã đạt Max Rank (Diamond) -> Hiện bảng chúc mừng */}
         {isMaxRank ? (
           <Card className="shadow-xl border-2 border-cyan-200 dark:border-cyan-800 bg-gradient-to-br from-cyan-50 via-white to-cyan-100 dark:from-cyan-950/40 dark:via-background dark:to-cyan-900/20">
@@ -532,9 +660,6 @@ export default function AuthorRankDashboard() {
               <CardTitle className="text-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-400 dark:to-blue-400 bg-clip-text text-transparent">
                 Chúc mừng! Bạn đã chạm tới cấp bậc cao quý nhất hệ thống.
               </CardTitle>
-              {/* <CardDescription className="text-lg text-cyan-700 dark:text-cyan-300 mt-2">
-                Chúc mừng! Bạn đã chạm tới cấp bậc cao quý nhất hệ thống.
-              </CardDescription> */}
             </CardHeader>
             <CardContent className="text-center space-y-4 max-w-2xl mx-auto">
               <p className="text-muted-foreground leading-relaxed">
@@ -564,10 +689,8 @@ export default function AuthorRankDashboard() {
               </CardHeader>
 
               <CardContent className="space-y-6">
-                {/* Copy lại nội dung bên trong CardContent cũ vào đây */}
-                {/* Thông tin tóm tắt rank cũ -> rank mới */}
+                {/* Phần so sánh rank cũ và rank mới */}
                 <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6">
-                  {/* ... */}
                   <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                       <div className={`p-3 rounded-xl ${currentRankStyle.bg}`}>
@@ -633,6 +756,8 @@ export default function AuthorRankDashboard() {
                         : "bg-card"
                     }`}
                   />
+
+                  {/* Feedback realtime về việc gõ đúng/sai */}
                   {typedCommitment.length > 0 && (
                     <p
                       className={`text-sm font-medium ${
@@ -673,6 +798,7 @@ export default function AuthorRankDashboard() {
           )
         )}
         {/* --- THÔNG BÁO TRẠNG THÁI --- */}
+
         {latestRequest.status !== "none" && (
           <Card
             className={`shadow-xl border-2 ${
@@ -721,7 +847,7 @@ export default function AuthorRankDashboard() {
                   </p>
                 </div>
               )}
-
+              {/* Hiển thị lý do từ chối nếu có */}
               {latestRequest.status === "rejected" &&
                 latestRequest.rejectionReason && (
                   <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
@@ -733,7 +859,7 @@ export default function AuthorRankDashboard() {
                     </p>
                   </div>
                 )}
-
+              {/* Nút gửi lại khi bị từ chối */}
               {latestRequest.status === "rejected" && (
                 <Button
                   onClick={() => {
@@ -750,6 +876,10 @@ export default function AuthorRankDashboard() {
           </Card>
         )}
         {/* --- LỊCH SỬ YÊU CẦU --- */}
+        {/* Hiển thị bảng lịch sử tất cả các request đã gửi
+         * Giúp user theo dõi tiến trình qua thời gian
+         */}
+
         {allRequests.length > 0 && (
           <Card className="shadow-sm border mt-8">
             <CardHeader>

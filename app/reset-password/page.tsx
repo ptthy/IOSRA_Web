@@ -19,7 +19,26 @@ import { authService } from "@/services/authService";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
-// Component route chính, export default
+/**
+ * TRANG ĐẶT LẠI MẬT KHẨU - XỬ LÝ RESET PASSWORD VỚI OTP
+ *
+ * MỤC ĐÍCH:
+ * - Xác thực OTP được gửi qua email
+ * - Cho phép user nhập mật khẩu mới
+ * - Validate và gửi request reset password
+ *
+ * FLOW CHÍNH:
+ * 1. Lấy email từ URL query params (từ trang forgot-password)
+ * 2. User nhập OTP 6 số từ email
+ * 3. User nhập mật khẩu mới và xác nhận
+ * 4. Gọi API reset-password với OTP và password mới
+ * 5. Redirect về login nếu thành công
+ *
+ * ĐIỂM QUAN TRỌNG:
+ * - Sử dụng Suspense để xử lý loading searchParams
+ * - Xử lý OTP validation (chỉ số, đủ 6 ký tự)
+ * - Real-time validation password
+ */
 export default function ResetPasswordRoute() {
   return (
     <Suspense
@@ -34,43 +53,66 @@ export default function ResetPasswordRoute() {
   );
 }
 
-// Component logic và UI
-function ResetPasswordForm() {
+/**
+ * COMPONENT CHÍNH CỦA TRANG RESET PASSWORD
+ *
+ * LƯU Ý: Wrapped trong Suspense vì useSearchParams là async trong Next.js 13+
+ * Xem thêm: https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
+ */ function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const email = searchParams.get("email");
+  const email = searchParams.get("email"); // Lấy email từ URL query params
 
+  // State quản lý các trường nhập liệu
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  // State quản lý hiển thị mật khẩu
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // State quản lý trạng thái loading và lỗi
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [imageError, setImageError] = useState(false);
+  const [imageError, setImageError] = useState(false); // Lỗi tải ảnh background
 
+  // Ảnh fallback khi ảnh chính bị lỗi
   const ERROR_IMG_SRC =
     "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==";
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  /**
+   * HÀM XỬ LÝ SUBMIT FORM RESET PASSWORD
+   *
+   * FLOW VALIDATION:
+   * 1. OTP phải đủ 6 chữ số (chỉ số)
+   * 2. Password mới >= 6 ký tự
+   * 3. Password và confirm phải khớp
+   * 4. Email phải tồn tại trong query params
+   *
+   * SECURITY:
+   * - OTP chỉ accept số (\D = non-digit)
+   * - Password không được hiển thị trong console/log
+   */ const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-
-    // Validation
+    setError(""); // Reset lỗi trước khi validate
+    // 1. VALIDATION OTP
     if (otp.length !== 6) {
       setError("Mã OTP phải có 6 chữ số");
       return;
     }
-
+    // 2. VALIDATION PASSWORD LENGTH
     if (newPassword.length < 6) {
       setError("Mật khẩu phải có ít nhất 6 ký tự");
       return;
     }
 
+    // 3. VALIDATION PASSWORD MATCH
     if (newPassword !== confirmPassword) {
       setError("Mật khẩu xác nhận không khớp");
       return;
     }
+    // 4. VALIDATION EMAIL EXISTENCE
     if (!email) {
       setError(
         "Không tìm thấy địa chỉ email. Vui lòng thử lại từ bước Quên mật khẩu."
@@ -80,26 +122,19 @@ function ResetPasswordForm() {
       );
       return;
     }
-    setIsLoading(true);
+    setIsLoading(true); // Bắt đầu loading
 
     try {
+      // 5. GỌI API RESET PASSWORD
       await authService.resetPassword({
         email,
         otp,
         newPassword,
         confirmNewPassword: confirmPassword,
       });
-
+      // 6. THÀNH CÔNG: Redirect về login
       toast.success("Đặt lại mật khẩu thành công! Vui lòng đăng nhập.");
-      router.push("/login");
-      // } catch (err: any) {
-      //   const errMsg =
-      //     err.response?.data?.message ||
-      //     "Đặt lại mật khẩu thất bại. Mã OTP có thể sai hoặc hết hạn.";
-      //   setError(errMsg);
-      //   toast.error(errMsg);
-      //   setIsLoading(false);
-      // }
+      router.push("/login"); // Redirect về trang đăng nhập sau khi thành công
     } catch (err: any) {
       setIsLoading(false);
 
@@ -135,10 +170,16 @@ function ResetPasswordForm() {
       toast.error(fallbackMsg);
     }
   };
-
+  /**
+   * RENDER CHÍNH CỦA COMPONENT
+   *
+   * LAYOUT 2 CỘT:
+   * - Left: Visual với thông tin bảo mật và countdown OTP
+   * - Right: Form nhập OTP và password mới
+   */
   return (
     <div className="min-h-screen flex">
-      {/* Left Side - Visual */}
+      {/* Left Side - Visual (Chỉ hiện trên desktop) */}
       <div
         className="hidden md:flex md:w-1/2 relative overflow-hidden"
         style={{ backgroundColor: "#00416A" }}
@@ -161,13 +202,13 @@ function ResetPasswordForm() {
           />
         )}
 
-        {/* Overlay Content */}
+        {/* Overlay Content trên ảnh */}
         <div
           className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center"
           style={{ color: "#F0EAD6" }}
         >
           <div className="max-w-md space-y-8">
-            {/* Icon */}
+            {/* Icon chính */}
             <div className="flex justify-center">
               <div
                 className="rounded-full p-6"
@@ -177,7 +218,7 @@ function ResetPasswordForm() {
               </div>
             </div>
 
-            {/* Title */}
+            {/* Title và description */}
             <div className="space-y-4">
               <h1 className="text-4xl">Đặt lại mật khẩu</h1>
               <p className="text-lg opacity-90">
@@ -185,7 +226,7 @@ function ResetPasswordForm() {
               </p>
             </div>
 
-            {/* Features */}
+            {/* Features list - Thông tin bổ sung */}
             <div className="space-y-4 text-left">
               <div className="flex items-start gap-3">
                 <ShieldCheck className="w-6 h-6 mt-1 flex-shrink-0" />
@@ -196,6 +237,7 @@ function ResetPasswordForm() {
                   </p>
                 </div>
               </div>
+              {/* OTP expiration */}
               <div className="flex items-start gap-3">
                 <Clock className="w-6 h-6 mt-1 flex-shrink-0" />
                 <div>
@@ -205,6 +247,7 @@ function ResetPasswordForm() {
                   </p>
                 </div>
               </div>
+              {/* Email confirmation */}
               <div className="flex items-start gap-3">
                 <Mail className="w-6 h-6 mt-1 flex-shrink-0" />
                 <div>
@@ -218,7 +261,7 @@ function ResetPasswordForm() {
           </div>
         </div>
 
-        {/* Decorative circles */}
+        {/* Decorative circles cho background */}
         <div
           className="absolute -top-24 -right-24 w-96 h-96 rounded-full opacity-10"
           style={{ backgroundColor: "#F0EAD6" }}
@@ -229,10 +272,10 @@ function ResetPasswordForm() {
         ></div>
       </div>
 
-      {/* Right Side - Form */}
+      {/* Right Side - Form (Hiển thị trên cả mobile và desktop) */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md space-y-8">
-          {/* Back Button */}
+          {/* Back Button - Quay lại trang trước */}
           <button
             onClick={() => router.back()}
             className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -242,7 +285,7 @@ function ResetPasswordForm() {
             Quay lại
           </button>
 
-          {/* Header */}
+          {/* Header với icon và email hiển thị */}
           <div className="text-center space-y-2">
             <div className="flex justify-center mb-4">
               <div className="w-16 h-16 rounded-full flex items-center justify-center bg-primary/10">
@@ -256,9 +299,9 @@ function ResetPasswordForm() {
             </p>
           </div>
 
-          {/* Form */}
+          {/* Form chính */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* OTP Field */}
+            {/* OTP Field với format chỉ nhận số */}
             <div className="space-y-2">
               <Label htmlFor="otp">Mã OTP (6 chữ số)</Label>
               <Input
@@ -267,6 +310,7 @@ function ResetPasswordForm() {
                 placeholder="123456"
                 value={otp}
                 onChange={(e) =>
+                  // Chỉ cho phép nhập số và giới hạn 6 ký tự
                   setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
                 }
                 required
@@ -276,7 +320,7 @@ function ResetPasswordForm() {
               />
             </div>
 
-            {/* New Password Field */}
+            {/* New Password Field với toggle visibility */}
             <div className="space-y-2">
               <Label htmlFor="newPassword">Mật khẩu mới</Label>
               <div className="relative">
@@ -348,12 +392,12 @@ function ResetPasswordForm() {
               </div>
             )}
 
-            {/* Submit Button */}
+            {/* Submit Button với validation disabled state */}
             <Button
               type="submit"
               className="w-full h-12 hover:opacity-90 gap-2"
               style={{ backgroundColor: "#F0EAD6", color: "#00416A" }}
-              disabled={!otp || !newPassword || !confirmPassword || isLoading}
+              disabled={!otp || !newPassword || !confirmPassword || isLoading} // Disable khi thiếu thông tin hoặc đang loading
             >
               {isLoading ? (
                 <>
@@ -366,7 +410,7 @@ function ResetPasswordForm() {
             </Button>
           </form>
 
-          {/* Info Box */}
+          {/* Info Box - Hiển thị requirements */}
           <div className="rounded-lg p-4 space-y-2 bg-muted border">
             <p className="text-sm font-medium text-primary">
               Yêu cầu mật khẩu:
@@ -387,7 +431,7 @@ function ResetPasswordForm() {
             </ul>
           </div>
 
-          {/* Mobile Logo */}
+          {/* Mobile Logo (Chỉ hiện trên mobile) */}
           <div className="lg:hidden text-center pt-8 border-t">
             <h3 className="text-2xl mb-2 text-primary">Tora Novel</h3>
             <p className="text-sm text-muted-foreground">

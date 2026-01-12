@@ -17,7 +17,7 @@ import {
   Receipt,
   Copy,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"; // Helper để gộp và xử lý className Tailwind CSS một cách linh hoạt
 import {
   Pagination,
   PaginationContent,
@@ -28,6 +28,11 @@ import {
 import { toast } from "sonner"; // Import thêm toast để báo copy thành công
 
 // --- CẤU HÌNH HIỂN THỊ ---
+/**
+ * TYPE_CONFIG: Map định nghĩa giao diện cho từng loại giao dịch
+ * Mỗi loại có: label (tên hiển thị), icon (component icon), colorClass (màu sắc)
+ * Giúp tái sử dụng code và đồng bộ giao diện
+ */
 const TYPE_CONFIG: Record<
   string,
   { label: string; icon: any; colorClass: string }
@@ -51,7 +56,10 @@ const TYPE_CONFIG: Record<
       "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400",
   },
 };
-
+/**
+ * STATUS_CONFIG: Map định nghĩa giao diện cho từng trạng thái giao dịch
+ * Mỗi trạng thái có: label (tên hiển thị), className (CSS classes)
+ */
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   success: {
     label: "Thành công",
@@ -74,7 +82,12 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
       "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
   },
 };
-
+/**
+ * Hàm định dạng tiền tệ VND
+ * Sử dụng Intl.NumberFormat để format theo chuẩn Việt Nam
+ * Input: amount (số tiền)
+ * Output: string định dạng "1.000.000 ₫"
+ */
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
@@ -83,18 +96,28 @@ const formatCurrency = (amount: number) => {
 };
 
 export default function PaymentHistoryPage() {
-  const [payments, setPayments] = useState<PaymentHistoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const pageSize = 20;
+  const [payments, setPayments] = useState<PaymentHistoryItem[]>([]); // Danh sách giao dịch
+  const [loading, setLoading] = useState(true); // Trạng thái loading
+  const [page, setPage] = useState(1); // Trang hiện tại
+  const [total, setTotal] = useState(0); // Tổng số bản ghi
+  const pageSize = 20; // Số item mỗi trang (cố định)
   // --- HELPER: Xử lý lỗi API ---
+  /**
+   * Hàm xử lý lỗi API thống nhất cho toàn bộ ứng dụng
+   * Logic xử lý ưu tiên:
+   * 1. Kiểm tra lỗi validation/Logic từ Backend (400 Bad Request)
+   * 2. Ưu tiên hiển thị lỗi validation chi tiết nếu có
+   * 3. Fallback: Hiển thị message từ backend hoặc message mặc định
+   *
+   * Đầu vào: err (lỗi từ catch), defaultMessage (thông báo mặc định)
+   * Đầu ra: Toast thông báo lỗi và return (không trả về giá trị)
+   */
   const handleApiError = (err: any, defaultMessage: string) => {
-    // 1. Check lỗi Validation/Logic từ Backend
+    // 1. Check lỗi Validation/Logic từ Backend (kiểu 400)
     if (err.response && err.response.data && err.response.data.error) {
       const { message, details } = err.response.data.error;
 
-      // Ưu tiên Validation
+      // Ưu tiên Validation (lỗi chi tiết từ field nào đó)
       if (details) {
         const firstKey = Object.keys(details)[0];
         if (firstKey && details[firstKey].length > 0) {
@@ -102,49 +125,78 @@ export default function PaymentHistoryPage() {
           return;
         }
       }
-      // Message từ Backend
+      // Message từ Backend (lỗi tổng quát)
       if (message) {
         toast.error(message);
         return;
       }
     }
-    // 2. Fallback
+    // 2. Fallback - lấy message từ response hoặc dùng default
     const fallbackMsg = err.response?.data?.message || defaultMessage;
     toast.error(fallbackMsg);
   };
-
+  // --- EFFECT: Load dữ liệu khi page thay đổi ---
+  /**
+   * useEffect này chạy mỗi khi biến page thay đổi
+   * Mục đích: Tải dữ liệu lịch sử giao dịch cho trang hiện tại
+   * Phụ thuộc: [page] - chỉ chạy lại khi page thay đổi
+   */
   useEffect(() => {
     loadPaymentHistory();
   }, [page]);
-
+  // --- HÀM LOAD LỊCH SỬ GIAO DỊCH ---
+  /**
+   * Hàm gọi API lấy lịch sử giao dịch với phân trang
+   * Flow:
+   * 1. Bật loading
+   * 2. Gọi API với params: Page (trang hiện tại), PageSize (20)
+   * 3. Nếu thành công: cập nhật payments và total
+   * 4. Nếu lỗi: gọi handleApiError để hiển thị thông báo
+   * 5. Luôn tắt loading (dù thành công hay thất bại)
+   */
   const loadPaymentHistory = async () => {
     setLoading(true);
     try {
+      // Gọi API từ service
       const data = await paymentHistoryService.getMyPaymentHistory({
         Page: page,
         PageSize: pageSize,
       });
-      setPayments(data.items);
-      setTotal(data.total);
-      // } catch (error) {
-      //   console.error("Lỗi tải lịch sử giao dịch:", error);
-      // } finally {
-      //   setLoading(false);
-      // }
+      setPayments(data.items); // Cập nhật danh sách giao dịch
+      setTotal(data.total); // Cập nhật tổng số bản ghi
     } catch (error: any) {
       //  GỌI HÀM XỬ LÝ LỖI
       handleApiError(error, "Không thể tải lịch sử giao dịch.");
       console.error("Lỗi tải lịch sử giao dịch:", error);
     } finally {
-      setLoading(false);
+      setLoading(false); // Luôn tắt loading
     }
   };
-
+  // --- HÀM SAO CHÉP MÃ ĐƠN ---
+  /**
+   * Hàm sao chép mã đơn hàng vào clipboard
+   * Sử dụng Web API: navigator.clipboard.writeText()
+   * Hiển thị toast thông báo thành công
+   *
+   * Đầu vào: code (mã đơn hàng)
+   * Đầu ra: Toast thông báo "Đã sao chép mã đơn!"
+   */
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
     toast.success("Đã sao chép mã đơn!");
   };
-
+  // --- HÀM RENDER MÔ TẢ GIAO DỊCH ---
+  /**
+   * Hàm render mô tả chi tiết cho từng loại giao dịch
+   * Logic phân loại theo item.type:
+   * - subscription: hiển thị tên gói
+   * - dia_topup: hiển thị số kim cương nhận được
+   * - voice_topup: hiển thị số ký tự voice nhận được
+   * - other: hiển thị "Giao dịch khác"
+   *
+   * Đầu vào: item (PaymentHistoryItem)
+   * Đầu ra: JSX Element (span với nội dung tương ứng)
+   */
   const renderPaymentDescription = (item: PaymentHistoryItem) => {
     if (item.type === "subscription") {
       return (
@@ -169,13 +221,18 @@ export default function PaymentHistoryPage() {
     }
     return <span>Giao dịch khác</span>;
   };
-
+  // --- TÍNH TOÁN PHÂN TRANG ---
+  /**
+   * Tính tổng số trang dựa trên:
+   * total (tổng số bản ghi từ API) / pageSize (20)
+   * Math.ceil làm tròn lên để đảm bảo trang cuối có đủ dữ liệu
+   */
   const totalPages = Math.ceil(total / pageSize);
 
   return (
     <div className="min-h-screen">
       <div className="max-w-7xl mx-auto space-y-8 pb-16 pt-6 px-4">
-        {/* HEADER */}
+        {/* HEADER - Tiêu đề trang */}
         <div className="space-y-2 border-b border-border/50 pb-6">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
@@ -192,11 +249,12 @@ export default function PaymentHistoryPage() {
           </div>
         </div>
 
-        {/* NỘI DUNG CHÍNH */}
+        {/* NỘI DUNG CHÍNH - Card chứa bảng giao dịch */}
         <Card className="shadow-md border-t-4 border-t-yellow-500 overflow-hidden">
           <CardHeader className="border-b border-border/50 pb-4">
             <CardTitle className="text-xl flex items-center justify-between">
               <span>Danh sách giao dịch</span>
+              {/* Badge hiển thị tổng số bản ghi khi không loading */}
               {!loading && (
                 <Badge
                   variant="secondary"
@@ -209,6 +267,7 @@ export default function PaymentHistoryPage() {
           </CardHeader>
 
           <CardContent className="p-0">
+            {/* LOADING STATE - Hiển thị khi đang tải dữ liệu */}
             {loading ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3">
                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -218,7 +277,7 @@ export default function PaymentHistoryPage() {
               </div>
             ) : payments.length > 0 ? (
               <>
-                {/*  DÙNG THẺ TABLE ĐỂ CỘT THẲNG HÀNG 100%  */}
+                {/* TABLE HIỂN THỊ - Dùng thẻ table để cột thẳng hàng 100% */}
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead className="bg-muted/40 text-xs uppercase text-muted-foreground font-semibold">
@@ -245,17 +304,20 @@ export default function PaymentHistoryPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/50">
+                      {/* MAP QUA DANH SÁCH GIAO DỊCH */}
                       {payments.map((item) => {
+                        // Lấy config cho loại giao dịch từ TYPE_CONFIG
                         const config = TYPE_CONFIG[item.type] || {
                           label: "Khác",
                           icon: CreditCard,
                           colorClass: "bg-gray-100 text-gray-600",
                         };
+                        // Lấy thông tin trạng thái từ STATUS_CONFIG
                         const statusInfo = STATUS_CONFIG[item.status] || {
                           label: item.status,
                           className: "bg-gray-100 text-gray-600",
                         };
-                        const Icon = config.icon;
+                        const Icon = config.icon; // Lấy component icon
 
                         return (
                           <tr
@@ -341,12 +403,13 @@ export default function PaymentHistoryPage() {
                   </table>
                 </div>
 
-                {/* Phân trang */}
+                {/* Phân trang - chỉ hiển thị khi có nhiều hơn 1 trang */}
                 {totalPages > 1 && (
                   <div className="py-4 border-t border-border/50 flex justify-center">
                     <Pagination>
                       <PaginationContent>
                         <PaginationItem>
+                          {/* Nút Previous: vô hiệu hóa khi ở trang 1 */}
                           <PaginationPrevious
                             onClick={() => setPage((p) => Math.max(1, p - 1))}
                             className={
@@ -364,6 +427,7 @@ export default function PaymentHistoryPage() {
                         </PaginationItem>
 
                         <PaginationItem>
+                          {/* Nút Next: vô hiệu hóa khi ở trang cuối */}
                           <PaginationNext
                             onClick={() =>
                               setPage((p) => Math.min(totalPages, p + 1))
@@ -381,6 +445,7 @@ export default function PaymentHistoryPage() {
                 )}
               </>
             ) : (
+              /* EMPTY STATE - Khi không có giao dịch nào */
               <div className="text-center py-20 bg-muted/10">
                 <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                   <Receipt className="h-10 w-10 text-muted-foreground/50" />

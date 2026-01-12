@@ -1,4 +1,32 @@
 // app/author/story/[id]/chapter/[chapterId]/page.tsx
+/**
+ * TRANG CHI TIẾT CHƯƠNG TRUYỆN VỚI CHẾ ĐỘ CHỈNH SỬA INLINE
+ *
+ * MỤC ĐÍCH:
+ * - Cung cấp giao diện quản lý toàn diện cho một chương truyện
+ * - Kết hợp cả chức năng xem và chỉnh sửa trong một trang
+ * - Quản lý vòng đời đầy đủ của chương (draft → review → published/rejected)
+ *
+ * CHỨC NĂNG CHÍNH:
+ * 1. Hiển thị thông tin chương với giao diện ribbon trạng thái trực quan
+ * 2. Hỗ trợ chỉnh sửa inline (tiêu đề, nội dung, loại truy cập) với Tiptap Editor
+ * 3. Quản lý vòng đời chương: draft → submit for review → pending → published/rejected
+ * 4. Tích hợp tính năng Voice AI (theo rank tác giả)
+ * 5. Xử lý rút chương về bản nháp khi bị từ chối
+ * 6. Hiển thị đánh giá AI và phản hồi từ Content Moderator
+ * 7. Tự động reload dữ liệu sau các thao tác quan trọng
+ *
+ * ĐIỂM KHÁC BIỆT VỚI CÁC TRANG KHÁC:
+ * - Có cả view mode và edit mode trong cùng trang
+ * - Có Tiptap Editor chuyên nghiệp thay vì textarea
+ * - Có nhiều action buttons hơn (submit, withdraw, edit, save)
+ *
+ * ĐỐI TƯỢNG SỬ DỤNG: Tác giả (Author) quản lý vòng đời đầy đủ của một chương truyện
+ * LIÊN KẾT VỚI FILE KHÁC:
+ * - Sử dụng TiptapEditor component cho rich text editing
+ * - Sử dụng VoiceChapterPlayer cho tính năng audio
+ * - Sử dụng AiModerationReport cho đánh giá AI
+ */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -53,7 +81,11 @@ import VoiceChapterPlayer from "@/components/author/VoiceChapterPlayer";
 import { profileService } from "@/services/profileService";
 import { voiceChapterService } from "@/services/voiceChapterService";
 import { AiModerationReport } from "@/components/AiModerationReport";
-// Hàm trích xuất phần tiếng Việt từ AI Feedback
+
+/**
+ * Hàm trích xuất phần tiếng Việt từ AI Feedback
+ * Tương tự như trong file view/page.tsx
+ */
 const extractVietnameseFeedback = (feedback: string | null): string | null => {
   if (!feedback) return null;
 
@@ -67,7 +99,9 @@ const extractVietnameseFeedback = (feedback: string | null): string | null => {
   return feedback;
 };
 
-// Custom components để style markdown
+/**
+ * Custom components để style markdown - giống file view/page.tsx
+ */
 const markdownComponents = {
   // Style cho các thẻ HTML cơ bản
   h1: ({ node, ...props }: any) => (
@@ -135,7 +169,11 @@ const markdownComponents = {
   ),
 };
 
-// Hàm phát hiện xem nội dung có phải là Markdown không
+/**
+ * HÀM PHÁT HIỆN NỘI DUNG CÓ PHẢI LÀ MARKDOWN KHÔNG
+ * (Giống hàm trong file view/page.tsx)
+ */
+
 const isMarkdownContent = (content: string): boolean => {
   if (!content) return false;
 
@@ -154,7 +192,10 @@ const isMarkdownContent = (content: string): boolean => {
   return markdownPatterns.some((pattern) => pattern.test(content));
 };
 
-// Hàm phát hiện xem nội dung có phải là HTML từ Rich Text Editor không
+/**
+ * HÀM PHÁT HIỆN NỘI DUNG CÓ PHẢI LÀ HTML TỪ RICH TEXT EDITOR
+ * (Giống hàm trong file view/page.tsx)
+ */
 const isHTMLContent = (content: string): boolean => {
   if (!content) return false;
 
@@ -190,7 +231,10 @@ const isHTMLContent = (content: string): boolean => {
   return hasHTMLTag || hasClosingTag;
 };
 
-// Hàm hiển thị nội dung HTML từ Rich Text Editor
+/**
+ * HÀM HIỂN THỊ NỘI DUNG HTML TỪ RICH TEXT EDITOR
+ * (Giống hàm trong file view/page.tsx)
+ */
 const renderHTMLContent = (content: string) => {
   return (
     <div
@@ -206,7 +250,10 @@ const renderHTMLContent = (content: string) => {
   );
 };
 
-// Hàm hiển thị nội dung với định dạng phù hợp
+/**
+ * HÀM HIỂN THỊ NỘI DUNG VỚI ĐỊNH DẠNG PHÙ HỢP
+ * (Giống hàm trong file view/page.tsx)
+ */
 const renderContent = (content: string) => {
   // Kiểm tra nếu là HTML từ Rich Text Editor
   if (isHTMLContent(content)) {
@@ -240,35 +287,56 @@ const renderContent = (content: string) => {
   }
 };
 
+/**
+ * COMPONENT CHÍNH: AuthorChapterDetailPage
+ *
+ * MỤC ĐÍCH: Trang chi tiết chương với chế độ edit inline
+ * KHÁC BIỆT với file view/page.tsx:
+ * - Có thể chỉnh sửa trực tiếp (inline editing)
+ * - Có nhiều action hơn: submit for review, withdraw, etc.
+ * - Có Tiptap Editor chuyên nghiệp
+ */
 export default function AuthorChapterDetailPage() {
+  // Lấy params từ URL
   const params = useParams();
   const router = useRouter();
   const storyId = params.id as string;
   const chapterId = params.chapterId as string;
-  const [showModeratorAlert, setShowModeratorAlert] = useState(false);
-  const [chapter, setChapter] = useState<ChapterDetails | null>(null);
-  const [chapterContent, setChapterContent] = useState<string>("");
-  const [isContentReady, setIsContentReady] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingContent, setIsLoadingContent] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isWithdrawing, setIsWithdrawing] = useState(false);
-  const [authorRank, setAuthorRank] = useState<string>("Casual");
-  const [rankLoading, setRankLoading] = useState(true);
-  const [voicePrice, setVoicePrice] = useState<number | null>(null);
+
+  // State cho hiển thị cảnh báo moderator
+  const [showModeratorAlert, setShowModeratorAlert] = useState(false); // Hiển thị cảnh báo moderator
+
+  // State chính
+  const [chapter, setChapter] = useState<ChapterDetails | null>(null); // Dữ liệu chapter
+  const [chapterContent, setChapterContent] = useState<string>(""); // Nội dung để hiển thị
+  const [isContentReady, setIsContentReady] = useState(false); // Content đã sẵn sàng
+  const [isLoading, setIsLoading] = useState(true); // Đang tải dữ liệu
+  const [isLoadingContent, setIsLoadingContent] = useState(false); // Đang tải content
+  const [isSubmitting, setIsSubmitting] = useState(false); // Đang submit for review
+  const [isWithdrawing, setIsWithdrawing] = useState(false); // Đang withdraw chapter
+  // State cho author rank và voice AI
+  const [authorRank, setAuthorRank] = useState<string>("Casual"); // Rank tác giả
+  const [rankLoading, setRankLoading] = useState(true); // Đang tải rank
+  const [voicePrice, setVoicePrice] = useState<number | null>(null); // Giá voice AI
   // State mới cho chế độ chỉnh sửa
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false); // Đang ở chế độ edit
+  const [isSaving, setIsSaving] = useState(false); // Đang lưu edit
+  // State cho form edit
   const [editFormData, setEditFormData] = useState({
     title: "",
     content: "",
     languageCode: "vi-VN" as "vi-VN" | "en-US" | "zh-CN" | "ja-JP",
     accessType: "free" as "free" | "dias",
   });
+  // Giới hạn cho tiêu đề
   const TITLE_MIN_LENGTH = 10;
   const TITLE_MAX_LENGTH = 50;
   // State theo dõi thay đổi chưa lưu
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  /**
+   * Hàm xử lý lỗi API thống nhất - giống các file trước
+   */
   const handleApiError = (error: any, defaultMessage: string) => {
     // 1. Check lỗi Validation/Logic từ Backend
     if (error.response && error.response.data && error.response.data.error) {
@@ -296,14 +364,24 @@ export default function AuthorChapterDetailPage() {
     const fallbackMsg = error.response?.data?.message || defaultMessage;
     toast.error(fallbackMsg);
   };
-  // -------------------
-  // Hàm xử lý thay đổi từ Tiptap Editor
+  /**
+   * HÀM XỬ LÝ THAY ĐỔI TỪ TIPTAP EDITOR
+   *
+   * MỤC ĐÍCH: Cập nhật content và đánh dấu có thay đổi chưa lưu
+   * INPUT: html string từ TiptapEditor
+   */
   const handleEditorChange = (html: string) => {
     setEditFormData((prev) => ({ ...prev, content: html }));
-    setHasUnsavedChanges(true);
+    setHasUnsavedChanges(true); // Đánh dấu có thay đổi chưa lưu
   };
 
-  // Hàm reload không hiển thị loading - ĐÃ ĐƯỢC TỐI ƯU
+  /**
+   * HÀM RELOAD CHAPTER KHÔNG HIỂN THỊ LOADING - ĐÃ ĐƯỢC TỐI ƯU
+   *
+   * MỤC ĐÍCH: Refresh dữ liệu sau khi thao tác thành công
+   * LOGIC: Load lại dữ liệu từ API nhưng không hiển thị loading spinner
+   * SỬ DỤNG: Sau khi submit for review, withdraw, etc.
+   */
   const reloadChapter = async () => {
     try {
       const chapterData = await chapterService.getChapterDetails(
@@ -312,7 +390,7 @@ export default function AuthorChapterDetailPage() {
       );
       setChapter(chapterData);
 
-      // Cập nhật form data
+      // Cập nhật form data với dữ liệu mới
       setEditFormData({
         title: chapterData.title,
         content: chapterData.content || "",
@@ -324,7 +402,7 @@ export default function AuthorChapterDetailPage() {
         accessType: (chapterData.accessType as "free" | "dias") || "free",
       });
 
-      // Cập nhật content
+      // Cập nhật content để hiển thị
       if (chapterData.content) {
         setChapterContent(chapterData.content);
       } else if (chapterData.contentPath) {
@@ -332,58 +410,80 @@ export default function AuthorChapterDetailPage() {
       } else {
         setChapterContent("");
       }
-
+      // Hiển thị cảnh báo nếu có ghi chú từ moderator
       if (chapterData.moderatorNote) {
         setShowModeratorAlert(true);
       }
-      // } catch (error: any) {
-      //   console.error("Error reloading chapter:", error);
-      //   toast.error(error.message || "Không thể tải thông tin chương");
-      // }
     } catch (error: any) {
       console.error("Error reloading chapter:", error);
       // --- DÙNG HELPER ---
       handleApiError(error, "Không thể tải thông tin chương");
     }
   };
+
+  /**
+   * useEffect 1: LẤY RANK CỦA TÁC GIẢ
+   *
+   * MỤC ĐÍCH: Xác định quyền sử dụng tính năng Audio AI
+   * DEPENDENCIES: [] → chỉ chạy 1 lần khi component mount
+   */
   useEffect(() => {
     profileService.getAuthorRank().then((rank) => {
       setAuthorRank(rank);
       setRankLoading(false);
     });
   }, []);
+
+  /**
+   * useEffect 2: TẢI THÔNG TIN CHƯƠNG KHI storyId HOẶC chapterId THAY ĐỔI
+   *
+   * MỤC ĐÍCH: Load dữ liệu chapter khi vào trang hoặc chuyển chapter
+   * DEPENDENCIES: [storyId, chapterId]
+   */
   useEffect(() => {
     loadChapter();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storyId, chapterId]);
 
+  /**
+   * HÀM TẢI THÔNG TIN CHƯƠNG CHÍNH
+   *
+   * MỤC ĐÍCH: Load tất cả dữ liệu liên quan đến chapter
+   * LOGIC ƯU TIÊN TẢI NỘI DUNG:
+   * 1. contentPath (file trong storage) → ưu tiên cao nhất
+   * 2. content (trong database) → fallback
+   */
   const loadChapter = async () => {
     setIsLoading(true);
     setIsContentReady(false);
     try {
+      // 1. Lấy thông tin chương từ API
       const chapterData = await chapterService.getChapterDetails(
         storyId,
         chapterId
       );
       setChapter(chapterData);
+
+      // 2. Lấy thông tin voice AI
       const voiceData = await voiceChapterService
         .getVoiceChapter(chapterId)
         .catch(() => null);
       // Lấy giá của giọng đầu tiên (nếu có)
       setVoicePrice(voiceData?.voices?.[0]?.priceDias ?? null);
 
-      // Khởi tạo form edit (dùng title, language... trước)
+      // 3. Khởi tạo form edit
       setEditFormData({
         title: chapterData.title,
         content: "", // để trống trước, lát sẽ load từ file
         languageCode: chapterData.languageCode as any,
         accessType: (chapterData.accessType as "free" | "dias") || "free",
       });
-
+      // 4. Hiển thị cảnh báo moderator nếu có
       if (chapterData.moderatorNote) {
         setShowModeratorAlert(true);
       }
 
+      // 5. TẢI NỘI DUNG VỚI LOGIC ƯU TIÊN:
       // ƯU TIÊN CAO NHẤT: DÙ CÓ content TRONG DB HAY KHÔNG → VẪN LẤY TỪ contentPath NẾU CÓ
       if (chapterData.contentPath) {
         await loadChapterContent(chapterData.contentPath);
@@ -399,12 +499,6 @@ export default function AuthorChapterDetailPage() {
         setChapterContent("");
         setIsContentReady(true);
       }
-      // } catch (error: any) {
-      //   console.error("Error loading chapter:", error);
-      //   toast.error(error.message || "Không thể tải thông tin chương");
-      // } finally {
-      //   setIsLoading(false);
-      // }
     } catch (error: any) {
       console.error("Error loading chapter:", error);
       // --- DÙNG HELPER ---
@@ -413,9 +507,15 @@ export default function AuthorChapterDetailPage() {
       setIsLoading(false);
     }
   };
+
+  /**
+   * Hàm tải nội dung từ file (contentPath)
+   * Gọi API proxy để lấy nội dung từ storage
+   */
   const loadChapterContent = async (contentPath: string) => {
     setIsLoadingContent(true);
     try {
+      // Gọi API proxy
       const response = await fetch(
         `/api/chapter-content?path=${encodeURIComponent(contentPath)}`
       );
@@ -429,6 +529,7 @@ export default function AuthorChapterDetailPage() {
 
       const fileContent = data.content || "";
 
+      // Cập nhật state hiển thị
       setChapterContent(fileContent);
 
       // <<< QUAN TRỌNG: Nếu đang edit → cập nhật luôn vào editor >>>
@@ -455,6 +556,10 @@ export default function AuthorChapterDetailPage() {
     }
   };
 
+  /**
+   * Hàm tải nội dung về máy
+   * Tương tự như trong file view/page.tsx
+   */
   const handleDownloadContent = () => {
     if (!chapterContent || !chapter) return;
 
@@ -469,7 +574,15 @@ export default function AuthorChapterDetailPage() {
     URL.revokeObjectURL(url);
   };
 
-  // HÀM SUBMIT ĐÃ ĐƯỢC SỬA - TỰ ĐỘNG RELOAD KHI CÓ LỖI
+  /**
+   * HÀM SUBMIT ĐÃ ĐƯỢC SỬA - TỰ ĐỘNG RELOAD KHI CÓ LỖI
+   *
+   * MỤC ĐÍCH: Gửi chương cho AI đánh giá
+   * LOGIC:
+   * 1. Gọi API submitChapterForReview
+   * 2. Tự động reload dữ liệu sau khi thành công
+   * 3. Reload lại khi có lỗi để đảm bảo UI đồng bộ
+   */
   const handleSubmitForReview = async () => {
     if (!chapter) return;
 
@@ -480,27 +593,6 @@ export default function AuthorChapterDetailPage() {
 
       // RELOAD LẠI CHAPTER SAU KHI SUBMIT THÀNH CÔNG
       await reloadChapter();
-      // } catch (error: any) {
-      //   console.error("Error submitting chapter:", error);
-
-      //   // QUAN TRỌNG: RELOAD LẠI CHAPTER KHI CÓ LỖI
-      //   await reloadChapter();
-
-      //   // Hiển thị thông báo lỗi cụ thể
-      //   if (error.response?.data?.error?.code === "InvalidChapterState") {
-      //     toast.error(
-      //       "Chương không ở trạng thái có thể gửi. Chỉ chương ở trạng thái bản nháp mới được gửi."
-      //     );
-      //   } else if (error.response?.data?.error?.code === "ChapterRejectedByAi") {
-      //     toast.error(
-      //       "Chương bị từ chối bởi hệ thống kiểm duyệt tự động của ToraNovel"
-      //     );
-      //   } else {
-      //     toast.error(error.message || "Có lỗi xảy ra khi gửi chương");
-      //   }
-      // } finally {
-      //   setIsSubmitting(false);
-      // }
     } catch (error: any) {
       console.error("Error submitting chapter:", error);
 
@@ -514,6 +606,12 @@ export default function AuthorChapterDetailPage() {
     }
   };
 
+  /**
+   * HÀM BẮT ĐẦU CHỈNH SỬA CHƯƠNG
+   *
+   * MỤC ĐÍCH: Chuyển sang chế độ edit và khởi tạo form
+   * LOGIC: Copy dữ liệu từ chapter hiện tại vào editFormData
+   */
   const handleEditChapter = () => {
     const currentContent = chapterContent || chapter?.content || "";
 
@@ -525,8 +623,17 @@ export default function AuthorChapterDetailPage() {
     });
 
     setIsEditing(true);
-    setHasUnsavedChanges(false);
+    setHasUnsavedChanges(false); // Reset trạng thái thay đổi
   };
+
+  /**
+   * HÀM HỦY CHỈNH SỬA
+   *
+   * MỤC ĐÍCH: Quay lại chế độ view và khôi phục dữ liệu gốc
+   * LOGIC:
+   * 1. Hiển thị confirm nếu có thay đổi chưa lưu
+   * 2. Khôi phục dữ liệu gốc từ chapter state
+   */
   const handleCancelEdit = () => {
     if (hasUnsavedChanges) {
       const confirmLeave = window.confirm(
@@ -551,7 +658,18 @@ export default function AuthorChapterDetailPage() {
     setHasUnsavedChanges(false);
   };
 
-  // HÀM WITHDRAW ĐÃ ĐƯỢC SỬA - TỰ ĐỘNG RELOAD
+  /**
+   * HÀM WITHDRAW ĐÃ ĐƯỢC SỬA - TỰ ĐỘNG RELOAD
+   *
+   * MỤC ĐÍCH: Rút chương về bản nháp để chỉnh sửa lại (khi bị từ chối)
+   * LOGIC CHI TIẾT:
+   * 1. Chỉ cho phép khi chapter status = "rejected"
+   * 2. Confirm với user
+   * 3. Gọi API withdrawChapter
+   * 4. Tự tay lấy lại dữ liệu mới nhất (không dùng reloadChapter)
+   * 5. Cập nhật đồng loạt UI state
+   * 6. Tự động chuyển sang chế độ edit
+   */
   const handleWithdraw = async () => {
     if (chapter?.status !== "rejected") {
       toast.error("Chỉ có thể rút chương khi bị từ chối");
@@ -569,7 +687,7 @@ export default function AuthorChapterDetailPage() {
       // 1. Gọi API rút chương
       await chapterService.withdrawChapter(chapterId);
 
-      // 2. Tự tay lấy lại dữ liệu mới nhất (Không dùng reloadChapter để tránh lằng nhằng)
+      // 2. Tự tay lấy lại dữ liệu mới nhất
       const freshChapterData = await chapterService.getChapterDetails(
         storyId,
         chapterId
@@ -609,19 +727,6 @@ export default function AuthorChapterDetailPage() {
       setIsEditing(true);
 
       toast.success("Đã rút chương về bản nháp thành công!");
-      // } catch (err: any) {
-      //   console.error("Error withdrawing chapter:", err);
-      //   // Nếu lỗi thì mới dùng reloadChapter để cứu vớt UI
-      //   await reloadChapter();
-
-      //   if (err.response?.data?.error?.code === "WithdrawNotAllowed") {
-      //     toast.error("Chỉ có thể rút chương khi bị từ chối");
-      //   } else {
-      //     toast.error(err.message || "Không thể rút chương");
-      //   }
-      // } finally {
-      //   setIsWithdrawing(false);
-      // }
     } catch (err: any) {
       console.error("Error withdrawing chapter:", err);
       // Nếu lỗi thì mới dùng reloadChapter để cứu vớt UI
@@ -633,7 +738,16 @@ export default function AuthorChapterDetailPage() {
       setIsWithdrawing(false);
     }
   };
-  // HÀM LƯU ĐÃ ĐƯỢC TỐI ƯU
+
+  /**
+   * HÀM LƯU ĐÃ ĐƯỢC TỐI ƯU
+   *
+   * MỤC ĐÍCH: Lưu thay đổi khi chỉnh sửa inline
+   * LOGIC:
+   * 1. Validation dữ liệu (title, content)
+   * 2. Gọi API updateChapter
+   * 3. Cập nhật state ngay lập tức (không cần reload)
+   */
   const handleSaveEdit = async () => {
     if (!chapter) return;
 
@@ -661,6 +775,7 @@ export default function AuthorChapterDetailPage() {
 
     setIsSaving(true);
     try {
+      // Gọi API cập nhật chương
       const updatedChapter = await chapterService.updateChapter(
         storyId,
         chapterId,
@@ -672,19 +787,13 @@ export default function AuthorChapterDetailPage() {
         }
       );
 
-      // CẬP NHẬT STATE NGAY LẬP TỨC
+      // CẬP NHẬT STATE NGAY LẬP TỨC (không cần reload)
       setChapter(updatedChapter);
       setChapterContent(editFormData.content);
 
       toast.success("Cập nhật chương thành công!");
       setIsEditing(false);
       setHasUnsavedChanges(false);
-      // } catch (error: any) {
-      //   console.error("Error updating chapter:", error);
-      //   toast.error(error.message || "Có lỗi xảy ra khi cập nhật chương");
-      // } finally {
-      //   setIsSaving(false);
-      // }
     } catch (error: any) {
       console.error("Error updating chapter:", error);
       // --- DÙNG HELPER ---
@@ -694,6 +803,10 @@ export default function AuthorChapterDetailPage() {
     }
   };
 
+  /**
+   * Hàm xử lý thay đổi input/textarea
+   * Cập nhật form data và đánh dấu có thay đổi
+   */
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -702,21 +815,31 @@ export default function AuthorChapterDetailPage() {
       ...prev,
       [name]: value,
     }));
-    setHasUnsavedChanges(true);
+    setHasUnsavedChanges(true); // Đánh dấu có thay đổi
   };
 
+  /**
+   * HÀM XỬ LÝ THAY ĐỔI SELECT
+   * (Giống hàm trong file edit/page.tsx)
+   */
   const handleSelectChange = (name: string, value: string) => {
     setEditFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
-    setHasUnsavedChanges(true);
+    setHasUnsavedChanges(true); // Đánh dấu có thay đổi
   };
 
+  /**
+   * HÀM QUAY LẠI DANH SÁCH CHƯƠNG
+   */
   const handleBackToChapters = () => {
     router.push(`/author/story/${storyId}/chapters`);
   };
 
+  /**
+   * HIỂN THỊ LOADING SPINNER KHI ĐANG TẢI DỮ LIỆU
+   */
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -725,6 +848,9 @@ export default function AuthorChapterDetailPage() {
     );
   }
 
+  /**
+   * HIỂN THỊ THÔNG BÁO NẾU KHÔNG TÌM THẤY CHƯƠNG
+   */
   if (!chapter) {
     return (
       <div className="text-center py-16">
@@ -736,6 +862,15 @@ export default function AuthorChapterDetailPage() {
     );
   }
 
+  /**
+   * XÁC ĐỊNH CÁC QUYỀN THAO TÁC DỰA TRÊN TRẠNG THÁI CHƯƠNG
+   *
+   * - canEdit: Chỉ được edit khi là draft
+   * - canSubmit: Chỉ được submit khi là draft
+   * - isPending: Đang chờ duyệt
+   * - isPublished: Đã xuất bản
+   * - isRejected: Bị từ chối
+   */
   const canEdit = chapter?.status === "draft";
   const canSubmit = chapter?.status === "draft";
   const isPending = chapter?.status === "pending";
@@ -746,7 +881,7 @@ export default function AuthorChapterDetailPage() {
   const vietnameseFeedback = chapter
     ? extractVietnameseFeedback(chapter.aiFeedback ?? null)
     : null;
-
+  // RENDER GIAO DIỆN CHÍNH
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-8">
       {/* Header - Thêm trạng thái chỉnh sửa */}
@@ -765,6 +900,7 @@ export default function AuthorChapterDetailPage() {
               : "Quản lý và xem thông tin chi tiết chương truyện"}
           </p>
         </div>
+        {/* Badge hiển thị khi đang chỉnh sửa */}
         {isEditing && (
           <Badge className="ml-auto bg-orange-500 hover:bg-orange-600 text-white border-none flex items-center gap-x-2 px-3 py-1.5 text-sm font-medium transition-all">
             <Pencil className="h-4 w-4" />
@@ -806,7 +942,7 @@ export default function AuthorChapterDetailPage() {
                 )}
               </Button>
             </div>
-
+            {/* Hiển thị góp ý từ moderator nếu có */}
             {chapter.moderatorNote && (
               <Alert className="mt-4 bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
                 <AlertDescription className="text-sm">
@@ -817,13 +953,14 @@ export default function AuthorChapterDetailPage() {
           </CardContent>
         </Card>
       )}
-      {/* Chapter Info - Chuyển thành form khi chỉnh sửa */}
+      {/* Card thông tin chương - Chuyển thành form khi chỉnh sửa */}
       <Card className="relative overflow-hidden">
         <CardHeader className="pt-0 pb-2">
           {/* Bỏ relative ở đây đi */}
           <div className="flex items-start justify-between">
             <div className="w-full pr-24">
               {isEditing ? (
+                /* CHẾ ĐỘ CHỈNH SỬA: Hiển thị form input */
                 <div className="space-y-2">
                   <div className="flex justify-between items-end">
                     <Label
@@ -880,6 +1017,7 @@ export default function AuthorChapterDetailPage() {
                     )}
                 </div>
               ) : (
+                /* CHẾ ĐỘ XEM: Hiển thị thông tin readonly */
                 <div className="space-y-1">
                   {" "}
                   {/* Thêm space-y-1 để khoảng cách giữa 2 dòng khít hơn */}
@@ -997,7 +1135,11 @@ export default function AuthorChapterDetailPage() {
               })()}
           </div>
         </CardHeader>
+
+        {/* Đường kẻ phân cách */}
         <div className="w-full h-[1px] -mt-6 bg-[#00416a] dark:bg-[#f0ead6]" />
+
+        {/* Nội dung chi tiết - 3 cột */}
         <CardContent className="grid md:grid-cols-3 gap-x-4 gap-y-6">
           {/* === CỘT 1 === */}
           <div className="space-y-6">
@@ -1263,8 +1405,10 @@ export default function AuthorChapterDetailPage() {
               aiViolations={chapter.aiViolations}
               contentType="chương"
             />
+            {/* 3. Thông tin từ ContentMod */}
             <div className="mt-4 pt-4 border-t border-slate-200">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Trạng thái kiểm duyệt */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200">
                     <UserCheck className="w-4 h-4 text-blue-500" />
@@ -1290,7 +1434,7 @@ export default function AuthorChapterDetailPage() {
                     </Badge>
                   </div>
                 </div>
-
+                {/* Ghi chú từ ContentMod */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200">
                     <MessageSquare className="w-4 h-4 text-blue-500" />
@@ -1372,6 +1516,7 @@ export default function AuthorChapterDetailPage() {
                     </AlertDescription>
                   </Alert>
                 )}
+                {/* Chương hidden - đã bị ẩn */}
                 {chapter.status === "hidden" && (
                   <Alert className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-700">
                     <XCircle className="h-4 w-4 text-gray-600" />
@@ -1398,6 +1543,8 @@ export default function AuthorChapterDetailPage() {
                   )}
                   Lưu thay đổi
                 </Button>
+
+                {/* Nút hủy */}
                 <Button
                   onClick={handleCancelEdit}
                   variant="outline"
@@ -1411,7 +1558,7 @@ export default function AuthorChapterDetailPage() {
           </div>
         </CardContent>
       </Card>
-      {/* Content Preview/Editor */}
+      {/* Content Preview/Editor - Hiển thị nội dung hoặc editor */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -1421,6 +1568,7 @@ export default function AuthorChapterDetailPage() {
                 {isEditing ? "Chỉnh sửa nội dung" : "Nội dung chương"}
               </CardTitle>
               <CardDescription>
+                {/* Nút tải xuống (chỉ hiện khi không editing) */}
                 {isEditing
                   ? "Sử dụng Tiptap Editor chuyên nghiệp"
                   : "Xem trước nội dung chương"}
@@ -1449,7 +1597,7 @@ export default function AuthorChapterDetailPage() {
               disabled={isSaving}
             />
           ) : (
-            // PREVIEW MODE
+            /* PREVIEW MODE - Hiển thị nội dung */
             <div className="bg-muted/50 rounded-lg p-6 min-h-[200px] max-h-[600px] overflow-y-auto">
               {isLoadingContent ? (
                 <div className="flex items-center justify-center py-8">
@@ -1468,6 +1616,7 @@ export default function AuthorChapterDetailPage() {
                       ? "Nội dung đã được xuất bản và có thể xem bởi độc giả"
                       : "Không thể tải nội dung chương"}
                   </p>
+                  {/* Nút thử tải lại nếu có contentPath */}
                   {chapter?.contentPath && (
                     <Button
                       variant="outline"

@@ -1,4 +1,17 @@
 // components/payment/VoiceTopupModal.tsx
+/**
+ * MỤC ĐÍCH: Modal hiển thị bảng giá dịch vụ tạo Audio AI cho chương truyện
+ * CHỨC NĂNG CHÍNH:
+ * - Hiển thị bảng giá theo độ dài chương truyện (tính bằng ký tự)
+ * - Hiển thị 2 cột giá: Phí tạo (cho tác giả) và Giá bán (cho độc giả)
+ * - Hiển thị số dư ví tác giả và giới thiệu dịch vụ AI Voice Studio
+ * - Cảnh báo về tính phí khi chọn nhiều giọng đọc
+ * LOGIC XỬ LÝ:
+ * - Parallel data fetching: Load bảng giá và số dư ví cùng lúc
+ * - Format số với toLocaleString() cho dễ đọc
+ * - Hiển thị khoảng ký tự: "min - max" hoặc "min trở lên"
+ * - Responsive table với hover effect
+ */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -35,21 +48,36 @@ import {
 import { authorRevenueService } from "@/services/authorRevenueService";
 
 interface VoiceTopupModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen: boolean; // Trạng thái mở/đóng modal
+  onClose: () => void; // Hàm đóng modal
 }
 
 export function VoiceTopupModal({ isOpen, onClose }: VoiceTopupModalProps) {
+  /**
+   * State quản lý:
+   * - pricingRules: Danh sách quy tắc tính giá
+   * - balance: Số dư ví của tác giả
+   * - isLoading: Trạng thái loading
+   */
   const [pricingRules, setPricingRules] = useState<PricingRule[]>([]);
   const [balance, setBalance] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
-
+  /**
+   * Effect: Load dữ liệu khi modal mở
+   * - Lấy danh sách pricing rules từ API
+   * - Lấy số dư ví từ API
+   */
   useEffect(() => {
     if (isOpen) {
       loadData();
     }
   }, [isOpen]);
-
+  /**
+   * Hàm load dữ liệu song song:
+   * 1. Lấy bảng giá từ voiceChapterService
+   * 2. Lấy thông tin số dư từ authorRevenueService
+   * Sử dụng Promise.all để tối ưu performance
+   */
   const loadData = async () => {
     setIsLoading(true);
     try {
@@ -83,14 +111,14 @@ export function VoiceTopupModal({ isOpen, onClose }: VoiceTopupModalProps) {
         </button>
 
         <div className="flex h-full w-full">
-          {/* --- CỘT TRÁI: ĐÃ CHỈNH LẠI WIDTH VÀ TEXT --- */}
-          {/* w-[320px] là kích thước chuẩn, text nhỏ lại để thoáng hơn */}
+          {/* --- CỘT TRÁI: GIỚI THIỆU DỊCH VỤ --- */}
           <div className="w-[320px] flex-shrink-0 bg-gradient-to-br from-[#667eea] via-[#764ba2] to-[#6B8DD6] p-8 text-white flex flex-col relative overflow-hidden">
             {/* Background Effects */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-purple-300/20 rounded-full blur-[60px] pointer-events-none translate-x-1/2 -translate-y-1/2"></div>
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-300/20 rounded-full blur-[50px] pointer-events-none -translate-x-1/2 translate-y-1/2"></div>
 
             <div className="relative z-10 flex flex-col h-full gap-6 justify-center">
+              {/* Header */}
               <div>
                 <div className="inline-flex items-center gap-2 mb-4 bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/20 shadow-sm">
                   <AudioWaveform className="h-4 w-4 text-purple-200" />
@@ -98,7 +126,7 @@ export function VoiceTopupModal({ isOpen, onClose }: VoiceTopupModalProps) {
                     AI Voice Studio
                   </span>
                 </div>
-                {/* Giảm size chữ tiêu đề xuống text-3xl cho vừa vặn */}
+
                 <h2 className="text-3xl font-bold mb-3 leading-tight">
                   Bảng Giá <br /> Dịch Vụ
                 </h2>
@@ -107,7 +135,7 @@ export function VoiceTopupModal({ isOpen, onClose }: VoiceTopupModalProps) {
                   truyện của bạn.
                 </p>
               </div>
-
+              {/* Card quyền lợi */}
               <div className="flex-1 flex flex-col justify-center mt-2">
                 <div className="bg-white/10 backdrop-blur-xl rounded-xl p-5 border border-white/20 shadow-lg">
                   <h3 className="text-base font-bold mb-4 flex items-center gap-2">
@@ -138,7 +166,7 @@ export function VoiceTopupModal({ isOpen, onClose }: VoiceTopupModalProps) {
             </div>
           </div>
 
-          {/* --- CỘT PHẢI: BẢNG GIÁ --- */}
+          {/* --- CỘT PHẢI: BẢNG GIÁ CHI TIẾT --- */}
           <div className="flex-1 min-w-0 bg-white dark:bg-card flex flex-col h-full">
             {/* Header */}
             <div className="flex-shrink-0 flex items-center justify-between px-8 py-6 border-b border-border/50">
@@ -152,7 +180,7 @@ export function VoiceTopupModal({ isOpen, onClose }: VoiceTopupModalProps) {
                 </DialogDescription>
               </div>
 
-              {/* Badge Số dư nhỏ gọn hơn */}
+              {/* Hiển thị số dư ví */}
               <div className="bg-indigo-50 dark:bg-muted px-4 py-2 rounded-lg border border-indigo-100 dark:border-indigo-900 shadow-sm flex flex-col items-end whitespace-nowrap mr-6">
                 <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-0.5">
                   Số dư ví
@@ -169,7 +197,7 @@ export function VoiceTopupModal({ isOpen, onClose }: VoiceTopupModalProps) {
               </div>
             </div>
 
-            {/* Content Table */}
+            {/* Bảng giá chi tiết */}
             <div className="flex-1 px-8 py-6 flex flex-col">
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center h-full">
@@ -180,11 +208,11 @@ export function VoiceTopupModal({ isOpen, onClose }: VoiceTopupModalProps) {
                 </div>
               ) : (
                 <div className="flex flex-col gap-5 h-full">
+                  {/* Bảng giá chi tiết */}
                   <div className="rounded-lg border overflow-hidden shadow-sm">
                     <Table>
                       <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
                         <TableRow className="h-10">
-                          {/* Font chữ bảng giảm về text-sm hoặc text-base */}
                           <TableHead className="w-[45%] text-slate-900 dark:text-slate-100 font-semibold text-sm pl-6">
                             Độ dài chương (Ký tự)
                           </TableHead>
@@ -202,6 +230,7 @@ export function VoiceTopupModal({ isOpen, onClose }: VoiceTopupModalProps) {
                             key={index}
                             className="hover:bg-slate-50/50 transition-colors h-12"
                           >
+                            {/* Hiển thị khoảng ký tự */}
                             <TableCell className="font-medium text-sm pl-6">
                               {rule.minCharCount.toLocaleString()}
                               {" - "}
@@ -209,6 +238,7 @@ export function VoiceTopupModal({ isOpen, onClose }: VoiceTopupModalProps) {
                                 ? rule.maxCharCount.toLocaleString()
                                 : "Trở lên"}
                             </TableCell>
+                            {/* Phí tạo (chi phí cho tác giả) */}
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1.5 text-sm font-semibold">
                                 {rule.generationCostDias}
@@ -220,6 +250,7 @@ export function VoiceTopupModal({ isOpen, onClose }: VoiceTopupModalProps) {
                                 </div>
                               </div>
                             </TableCell>
+                            {/* Giá bán (giá bán cho độc giả) */}
                             <TableCell className="text-right pr-6">
                               <div className="flex items-center justify-end gap-1.5 text-sm font-semibold">
                                 {rule.sellingPriceDias}

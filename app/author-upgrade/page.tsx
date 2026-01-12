@@ -1,4 +1,29 @@
 //app/author-upgrade/page.tsx
+
+/* 
+MỤC ĐÍCH: Trang đăng ký trở thành Tác giả LẦN ĐẦU (cho user chưa là tác giả)
+CHỨC NĂNG CHÍNH:
+- Form đăng ký với điều khoản và cam kết (copy text)
+- Hiển thị 4 trạng thái: default, pending, rejected, approved
+- Xử lý tự động refresh token khi được approved
+- Handle rate limiting (429) với thông báo thời gian chờ
+- Parse lý do từ chối từ backend format đặc biệt
+
+KHÁC BIỆT VỚI author/author-upgrade-rank/page.tsx:
+- Trang này: Đăng ký LÀM TÁC GIẢ lần đầu (từ reader → author)
+- Trang kia: NÂNG CẤP HẠNG TÁC GIẢ (từ Casual → Bronze → Gold → Diamond)
+
+LOGIC FLOW:
+1. User chưa là tác giả → vào trang này
+2. Gửi yêu cầu → status: pending
+3. Admin duyệt → status: approved → tự động refresh token
+4. Nếu bị từ chối → status: rejected → hiện lý do → có thể gửi lại
+
+QUAN HỆ VỚI HỆ THỐNG:
+- Service: @/services/authorUpgradeService
+- Auth: @/context/AuthContext (lấy user, refresh token)
+- API: /author-upgrade/request (POST), /author-upgrade/my-requests (GET)
+*/
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -35,20 +60,39 @@ import { useAuth } from "@/context/AuthContext";
 import { Navbar } from "@/components/layout/Navbar";
 import { Textarea } from "@/components/ui/textarea";
 import { useRouter, useSearchParams } from "next/navigation";
-// Định nghĩa các trạng thái của GIAO DIỆN
+/**
+ * ĐỊNH NGHĨA TRẠNG THÁI GIAO DIỆN (UI STATUS)
+ * LÝ DO KHÔNG DÙNG TRỰC TIẾP API STATUS:
+ * - API dùng uppercase ("PENDING") nhưng UI muốn lowercase ("pending")
+ * - Tách biệt concern: API layer và UI layer
+ * - Dễ mapping và xử lý hiển thị (có thêm "default" state)
+ * - Type safety: TypeScript kiểm tra giá trị hợp lệ
+ */
 type UpgradeStatus = "default" | "pending" | "rejected" | "approved";
 
-// Kiểu dữ liệu cho state local
+/**
+ * INTERFACE CHO STATE LOCAL CỦA REQUEST
+ * Bao gồm các thông tin cần thiết cho UI:
+ * - status: trạng thái hiển thị (UI Status)
+ * - submittedDate: ngày gửi (đã format vi-VN)
+ * - rejectionReason: lý do từ chối (nếu có, đã parse từ content)
+ */
 interface LocalUpgradeRequest {
   status: UpgradeStatus;
   submittedDate?: string;
   rejectionReason?: string;
 }
+/**
+ * ĐỊNH NGHĨA CAM KẾT VÀ ĐIỀU KHOẢN
+ * ---------------------------------
+ * LÝ DO ĐẶT CONST NGOÀI COMPONENT:
+ * - Tái sử dụng: dùng ở nhiều nơi (validation, display)
+ * - Dễ chỉnh sửa: thay đổi content ở 1 chỗ
+ * - Tách biệt logic và content
+ * - Tránh hardcode string trong component
+ */
 
-// ĐỊNH NGHĨA CAM KẾT VÀ ĐIỀU KHOẢN
-// ---------------------------------
-
-// Text cam kết (để gửi đi)
+// Text cam kết (để gửi đi) - user phải gõ lại chính xác
 const COMMITMENT_TEXT =
   "Tôi đã đọc và đồng ý với điều khoản, quy định của Tora Novel. Tôi cam kết tuân thủ các quy tắc về nội dung, bản quyền và xây dựng cộng đồng lành mạnh.";
 
@@ -80,12 +124,19 @@ const TERMS_AND_CONDITIONS = [
   },
 ];
 
-// BỔ SUNG ĐỐI TƯỢNG CONFIG CHO STATUS BADGE
+/**
+ * CONFIG OBJECT CHO STATUS BADGE HIỂN THỊ
+ * LÝ DO DÙNG CONFIG OBJECT:
+ * - Tập trung hóa config: màu sắc, icon, className
+ * - Tránh code điều kiện rải rác (if-else trong JSX)
+ * - Dễ thêm status mới: chỉ cần thêm vào object
+ * - Dễ chỉnh sửa style: thay đổi ở 1 chỗ
+ */
 const STATUS_DISPLAY_CONFIG: {
   [key in UpgradeStatus]: {
-    text: string;
-    icon: React.ElementType;
-    className: string;
+    text: string; // Text hiển thị
+    icon: React.ElementType; // Icon component
+    className: string; // CSS classes cho badge
   };
 } = {
   default: {
@@ -115,22 +166,29 @@ const STATUS_DISPLAY_CONFIG: {
 
 export default function AuthorUpgradePage() {
   const searchParams = useSearchParams();
-
+  /**
+   * XỬ LÝ ERROR MESSAGE TỪ URL PARAM (redirect từ trang khác)
+   * LÝ DO:
+   * - Khi redirect từ trang khác (ví dụ: middleware) có thể truyền error message qua URL
+   * - Dùng searchParams.get() để lấy message
+   * - Hiển thị toast và xóa khỏi URL để tránh hiển thị lại khi refresh
+   */
   useEffect(() => {
     const message = searchParams.get("message");
     if (message) {
       toast.error(message);
-      // Xóa message khỏi URL sau khi hiển thị
+      // Xóa message khỏi URL sau khi hiển thị (clean URL)
       window.history.replaceState({}, "", "/author-upgrade");
     }
   }, [searchParams]);
 
-  //  KHAI BÁO STATE
-  // ---------------------------------
-  //const { user, isLoading: isAuthLoading } = useAuth(); // Lấy trạng thái auth
-  // Thêm refreshAndUpdateUser vào đây
+  // ================ STATE DECLARATIONS ================
+
+  /**
+   * STATE CHÍNH QUẢN LÝ TRẠNG THÁI UI
+   */
   const { user, isLoading: isAuthLoading, refreshAndUpdateUser } = useAuth();
-  const router = useRouter();
+  const router = useRouter(); // Mặc định chưa gửi yêu cầu
 
   // ---------------------
   // State chính quản lý trạng thái UI
@@ -141,13 +199,23 @@ export default function AuthorUpgradePage() {
   // State loading cho lần tải trang ĐẦU TIÊN
   const [isLoadingPage, setIsLoadingPage] = useState(false);
 
-  // Thêm flag để tránh fetch lại khi đã fetch xong
+  /**
+   * Thêm flag để tránh fetch lại khi đã fetch xong
+   * LÝ DO QUAN TRỌNG:
+   * - Tránh infinite loop trong useEffect
+   * - Chỉ fetch khi thực sự cần (chưa fetch hoặc force fetch)
+   * - Tối ưu performance
+   */
   const [hasFetched, setHasFetched] = useState(false);
 
   const [typedCommitment, setTypedCommitment] = useState("");
 
   // State khi đang nhấn nút "Gửi"
   const [isSubmitting, setIsSubmitting] = useState(false);
+  /**
+   * Hàm xử lý lỗi từ API một cách thống nhất
+   * Tương tự như file trước nhưng đặt trong component này để độc lập
+   */
   const handleApiError = (error: any, defaultMessage: string) => {
     // 1. Check lỗi Validation/Logic từ Backend
     if (error.response && error.response.data && error.response.data.error) {
@@ -179,12 +247,22 @@ export default function AuthorUpgradePage() {
   // BIẾN SO SÁNH CAM KẾT
   const isCommitmentMatched = typedCommitment === COMMITMENT_TEXT;
   const { updateUser } = useAuth();
-  // useEffect(() => {
-  //   if (upgradeRequest.status === "approved") {
-  //     updateUser({ role: "author" });
-  //     // toast.success("Tài khoản của bạn đã được nâng cấp lên tác giả!");
-  //   }
-  // }, [upgradeRequest.status, updateUser]);
+
+  // ================ EFFECTS ================
+
+  /**
+   * EFFECT QUAN TRỌNG: TỰ ĐỘNG REFRESH TOKEN KHI REQUEST ĐƯỢC APPROVED
+   * LÝ DO CẦN REFRESH TOKEN:
+   * - Khi user được approve làm tác giả, backend sẽ cấp token mới có role "author"
+   * - Token cũ chỉ có role "user" → không vào được trang /author/*
+   * - Cần refresh token ngay lập tức để user có quyền tác giả
+   *
+   * FLOW:
+   * 1. Khi status = "approved" và user chưa có role author
+   * 2. Gọi refreshAndUpdateUser() → fetch token mới từ backend
+   * 3. Update AuthContext với token mới (có role author)
+   * 4. Redirect về trang author overview
+   */
   useEffect(() => {
     if (upgradeRequest.status === "approved") {
       // Kiểm tra xem token hiện tại đã có role author chưa
@@ -192,6 +270,7 @@ export default function AuthorUpgradePage() {
         user?.roles?.includes("author") || user?.isAuthorApproved;
 
       // Nếu chưa có, gọi API lấy token mới ngay lập tức
+      // Nếu chưa có role author → refresh token
       if (!hasAuthorRole) {
         console.log("Đã duyệt -> Refresh token để lấy quyền Tác giả...");
         refreshAndUpdateUser().then(() => {
@@ -203,9 +282,18 @@ export default function AuthorUpgradePage() {
     }
   }, [upgradeRequest.status, user, refreshAndUpdateUser, router]);
 
-  // CÁC HÀM XỬ LÝ LOGIC
-  // ---------------------------------
-  // Thêm hàm helper để bóc tách lý do từ chối từ trường 'content'
+  // ================ HELPER FUNCTIONS ================
+
+  /**
+   * HÀM PARSE LÝ DO TỪ CHỐI TỪ TRƯỜNG 'content' CỦA BACKEND
+   * LÝ DO CẦN PARSE:
+   * - Backend lưu lý do từ chối trong field 'content' với format đặc biệt: "[REJECT_REASON]: lý do"
+   * - Cần tách riêng lý do để hiển thị đẹp trên UI
+   * - Nếu không có marker → return undefined
+   *
+   * @param content - String từ backend (có thể chứa marker)
+   * @returns string | undefined - Lý do đã được tách (hoặc undefined)
+   */
   const parseRejectionReason = (content: string): string | undefined => {
     const reasonMarker = "[REJECT_REASON]:";
     const index = content.indexOf(reasonMarker);
@@ -221,12 +309,20 @@ export default function AuthorUpgradePage() {
     return reason.length > 0 ? reason : undefined;
   };
   /**
-   * Hàm map status từ API (PENDING) sang state local (pending)
+   * HÀM MAP STATUS TỪ API (UPPERCASE) SANG STATE LOCAL (lowercase)
+   * LOGIC MAPPING:
+   * - "PENDING" → "pending"
+   * - "REJECTED" → "rejected"
+   * - "APPROVED" → "approved"
+   * - Khác → "default"
+   *
+   * @param apiStatus - Status từ API (string, có thể là ApiUpgradeStatus)
+   * @returns UpgradeStatus - Status đã được map cho UI
    */
   const mapApiStatusToLocal = (
     apiStatus: ApiUpgradeStatus | string // Chấp nhận cả string
   ): UpgradeStatus => {
-    const upperStatus = String(apiStatus).toUpperCase();
+    const upperStatus = String(apiStatus).toUpperCase(); // Đảm bảo uppercase
 
     switch (upperStatus) {
       case "PENDING":
@@ -240,39 +336,55 @@ export default function AuthorUpgradePage() {
     }
   };
   /**
-   * Hàm format ngày (ví dụ: "10/10/2025")
+   * HÀM FORMAT DATE THEO ĐỊNH DẠNG VIỆT NAM
+   * @param dateString - String date từ API (ISO format)
+   * @returns string - Date đã format "dd/MM/yyyy"
    */
   const formatDate = (dateString: string) => {
     try {
       // Dùng ngày cập nhật (updatedAt) để có ngày mới nhất
       return new Date(dateString).toLocaleDateString("vi-VN");
     } catch (e) {
-      return "không rõ";
+      return "không rõ"; // Fallback nếu parse lỗi
     }
   };
 
   /**
-   * Hàm fetch trạng thái từ API, được bọc trong useCallback
-   * @param force - Nếu true, sẽ fetch lại ngay cả khi đã fetch rồi
+   * HÀM FETCH TRẠNG THÁI TỪ API
+   * @param force - Nếu true, fetch lại ngay cả khi đã fetch rồi
+   *
+   * FLOW:
+   * 1. Check flag hasFetched để tránh fetch nhiều lần
+   * 2. Gọi API getMyRequests() → trả về array các request
+   * 3. Lấy request mới nhất (index 0 sau khi sort)
+   * 4. Parse rejectionReason từ content field
+   * 5. Map API status → UI status
+   * 6. Update state
+   *
+   * LÝ DO DÙNG useCallback:
+   * - Tránh tạo hàm mới mỗi lần render
+   * - Tránh infinite loop trong useEffect (dependency thay đổi)
    */
   const fetchUpgradeStatus = useCallback(
     async (force: boolean = false) => {
-      // Nếu đã fetch rồi và không force, không fetch lại
+      // Optimization: Nếu đã fetch và không force → không fetch lại
       if (hasFetched && !force) return;
 
       setIsLoadingPage(true);
       try {
+        // 1. Gọi API - trả về array các request
         const response = await authorUpgradeService.getMyRequests();
-
-        // API trả về mảng, chúng ta lấy request mới nhất (giả sử là vị trí 0)
+        // 2. Lấy request mới nhất (giả sử API trả về theo thứ tự mới nhất đầu tiên)
         const latestRequest = response.data[0];
-
         if (!latestRequest) {
+          // 3. Không có request nào → set default
           setUpgradeRequest({ status: "default" });
         } else {
+          // 4. Parse lý do từ chối từ content field
           const reason = parseRejectionReason(latestRequest.content);
+          // 5. Map API status sang UI status
           const mappedStatus = mapApiStatusToLocal(latestRequest.status);
-
+          // 6. Update state với thông tin đầy đủ
           setUpgradeRequest({
             status: mappedStatus,
             submittedDate: formatDate(latestRequest.createdAt),
@@ -284,6 +396,7 @@ export default function AuthorUpgradePage() {
       } catch (error) {
         const axiosError = error as AxiosError;
         if (axiosError.response?.status === 404) {
+          // 404 nghĩa là chưa có request nào -> default state
           setUpgradeRequest({ status: "default" });
           setHasFetched(true); // Vẫn đánh dấu đã fetch
         } else {
@@ -294,24 +407,39 @@ export default function AuthorUpgradePage() {
       }
     },
     [hasFetched, handleApiError]
-  ); // Thêm hasFetched vào dependency
+  ); // Dependency: chỉ chạy lại khi hasFetched thay đổi
 
   /**
-   * useEffect: Chạy khi component mount VÀ khi auth đã sẵn sàng
+   * useEffect: CHẠY KHI COMPONENT MOUNT VÀ AUTH ĐÃ SẴN SÀNG
+   * LOGIC:
+   * 1. Chờ auth loading xong (isAuthLoading = false)
+   * 2. Nếu có user và chưa fetch → fetch data
+   * 3. Nếu không có user (chưa login) → chỉ set loading false
+   *
+   * Optimization: Chỉ fetch khi user.id thay đổi (tránh fetch nhiều lần)
    */
   useEffect(() => {
     if (!isAuthLoading && user && !hasFetched) {
       fetchUpgradeStatus();
     } else if (!isAuthLoading && !user) {
-      setIsLoadingPage(false);
+      setIsLoadingPage(false); // Không có user, không cần fetch
     }
   }, [isAuthLoading, user?.id, hasFetched, fetchUpgradeStatus]); // Chỉ phụ thuộc vào user.id
 
+  // ================ EVENT HANDLERS ================
+
   /**
-   * Xử lý gửi yêu cầu (khi bấm nút ở form 'default')
+   * XỬ LÝ GỬI YÊU CẦU (Khi bấm nút ở form 'default')
+   * FLOW CHI TIẾT:
+   * 1. Validate: user đã login? đã gõ đúng cam kết?
+   * 2. Set loading state (isSubmitting = true)
+   * 3. Gọi API submitRequest với commitment text
+   * 4. Xử lý thành công: toast, force fetch lại data
+   * 5. Xử lý lỗi đặc biệt: rate limit (429) với thông báo thời gian
+   * 6. Xử lý lỗi khác: dùng helper handleApiError
    */
   const handleSubmitRequest = async () => {
-    // === CODE BỔ SUNG BẮT ĐẦU ===
+    // 1. VALIDATION
     if (!user) {
       toast.error("Bạn cần đăng nhập để thực hiện đăng ký.");
       return;
@@ -324,20 +452,22 @@ export default function AuthorUpgradePage() {
     setIsSubmitting(true);
 
     try {
+      // 2. GỬI API
       await authorUpgradeService.submitRequest({
         commitment: COMMITMENT_TEXT,
       });
-
+      // 3. THÀNH CÔNG
       toast.success("Yêu cầu của bạn đã được gửi thành công!");
-      // Force fetch lại để lấy trạng thái mới (pending)
+      // 4. FORCE FETCH LẠI để lấy trạng thái mới (pending)
       await fetchUpgradeStatus(true);
     } catch (error) {
       const axiosError = error as AxiosError;
-
+      // 5. XỬ LÝ LỖI RATE LIMIT (429) ĐẶC BIỆT
       if (axiosError.response?.status === 429) {
+        // Backend trả về message: "Too many requests. Try again in X hours/days"
         const errorData = axiosError.response?.data as any;
         const errorMessage = errorData?.error?.message || "";
-
+        // Regex extract số giờ/ngày từ message
         const hoursMatch = errorMessage.match(/(\d+)\s*hour/);
         const daysMatch = errorMessage.match(/(\d+)\s*day/);
 
@@ -356,11 +486,8 @@ export default function AuthorUpgradePage() {
             "Bạn đã gửi yêu cầu quá nhiều lần. Vui lòng chờ một thời gian trước khi thử lại."
           );
         }
-        // } else {
-        //   toast.error("Có lỗi xảy ra khi gửi yêu cầu. Vui lòng thử lại.");
-        // }
       } else {
-        // --- CÁC LỖI KHÁC DÙNG HELPER CHUẨN ---
+        // 6. CÁC LỖI KHÁC DÙNG HELPER CHUẨN
         handleApiError(
           error,
           "Có lỗi xảy ra khi gửi yêu cầu. Vui lòng thử lại."
@@ -372,7 +499,11 @@ export default function AuthorUpgradePage() {
   };
 
   /**
-   * Xử lý gửi lại yêu cầu (khi bấm nút ở form 'rejected')
+   * XỬ LÝ GỬI LẠI YÊU CẦU (Khi bấm nút ở form 'rejected')
+   * LOGIC ĐƠN GIẢN:
+   * 1. Reset state về "default" (hiện lại form ban đầu)
+   * 2. Reset typedCommitment về rỗng
+   * 3. User có thể gửi lại yêu cầu mới
    */
   const handleResubmit = () => {
     if (!user) {
@@ -380,36 +511,18 @@ export default function AuthorUpgradePage() {
 
       return;
     }
+    // Reset về trạng thái ban đầu
     // Đơn giản là reset về trạng thái "default" để user thấy lại form
     // Và reset luôn text đã gõ
     setTypedCommitment("");
     setUpgradeRequest({ status: "default" });
   };
 
-  /**
-   * Xử lý điều hướng đến trang sáng tác (Giữ nguyên)
-   */
-  // const handleStartWriting = () => {
-  //   toast.success("Chào mừng bạn đến với thế giới sáng tác !");
-  //   router.push("/author/overview");
-  // };
+  // ================ UI RENDERING ================
 
   /**
-   * Màn hình Loading chính (khi đang fetch trạng thái lần đầu)
+   * LẤY CONFIG CHO STATUS HIỆN TẠI ĐỂ HIỂN THỊ BADGE
    */
-  // if (isLoadingPage) {
-  //   return (
-  //     <>
-  //       <div className="min-h-screen flex items-center justify-center p-4 py-12 bg-background">
-  //         <div className="flex flex-col items-center gap-4">
-  //           <Loader2 className="h-12 w-12 animate-spin text-primary" />
-  //           <p className="text-muted-foreground">Đang tải trạng thái...</p>
-  //         </div>
-  //       </div>
-  //     </>
-  //   );
-  // }
-  /** * Render nội dung chính khi đã có trạng thái */ // LẤY CONFIG CHO
   const currentStatusConfig =
     STATUS_DISPLAY_CONFIG[upgradeRequest.status] ||
     STATUS_DISPLAY_CONFIG["default"];
@@ -518,7 +631,7 @@ export default function AuthorUpgradePage() {
                     <p className="mt-2 text-primary">{COMMITMENT_TEXT}</p>
                   </div>
 
-                  {/* Ô nhập liệu */}
+                  {/* Ô nhập liệu với validation realtime */}
                   <Textarea
                     id="commitment-input"
                     placeholder="Gõ lại câu cam kết tại đây..."
@@ -557,7 +670,7 @@ export default function AuthorUpgradePage() {
               <CardFooter className="pt-2">
                 <Button
                   onClick={handleSubmitRequest} // Gắn hàm thật
-                  // CẬP NHẬT ĐIỀU KIỆN DISABLED
+                  // CẬP NHẬT ĐIỀU KIỆN DISABLED: chỉ enable khi gõ đúng cam kết
                   disabled={isSubmitting || !isCommitmentMatched}
                   className="w-full h-11"
                 >
@@ -607,7 +720,7 @@ export default function AuthorUpgradePage() {
                   </p>
                 </div>
 
-                {/* Trạng thái hiện tại (giữ nguyên) */}
+                {/* Trạng thái hiện tại với timeline */}
                 <div className="bg-muted rounded-lg p-5 space-y-3">
                   <p className="text-sm">
                     <strong>Trạng thái hiện tại:</strong>

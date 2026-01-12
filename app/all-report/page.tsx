@@ -7,8 +7,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Flag, AlertCircle, Clock } from "lucide-react";
 import { ReportDetailModal } from "@/components/report/ReportDetailModal";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"; // Helper để gộp và xử lý className Tailwind CSS một cách linh hoạt
 import { toast } from "sonner";
+
+/**
+ * FILE MÔ TẢ: Trang hiển thị lịch sử báo cáo của người dùng
+ *
+ * CHỨC NĂNG:
+ * 1. Hiển thị danh sách các báo cáo đã gửi
+ * 2. Hiển thị trạng thái xử lý (pending/approved/rejected)
+ * 3. Cho phép xem chi tiết từng báo cáo qua modal
+ * 4. Xử lý lỗi API chi tiết với validation từ backend
+ *
+ * THÀNH PHẦN LIÊN QUAN:
+ * - reportService: Service gọi API lấy danh sách báo cáo
+ * - ReportDetailModal: Component hiển thị chi tiết báo cáo khi click
+ * - Auth Context: Không dùng trực tiếp nhưng cần user đã đăng nhập
+ */
+
+/**
+ * BẢNG ÁNH XẠ LÝ DO BÁO CÁO
+ * Chuyển đổi key từ backend sang tiếng Việt ngắn gọn cho UI
+ * Cấu trúc: { backend_key: "text hiển thị" }
+ */
 // Map tiếng Việt cho giao diện list
 const REASON_MAP_SHORT: Record<string, string> = {
   spam: "Spam",
@@ -16,7 +37,13 @@ const REASON_MAP_SHORT: Record<string, string> = {
   misinformation: "Sai lệch",
   ip_infringement: "Bản quyền",
 };
-
+/**
+ * BẢNG ÁNH XẠ TRẠNG THÁI BÁO CÁO
+ * Mỗi trạng thái có:
+ * - label: Text hiển thị
+ * - className: CSS classes cho Badge component
+ * Tại sao dùng object? Để kết hợp cả text và style cùng lúc
+ */
 const STATUS_MAP: Record<string, { label: string; className: string }> = {
   pending: {
     label: "Chờ xử lý",
@@ -31,14 +58,23 @@ const STATUS_MAP: Record<string, { label: string; className: string }> = {
     className: "bg-red-100 text-red-700 border-red-200",
   },
 };
-
+/**
+ * BẢNG ÁNH XẠ LOẠI ĐỐI TƯỢNG BỊ BÁO CÁO
+ * story: Truyện, chapter: Chương, comment: Bình luận
+ * Màu sắc khác nhau để dễ phân biệt trực quan
+ */
 const TYPE_MAP: Record<string, { label: string; color: string }> = {
   story: { label: "Truyện", color: "bg-blue-50 text-blue-700" },
   chapter: { label: "Chương", color: "bg-purple-50 text-purple-700" },
   comment: { label: "Bình luận", color: "bg-gray-50 text-gray-700" },
 };
 
-// Hàm cắt chuỗi 5 từ
+/**
+ * HÀM CẮT CHUỖI CHI TIẾT
+ * Mục đích: Giới hạn hiển thị chi tiết báo cáo xuống 5 từ đầu tiên
+ * Tại sao 5 từ? Đủ để hiểu nội dung nhưng không chiếm nhiều space
+ * Logic: Tách chuỗi bằng khoảng trắng → lấy 5 từ đầu → nối lại
+ */
 const truncateDetails = (text: string) => {
   if (!text) return "";
   const words = text.split(" ");
@@ -47,15 +83,33 @@ const truncateDetails = (text: string) => {
 };
 
 export default function AllReportPage() {
-  const [reports, setReports] = useState<ReportItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [reports, setReports] = useState<ReportItem[]>([]); // Danh sách báo cáo
+  const [loading, setLoading] = useState(true); // Trạng thái loading
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null); // ID báo cáo đang xem chi tiết
+
+  /**
+   * HÀM XỬ LÝ LỖI API THỐNG NHẤT
+   * Mục đích: Xử lý lỗi từ backend theo cấu trúc chuẩn
+   * Input: error object từ axios, defaultMessage nếu không parse được
+   * Output: Hiển thị toast với message phù hợp
+   *
+   * CẤU TRÚC LỖI BACKEND (NESTED):
+   * error.response.data.error = {
+   *   message: "Lỗi chung",
+   *   details: { field1: ["Lỗi 1", "Lỗi 2"], field2: ["Lỗi 3"] }
+   * }
+   *
+   * LOGIC XỬ LÝ:
+   * 1. Ưu tiên details (validation errors) → nối tất cả lỗi thành 1 câu
+   * 2. Nếu không có details → dùng message chung
+   * 3. Fallback: dùng response.data.message hoặc defaultMessage
+   */
   const handleApiError = (error: any, defaultMessage: string) => {
-    // 1. Check lỗi Validation/Logic từ Backend
+    // 1. Kiểm tra cấu trúc lỗi nested từ backend
     if (error.response && error.response.data && error.response.data.error) {
       const { message, details } = error.response.data.error;
 
-      // Ưu tiên Validation (details)
+      // Ưu tiên Validation errors (details) - thường chi tiết hơn
       if (details) {
         const firstKey = Object.keys(details)[0];
         if (firstKey && details[firstKey].length > 0) {
@@ -73,25 +127,36 @@ export default function AllReportPage() {
       }
     }
 
-    // 2. Fallback
+    // 2. Fallback: lỗi mạng hoặc lỗi không xác định
     const fallbackMsg = error.response?.data?.message || defaultMessage;
     toast.error(fallbackMsg);
   };
   // -------------------
+  /**
+   * useEffect: Load danh sách báo cáo khi component mount
+   * [] dependency array: chỉ chạy 1 lần khi component render lần đầu
+   * Tại sao không có dependencies? Vì đây là load dữ liệu ban đầu
+   */
   useEffect(() => {
     loadReports();
   }, []);
-
+  /**
+   * HÀM LOAD DANH SÁCH BÁO CÁO
+   * Logic:
+   * 1. Set loading = true (hiện spinner)
+   * 2. Gọi API qua reportService.getMyReports()
+   * 3. Lưu data vào state
+   * 4. Xử lý lỗi nếu có
+   * 5. Set loading = false (ẩn spinner)
+   *
+   * Tham số API: (1, 50) = page 1, 50 items per page
+   * Tại sao 50? Đủ để hiển thị mà không cần phân trang phức tạp
+   */
   const loadReports = async () => {
     setLoading(true);
     try {
       const data = await reportService.getMyReports(1, 50); // Lấy 50 cái mới nhất
       setReports(data.items);
-      // } catch (error) {
-      //   console.error(error);
-      // } finally {
-      //   setLoading(false);
-      // }
     } catch (error: any) {
       console.error(error);
       // --- DÙNG HELPER ---
@@ -205,7 +270,7 @@ export default function AllReportPage() {
 
       {/* Modal chi tiết */}
       <ReportDetailModal
-        isOpen={!!selectedReportId}
+        isOpen={!!selectedReportId} // Chuyển thành boolean: true nếu có ID
         reportId={selectedReportId}
         onClose={() => setSelectedReportId(null)}
       />

@@ -1,4 +1,24 @@
 //app/author/story/page.tsx
+
+/*
+MỤC ĐÍCH: Trang quản lý tất cả truyện của tác giả (danh sách tổng hợp)
+CHỨC NĂNG CHÍNH:
+1. Hiển thị danh sách tất cả truyện do tác giả sở hữu và quản lý
+2. Hiển thị trạng thái từng truyện (draft, pending, published, hidden, rejected, completed)
+3. Hiển thị cảnh báo nếu tác giả đang có truyện "active" (theo quy định chỉ được viết 1 truyện tại 1 thời điểm)
+4. Cho phép tạo truyện mới nếu chưa có truyện nào đang viết (active)
+5. Điều hướng đến trang chi tiết truyện, tạo truyện mới hoặc dashboard
+6. Tự động tải danh sách truyện khi trang được mở
+KHÁC BIỆT SO VỚI DASHBOARD (/author/overview):
+- Dashboard: Tập trung vào trạng thái hiện tại và phân loại theo nhóm
+- Manage Stories: Hiển thị tất cả truyện trong 1 danh sách, không phân nhóm
+ĐỐI TƯỢNG SỬ DỤNG: Tác giả (Author) muốn xem tổng quan tất cả truyện của mình
+FLOW XỬ LÝ CHÍNH:
+1. Load danh sách truyện từ API
+2. Xác định có truyện "active" không (draft/pending/published/hidden)
+3. Hiển thị UI tương ứng: cho phép tạo mới nếu không có active, cảnh báo nếu có
+4. Hiển thị danh sách tất cả truyện với thông tin cơ bản
+*/
 "use client";
 
 import { useState, useEffect } from "react";
@@ -18,10 +38,24 @@ import type { Story } from "@/services/apiTypes";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+
 export default function ManageStoriesPage() {
+  /**
+   * HOOKS VÀ STATE:
+   * - useRouter: Để điều hướng giữa các trang
+   * - stories: State lưu danh sách tất cả truyện của tác giả
+   * - isLoading: State quản lý loading khi fetch data
+   */
   const router = useRouter();
+  // State quản lý danh sách truyện và loading
   const [stories, setStories] = useState<Story[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  /**
+   * HELPER XỬ LÝ LỖI API THỐNG NHẤT (giống các file khác):
+   * Xử lý error response từ backend với ưu tiên: details -> message -> fallback
+   * Đảm bảo consistency trong error handling toàn bộ app
+   */
   const handleApiError = (error: any, defaultMessage: string) => {
     // 1. Check lỗi Validation/Logic từ Backend
     if (error.response && error.response.data && error.response.data.error) {
@@ -50,20 +84,29 @@ export default function ManageStoriesPage() {
     toast.error(fallbackMsg);
   };
   // -------------------
+
+  /**
+   * useEffect ĐỂ LOAD DANH SÁCH TRUYỆN KHI COMPONENT MOUNT:
+   * Chạy 1 lần khi component được mount lần đầu tiên
+   * Dependency array rỗng [] -> chỉ chạy 1 lần
+   */
   useEffect(() => {
     loadStories();
   }, []);
-
+  /**
+   * HÀM LOAD DANH SÁCH TRUYỆN TỪ API:
+   * 1. Set loading state = true để hiển thị spinner
+   * 2. Gọi API getAllStories từ storyService
+   * 3. Set data vào state stories nếu thành công
+   * 4. Xử lý lỗi bằng helper handleApiError
+   * 5. Luôn tắt loading state ở finally
+   */
   const loadStories = async () => {
     setIsLoading(true);
     try {
+      // Gọi API để lấy tất cả truyện của user
       const data = await storyService.getAllStories();
       setStories(data);
-      // } catch (error) {
-      //   console.error("Error loading stories:", error);
-      // } finally {
-      //   setIsLoading(false);
-      // }
     } catch (error: any) {
       // --- DÙNG HELPER ---
       handleApiError(error, "Không thể tải danh sách truyện.");
@@ -72,6 +115,13 @@ export default function ManageStoriesPage() {
     }
   };
 
+  /**
+   * HELPER FUNCTION ĐỂ NAVIGATE ĐẾN CÁC TRANG KHÁC:
+   * @param page - Tên trang đích (key trong routes object)
+   * @param params - Tham số cho route (ví dụ: storyId cho dynamic routes)
+   *
+   * Tương tự như trong dashboard page, dùng mapping object để quản lý route tập trung
+   */
   const onNavigate = (page: string, params?: any) => {
     const routes: Record<string, string> = {
       "author-dashboard": "/author/overview",
@@ -83,6 +133,7 @@ export default function ManageStoriesPage() {
     router.push(route);
   };
 
+  // Hiển thị loading spinner khi đang fetch data
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -91,6 +142,17 @@ export default function ManageStoriesPage() {
     );
   }
 
+  /**
+   * LOGIC XÁC ĐỊNH TRUYỆN "ACTIVE" (ĐANG VIẾT):
+   * - activeStory: Truyện đầu tiên tìm thấy ở trạng thái active
+   * - hasActiveStory: Boolean kiểm tra có truyện active không
+   *
+   * ĐỊNH NGHĨA "ACTIVE STORY" TRONG TRANG NÀY:
+   * - Bao gồm: draft, pending, published, hidden
+   * - Không bao gồm: rejected, completed (đã kết thúc)
+   *
+   * QUY ĐỊNH TORANOVEL: Chỉ được viết 1 truyện cùng lúc
+   */
   const activeStory = stories.find(
     (s) =>
       s.status === "draft" ||
@@ -100,6 +162,19 @@ export default function ManageStoriesPage() {
   );
   const hasActiveStory = !!activeStory;
 
+  /**
+   * HÀM TRẢ VỀ BADGE CHO TỪNG TRẠNG THÁI TRUYỆN:
+   * @param status - Trạng thái của truyện (type: Story["status"])
+   * @returns Component Badge với màu sắc và text phù hợp
+   *
+   * MAPPING TRẠNG THÁI -> UI (tương tự dashboard nhưng có thêm "hidden"):
+   * - draft: Bản nháp (màu secondary - xám)
+   * - pending: Chờ duyệt (màu xanh dương)
+   * - published: Đã xuất bản (màu xanh lá)
+   * - hidden: Đã ẩn (màu amber/vàng cam) - truyện đã published nhưng tác giả ẩn đi
+   * - rejected: Bị từ chối (màu đỏ - variant destructive)
+   * - completed: Hoàn thành (outline - viền)
+   */
   const getStatusBadge = (status: Story["status"]) => {
     switch (status) {
       case "draft":
@@ -134,7 +209,7 @@ export default function ManageStoriesPage() {
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Header */}
+      {/* Header của trang */}
       <div>
         <h2 className="text-3xl font-bold text-[var(--primary)]">
           Quản Lý Truyện
@@ -144,7 +219,10 @@ export default function ManageStoriesPage() {
         </p>
       </div>
 
-      {/* Alert về giới hạn 1 truyện nếu có truyện đang viết */}
+      {/* 
+        Alert về giới hạn 1 truyện - chỉ hiển thị khi có truyện active
+        Tương tự như dashboard nhưng hiển thị ở đây để nhắc nhở user
+      */}
       {hasActiveStory && (
         <Alert>
           <AlertCircle className="h-4 w-4" />
@@ -163,7 +241,7 @@ export default function ManageStoriesPage() {
           </AlertDescription>
         </Alert>
       )}
-
+      {/* Card tạo truyện mới - hiển thị khác nhau tùy vào hasActiveStory */}
       {/* Nút tạo truyện mới - chỉ enable khi không có truyện đang viết */}
       <Card>
         <CardHeader>
@@ -178,6 +256,7 @@ export default function ManageStoriesPage() {
         </CardHeader>
         <CardContent>
           {!hasActiveStory ? (
+            // Hiển thị khi KHÔNG có truyện active - cho phép tạo mới
             <div className="text-center py-12 border-2 border-dashed rounded-lg">
               <BookOpen className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
               <p className="text-muted-foreground mb-4">
@@ -191,6 +270,7 @@ export default function ManageStoriesPage() {
               </Button>
             </div>
           ) : (
+            // Hiển thị khi ĐÃ có truyện active - không cho phép tạo mới
             <div className="text-center py-12">
               <p className="text-muted-foreground">
                 Bạn có thể tạo truyện mới sau khi hoàn thành truyện hiện tại.
@@ -199,8 +279,11 @@ export default function ManageStoriesPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* Danh sách truyện */}
+      {/* 
+        Danh sách tất cả truyện - Hiển thị khi có ít nhất 1 truyện
+        Khác với dashboard: hiển thị tất cả trong 1 list, không phân nhóm
+      */}
+      {/* Danh sách truyện - Hiển thị tất cả truyện đã tạo */}
       {stories.length > 0 && (
         <Card>
           <CardHeader>
@@ -209,6 +292,7 @@ export default function ManageStoriesPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {/* Map qua tất cả stories (không filter theo status) */}
               {stories.map((story) => (
                 <div
                   key={story.storyId}
@@ -216,38 +300,47 @@ export default function ManageStoriesPage() {
                 >
                   <div className="flex items-start gap-4 p-4">
                     {/* Cover Image */}
+                    {/* Cover Image với fallback nếu không có ảnh */}
                     <div className="shrink-0">
                       <div className="w-16 h-24 sm:w-20 sm:h-28 bg-muted rounded-lg flex items-center justify-center">
                         {story.coverUrl ? (
+                          // Hiển thị ảnh cover nếu có
                           <img
                             src={story.coverUrl}
                             alt={story.title}
                             className="w-full h-full object-cover rounded-lg"
                           />
                         ) : (
+                          // Fallback icon nếu không có ảnh
                           <BookOpen className="h-8 w-8 text-muted-foreground" />
                         )}
                       </div>
                     </div>
 
-                    {/* Content */}
+                    {/* Content bên phải ảnh */}
                     <div className="flex-1 min-w-0 space-y-2">
                       <h3 className="font-semibold">{story.title}</h3>
+                      {/* Tags và status badge */}
                       <div className="flex flex-wrap items-center gap-2">
+                        {/* Chỉ hiển thị tag đầu tiên (nếu có) để UI gọn */}
                         {story.tags && story.tags.length > 0 ? (
                           <Badge variant="secondary">
                             {story.tags[0].tagName}
                           </Badge>
                         ) : null}
+                        {/* Badge trạng thái */}
                         {getStatusBadge(story.status)}
                       </div>
+                      {/* Mô tả truyện (truncate 2 dòng) */}
                       <p className="text-sm text-muted-foreground line-clamp-2">
                         {story.description}
                       </p>
+                      {/* Ngày cập nhật */}
                       <p className="text-sm text-muted-foreground">
                         Cập nhật:{" "}
                         {new Date(story.updatedAt).toLocaleDateString("vi-VN")}
                       </p>
+                      {/* Nút Xem Chi Tiết - điều hướng đến trang chi tiết truyện */}
                       <Button
                         variant="outline"
                         size="sm"

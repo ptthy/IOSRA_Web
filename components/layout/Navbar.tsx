@@ -34,10 +34,24 @@ import { profileService } from "@/services/profileService";
 import { TopUpModal } from "@/components/payment/TopUpModal";
 import { NotificationDropdown } from "@/components/notification/NotificationDropdown";
 import { NotificationTicker } from "@/components/notification/NotificationTicker";
+
+/**
+ * Navbar Component - Thanh điều hướng chính của ứng dụng
+ * Xử lý: đăng nhập/đăng xuất, chuyển đổi theme, hiển thị số dư, nhận quà hàng ngày
+ *
+ * Logic xử lý chính:
+ * 1. Quản lý trạng thái đăng nhập và hiển thị UI tương ứng
+ * 2. Xử lý hydration để tránh lỗi SSR với next-themes
+ * 3. Fetch và hiển thị số dư ví của người dùng
+ * 4. Xử lý nhận quà hàng ngày
+ * 5. Ẩn navbar ở các trang đặc biệt (đọc truyện, admin)
+ */
 export function Navbar() {
+  // Hook cho theme (light/dark mode)
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
+  // State cho hydration fix và mobile menu
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -47,15 +61,17 @@ export function Navbar() {
 
   // --- STATE NHẬN QUÀ ---
   const [claimInfo, setClaimInfo] = useState({
-    canClaim: false,
-    amount: 0,
+    canClaim: false, // Có thể nhận quà hôm nay không
+    amount: 0, // Số lượng Dias có thể nhận
   });
   const [isClaiming, setIsClaiming] = useState(false);
-
+  // Context authentication
   const { user, isAuthenticated, logout } = useAuth();
+  // Xác định role người dùng
   const isStaff = user?.role && ["admin", "omod", "cmod"].includes(user.role);
   const isAuthor =
     user?.roles?.includes("author") || (user as any)?.isAuthorApproved;
+  // Kiểm tra có đang ở trang auth không
   const isAuthPage =
     pathname === "/login" ||
     pathname === "/register" ||
@@ -63,12 +79,15 @@ export function Navbar() {
     pathname === "/forgot-password" ||
     pathname === "/google-complete";
 
-  // Fix hydration
+  // Fix hydration: Chỉ render client-side sau khi mounted
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Hàm lấy số dư
+  /**
+   * Hàm lấy số dư ví từ API
+   * Gọi khi component mount và khi có sự kiện wallet-updated
+   */
   const fetchWallet = async () => {
     try {
       const res = await profileService.getWallet();
@@ -80,7 +99,10 @@ export function Navbar() {
     }
   };
 
-  // Hàm kiểm tra trạng thái nhận quà
+  /**
+   * Hàm kiểm tra trạng thái nhận quà hàng ngày
+   * Kiểm tra xem người dùng có thể nhận quà hôm nay không
+   */
   const checkClaimStatus = async () => {
     try {
       const res = await subscriptionService.getStatus();
@@ -114,7 +136,7 @@ export function Navbar() {
     // Đăng ký sự kiện cập nhật ví từ nơi khác (ví dụ: trang Profile)
     window.addEventListener("wallet-updated", handleWalletUpdate);
 
-    // Cleanup
+    // Cleanup: xóa event listener khi component unmount
     return () => {
       window.removeEventListener("wallet-updated", handleWalletUpdate);
     };
@@ -131,7 +153,7 @@ export function Navbar() {
     try {
       const res = await subscriptionService.claimDaily();
       const data = res.data;
-
+      // Hiển thị toast thông báo thành công
       toast.success(
         <div className="flex items-center gap-1">
           <span>Đã nhận {data.claimedDias}</span>
@@ -152,7 +174,10 @@ export function Navbar() {
       setIsClaiming(false);
     }
   };
-  // --- HÀM MỚI: XỬ LÝ CHUYỂN HƯỚNG TÁC GIẢ ---
+  /**
+   * Xử lý chuyển hướng đến trang tác giả
+   * Kiểm tra quyền và chuyển hướng tương ứng
+   */
   const handleAuthorClick = () => {
     // Check quyền ngay lúc bấm, không render điều kiện gây lag
     if (isAuthor) {
@@ -170,14 +195,18 @@ export function Navbar() {
   ) {
     return null;
   }
-
+  // Hàm chuyển đổi theme
   const toggleTheme = () => setTheme(theme === "light" ? "dark" : "light");
+  // Hàm chuyển hướng
   const handleNavigate = (path: string) => router.push(path);
 
   // -----------------------------
-
+  // Helper function kiểm tra active link
   const isActive = (path: string) => pathname === path;
-
+  /**
+   * Hàm lấy chữ cái đầu của tên để hiển thị avatar fallback
+   * Ví dụ: "Nguyen Van A" -> "NV"
+   */
   const getInitials = (name: string) => {
     if (!name) return "??";
     return name
@@ -187,12 +216,16 @@ export function Navbar() {
       .toUpperCase()
       .slice(0, 2);
   };
-
+  // Xử lý đăng xuất
   const handleLogout = () => {
     logout();
     router.push("/");
   };
 
+  /**
+   * Render avatar component với fallback
+   * Ưu tiên lấy serverAvatar (từ API) -> sau đó mới tới user.avatar (từ Context)
+   */
   const renderAvatar = (size = 10) => {
     // Ưu tiên lấy serverAvatar (từ API) -> sau đó mới tới user.avatar (từ Context)
     const displayAvatar = user?.avatar;
@@ -214,13 +247,14 @@ export function Navbar() {
       </Avatar>
     );
   };
-
+  // Không render gì cho đến khi mounted để tránh hydration error
   if (!mounted) return null;
 
   return (
     <>
       <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between px-4">
+          {/* Logo và Brand */}
           <div
             className="flex items-center gap-2 cursor-pointer"
             onClick={() => handleNavigate("/")}
@@ -283,7 +317,8 @@ export function Navbar() {
                 <NotificationTicker />
               </div>
             )}
-            {/* Desktop Top Up Button */}
+
+            {/* Desktop Top Up Button - hiển thị số dư Dias */}
             {isAuthenticated && !isAuthPage && (
               <Button
                 variant="outline"
@@ -295,7 +330,7 @@ export function Navbar() {
                 <span className="font-bold">{diaBalance.toLocaleString()}</span>
               </Button>
             )}
-
+            {/* Theme Toggle Button */}
             <Button
               variant="ghost"
               size="icon"
@@ -308,7 +343,7 @@ export function Navbar() {
                 <Sun className="h-5 w-5" />
               )}
             </Button>
-
+            {/* Desktop User Menu */}
             {!isAuthPage && (
               <div className="hidden md:flex items-center gap-3">
                 {isAuthenticated && user ? (
@@ -390,6 +425,7 @@ export function Navbar() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : (
+                  /* Chưa đăng nhập - hiển thị nút đăng nhập/đăng ký */
                   <>
                     <Button
                       variant="ghost"
@@ -462,7 +498,7 @@ export function Navbar() {
                       </div>
                     </div>
                   )}
-
+                  {/* Mobile Navigation Links */}
                   {!isAuthPage && (
                     <>
                       <button
@@ -496,7 +532,7 @@ export function Navbar() {
                       </button> */}
                     </>
                   )}
-
+                  {/* Mobile Auth Buttons */}
                   <div className="border-t pt-4 flex flex-col gap-2">
                     {isAuthenticated && user ? (
                       <>
@@ -539,7 +575,7 @@ export function Navbar() {
           </div>
         </div>
       </nav>
-
+      {/* Modal nạp tiền */}
       <TopUpModal
         isOpen={isTopUpOpen}
         onClose={() => setIsTopUpOpen(false)}

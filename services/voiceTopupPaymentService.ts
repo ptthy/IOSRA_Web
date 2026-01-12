@@ -2,9 +2,9 @@
 import apiClient from "./apiClient";
 //  Interface cho gói nạp từ API Pricing
 export interface VoicePricingPackage {
-  pricingId: string;
+  pricingId: string; // ID gói
   amountVnd: number;
-  charsGranted: number;
+  charsGranted: number; // Số ký tự
   isActive: boolean;
   updatedAt: string;
 }

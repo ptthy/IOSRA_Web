@@ -1,4 +1,90 @@
 //app/purchased-stories/page.tsx
+/* 
+================================================================================
+
+1. VAI TRÒ TỔNG QUAN:
+   - Là TRANG CHÍNH (Page Component) của route: /purchased-stories
+   - Trang quản lý hai phần: "Kho Audio" và "Lịch sử mua chương"
+   - Component cha trực tiếp của StorySection (gọi và truyền dữ liệu xuống)
+   - Sử dụng Tab để chuyển đổi giữa 2 chế độ xem khác nhau
+
+2. KIẾN TRÚC COMPONENT HIERARCHY:
+   PurchasedStoriesPage (Page Component - this file)
+   │
+   ├── Tab 1: "Kho Audio"
+   │   ├── Loading State (khi đang fetch data)
+   │   ├── Empty State (khi không có data)
+   │   └── StorySection × N (với N = số story, mỗi story 1 component)
+   │       └── AudioPlayer (con của StorySection)
+   │
+   └── Tab 2: "Lịch sử mua chương"
+       └── History Table (hiển thị dạng bảng)
+
+3. QUẢN LÝ STATE CHÍNH:
+   - stories: StoryItem[] → Data cho các StorySection
+   - historyItems: ChapterPurchaseHistoryItem[] → Data cho bảng lịch sử
+   - activeTab: 'audio' | 'history' → Theo dõi tab đang active
+   - loadingAudio & loadingHistory → Trạng thái loading
+   - audioPage & historyPage → Phân trang
+
+4. FLOW XỬ LÝ DỮ LIỆU:
+   a. Khi component mount:
+      1. useEffect() gọi loadAudioStories() và loadChapterHistory()
+      2. Gọi API: chapterPurchaseApi.getAllVoiceHistory()
+      3. Nhận data → setStories(data) → update state
+      4. Gọi API: chapterPurchaseApi.getChapterHistory()
+      5. Nhận data → setHistoryItems(data) → update state
+   
+   b. Khi render:
+      1. Tính toán phân trang: currentAudios = stories.slice(...)
+      2. Map qua currentAudios → render StorySection cho mỗi story
+      3. Truyền props: story={story} xuống từng StorySection
+
+5. XỬ LÝ LỖI (ERROR HANDLING):
+   - Dùng try-catch bọc API calls
+   - Gọi handleApiError() để hiển thị toast thông báo
+   - Phân loại lỗi: Validation errors → Backend errors → Fallback errors
+
+6. PAGINATION LOGIC (Thuật toán phân trang):
+   a. Cho Audio Stories:
+      - audioPerPage = 5 (mỗi trang 5 story)
+      - idxLastAudio = currentPage × audioPerPage
+      - idxFirstAudio = idxLastAudio - audioPerPage
+      - currentAudios = stories.slice(idxFirstAudio, idxLastAudio)
+   
+   b. Cho History Items:
+      - historyPerPage = 10 (mỗi trang 10 giao dịch)
+      - Tương tự tính toán với historyItems
+
+7. UI/UX FEATURES:
+   - Tab switching với animation
+   - Responsive design (mobile/desktop)
+   - Loading skeletons
+   - Empty states với icon
+   - Pagination controls
+   - Copy-to-clipboard cho mã giao dịch
+   - Toast notifications
+
+8. COMPONENT CONNECTIONS:
+   - IMPORT StorySection từ: @/components/purchased/StorySection
+   - IMPORT APIs từ: @/services/chapterPurchaseService
+   - IMPORT UI Components: Tabs, Pagination, Card, Badge từ ShadCN
+   - IMPORT Icons từ: lucide-react
+   - IMPORT Utilities: cn từ @/lib/utils, toast từ sonner
+
+9. DATA TRANSFORMATION:
+   - Tính totalAudiosCount: reduce qua stories → chapters → voices
+   - Format date/time: toLocaleDateString() và toLocaleTimeString()
+   - Copy mã: navigator.clipboard.writeText()
+
+10. PERFORMANCE OPTIMIZATION:
+    - Chỉ load data một lần khi component mount (dependency array rỗng)
+    - Phân trang giảm số lượng component render cùng lúc
+    - Sử dụng key prop (story.storyId) cho list rendering
+    - Conditional rendering: chỉ render khi có data
+
+================================================================================
+*/
 
 "use client";
 
@@ -30,44 +116,58 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"; // Helper để gộp và xử lý className Tailwind CSS một cách linh hoạt
 import { toast } from "sonner"; // Dùng toast báo copy mã
 
 export default function PurchasedStoriesPage() {
   // --- STATE CHO AUDIO (CŨ) ---
+  /* State lưu trữ danh sách stories từ API 
+     Mỗi StoryItem sẽ được truyền xuống một StorySection */
   const [stories, setStories] = useState<StoryItem[]>([]);
+  /* Loading state cho phần audio: true khi đang fetch data từ API */
   const [loadingAudio, setLoadingAudio] = useState(true);
 
   // --- STATE CHO LỊCH SỬ MUA CHƯƠNG (MỚI) ---
+  /* State lưu trữ lịch sử giao dịch - hiển thị trong tab 2 */
   const [historyItems, setHistoryItems] = useState<
     ChapterPurchaseHistoryItem[]
   >([]);
-  const [loadingHistory, setLoadingHistory] = useState(true);
+  // State chung
+  /* activeTab: quản lý tab nào đang được chọn 
+     'audio' → Tab Kho Audio, 'history' → Tab Lịch sử Mua */
+  const [loadingHistory, setLoadingHistory] = useState(true); // 'audio' | 'history'
 
   // State chung
   const [activeTab, setActiveTab] = useState("audio"); // 'audio' | 'history'
 
   // --- PAGINATION CONFIG ---
-  // Pagination Audio
-  const [audioPage, setAudioPage] = useState(1);
-  const audioPerPage = 5;
+  // Pagination Audio: quản lý phân trang cho danh sách stories
+  const [audioPage, setAudioPage] = useState(1); // Trang hiện tại (bắt đầu từ 1)
+  const audioPerPage = 5; // Mỗi trang hiển thị 5 stories
 
-  // Pagination History
+  // Pagination History: quản lý phân trang cho bảng lịch sử
   const [historyPage, setHistoryPage] = useState(1);
-  const historyPerPage = 10;
-
+  const historyPerPage = 10; // Mỗi trang hiển thị 10 giao dịch
+  /* useEffect với dependency array rỗng [] 
+     Chạy MỘT LẦN DUY NHẤT khi component được mount */
   useEffect(() => {
-    // Load cả 2 hoặc chỉ load khi tab active (ở đây load luôn cho tiện)
-    loadAudioStories();
-    loadChapterHistory();
-  }, []);
+    // Load cả 2 data source ngay khi component mount
+    loadAudioStories(); // Fetch data cho tab Audio
+    loadChapterHistory(); // Fetch data cho tab History
+  }, []); // Empty array = chỉ chạy khi mount
 
+  /**
+   * Hàm xử lý lỗi từ API calls một cách thống nhất
+   * Ưu tiên hiển thị lỗi chi tiết từ backend trước
+   * @param err - Error object từ catch block
+   * @param defaultMessage - Message fallback nếu không parse được lỗi
+   */
   const handleApiError = (err: any, defaultMessage: string) => {
-    // 1. Check lỗi Validation/Logic từ Backend
+    // 1. Check lỗi Validation/Logic từ Backend (Axios response structure)
     if (err.response && err.response.data && err.response.data.error) {
       const { message, details } = err.response.data.error;
 
-      // Ưu tiên Validation
+      // Ưu tiên hiển thị Validation errors (nếu có)
       if (details) {
         const firstKey = Object.keys(details)[0];
         if (firstKey && details[firstKey].length > 0) {
@@ -75,33 +175,40 @@ export default function PurchasedStoriesPage() {
           return;
         }
       }
-      // Message từ Backend
+      // Nếu có message từ Backend
       if (message) {
         toast.error(message);
         return;
       }
     }
-    // 2. Fallback
+    // 2. Fallback: dùng message từ response hoặc defaultMessage
     const fallbackMsg = err.response?.data?.message || defaultMessage;
     toast.error(fallbackMsg);
   };
 
-  // 1. Gọi API lấy Audio
+  /**
+   * 1. Gọi API lấy Audio Stories - Data cho StorySection
+   * API: getAllVoiceHistory() → trả về StoryItem[]
+   */
   const loadAudioStories = async () => {
-    setLoadingAudio(true);
+    setLoadingAudio(true); // Bắt đầu loading
     try {
+      // Gọi API từ service
       const data = await chapterPurchaseApi.getAllVoiceHistory();
-      setStories(data);
+      setStories(data); // Lưu data vào state
     } catch (err) {
-      // CẬP NHẬT: thông báo Toast
+      // Xử lý lỗi với toast notification
       handleApiError(err, "Không thể tải danh sách Audio.");
       console.error("Error loading voice history:", err);
     } finally {
-      setLoadingAudio(false);
+      setLoadingAudio(false); // Kết thúc loading (dù thành công hay thất bại)
     }
   };
 
-  // 2. Gọi API lấy Lịch sử mua chương
+  /**
+   * 2. Gọi API lấy Lịch sử mua chương - Data cho tab History
+   * API: getChapterHistory() → trả về ChapterPurchaseHistoryItem[]
+   */
   const loadChapterHistory = async () => {
     setLoadingHistory(true);
     try {
@@ -117,10 +224,21 @@ export default function PurchasedStoriesPage() {
   };
 
   // --- LOGIC PHÂN TRANG AUDIO ---
+  /**
+   * Thuật toán phân trang cho audio stories:
+   * - idxLastAudio: chỉ số cuối của items trên trang hiện tại
+   * - idxFirstAudio: chỉ số đầu của items trên trang hiện tại
+   * - currentAudios: mảng con từ stories dựa trên phân trang
+   */
   const idxLastAudio = audioPage * audioPerPage;
   const idxFirstAudio = idxLastAudio - audioPerPage;
   const currentAudios = stories.slice(idxFirstAudio, idxLastAudio);
+  // Tính tổng số trang = ceil(tổng items / items per page)
   const totalAudioPages = Math.ceil(stories.length / audioPerPage);
+  /**
+   * Tính tổng số audio trong tất cả stories
+   * Dùng reduce lồng nhau: stories → chapters → voices
+   */
   const totalAudiosCount = stories.reduce(
     (sum, story) =>
       sum + story.chapters.reduce((chSum, ch) => chSum + ch.voices.length, 0),
@@ -128,21 +246,25 @@ export default function PurchasedStoriesPage() {
   );
 
   // --- LOGIC PHÂN TRANG HISTORY ---
+  // Tương tự như audio nhưng với historyItems
   const idxLastHist = historyPage * historyPerPage;
   const idxFirstHist = idxLastHist - historyPerPage;
   const currentHistory = historyItems.slice(idxFirstHist, idxLastHist);
   const totalHistoryPages = Math.ceil(historyItems.length / historyPerPage);
 
-  // Helper copy mã
+  /**
+   * Helper copy mã giao dịch vào clipboard
+   * Sử dụng Web API: navigator.clipboard.writeText()
+   */
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
-    toast.success("Đã sao chép mã giao dịch!");
+    toast.success("Đã sao chép mã giao dịch!"); // Toast notification
   };
 
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto space-y-8 pb-16 pt-6 px-4">
-        {/* Header Chung */}
+        {/* Header Chung - Hiển thị tiêu đề và icon theo tab active */}
         <div className="space-y-2 border-b border-border/50 pb-6">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
@@ -165,13 +287,14 @@ export default function PurchasedStoriesPage() {
           </div>
         </div>
 
-        {/* TABS CONTROL */}
+        {/* TABS CONTROL - Dùng component Tabs từ ShadCN */}
         <Tabs
           defaultValue="audio"
           value={activeTab}
-          onValueChange={setActiveTab}
+          onValueChange={setActiveTab} // Cập nhật activeTab khi user click tab
           className="w-full"
         >
+          {/* Tab Buttons */}
           <TabsList className="grid w-full max-w-[400px] grid-cols-2 mb-8">
             <TabsTrigger value="audio" className="flex items-center gap-2">
               <Headphones className="h-4 w-4" /> Kho Audio
@@ -181,27 +304,39 @@ export default function PurchasedStoriesPage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* === TAB 1: KHO AUDIO  === */}
+          {/* === TAB 1: KHO AUDIO (Chứa StorySection) === */}
           <TabsContent value="audio" className="space-y-6">
             {loadingAudio ? (
+              /* Loading State: Hiển thị spinner khi đang fetch data */
               <div className="flex flex-col items-center justify-center min-h-[40vh]">
                 <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
                 <p className="text-muted-foreground">Đang tải dữ liệu...</p>
               </div>
             ) : stories.length > 0 ? (
+              /* Có data: Hiển thị danh sách StorySection */
               <div className="space-y-6">
+                {/* Thông tin tổng số audio */}
                 <p className="text-sm text-muted-foreground">
                   Bạn đang sở hữu {totalAudiosCount} bản thu âm.
                 </p>
+                {/* 
+                RENDER MULTIPLE STORYSECTION COMPONENTS:
+                - Map qua currentAudios (đã được phân trang)
+                - Mỗi story → một StorySection component
+                - key: story.storyId để React optimize re-renders
+                - prop story={story}: truyền toàn bộ story object xuống
+                */}
+
                 {currentAudios.map((story) => (
                   <StorySection key={story.storyId} story={story} />
                 ))}
 
-                {/* Pagination Audio */}
+                {/* Pagination Audio - chỉ hiển thị nếu có nhiều hơn 1 trang */}
                 {totalAudioPages > 1 && (
                   <div className="flex justify-center mt-8">
                     <Pagination>
                       <PaginationContent>
+                        {/* Nút Previous: disabled ở trang 1 */}
                         <PaginationItem>
                           <PaginationPrevious
                             onClick={() =>
@@ -214,11 +349,13 @@ export default function PurchasedStoriesPage() {
                             }
                           />
                         </PaginationItem>
+                        {/* Hiển thị số trang hiện tại/tổng số trang */}
                         <PaginationItem>
                           <span className="px-4 text-sm font-medium">
                             Trang {audioPage} / {totalAudioPages}
                           </span>
                         </PaginationItem>
+                        {/* Nút Next: disabled ở trang cuối */}
                         <PaginationItem>
                           <PaginationNext
                             onClick={() =>
@@ -239,6 +376,7 @@ export default function PurchasedStoriesPage() {
                 )}
               </div>
             ) : (
+              /* Empty State: Khi không có stories nào */
               <div className="text-center py-24 border-2 border-dashed border-border rounded-xl bg-muted/5">
                 <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
                   <Inbox className="h-10 w-10 text-muted-foreground/50" />
@@ -256,6 +394,7 @@ export default function PurchasedStoriesPage() {
               <CardHeader className="border-b border-border/50 pb-4">
                 <CardTitle className="text-xl flex items-center justify-between">
                   <span>Danh sách chương đã mua</span>
+                  {/* Badge hiển thị tổng số giao dịch */}
                   {!loadingHistory && (
                     <Badge
                       variant="secondary"

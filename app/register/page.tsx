@@ -25,44 +25,96 @@ import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "../../lib/firebase";
 import { jwtDecode } from "jwt-decode";
 
+/**
+ * TRANG ĐĂNG KÝ TÀI KHOẢN - XỬ LÝ REGISTER VÀ GOOGLE SIGN-UP
+ *
+ * MỤC ĐÍCH:
+ * - Đăng ký tài khoản mới bằng email/password
+ * - Đăng ký/đăng nhập bằng Google OAuth
+ * - Validation form client-side
+ * - Xử lý redirect sau khi đăng ký thành công
+ *
+ * FLOW CHÍNH:
+ * 1. Người dùng nhập thông tin (username, email, password)
+ * 2. Validation client-side (password length, confirm password)
+ * 3. Gọi API register -> redirect đến verify OTP nếu thành công
+ * 4. Hoặc đăng nhập bằng Google -> xử lý 2 case:
+ *    a. Tài khoản đã tồn tại: login thẳng
+ *    b. Tài khoản mới: redirect đến complete registration
+ *
+ * ĐIỂM QUAN TRỌNG:
+ * - Xử lý lỗi validation từ backend chi tiết
+ * - Firebase Google Auth integration
+ * - JWT token decoding và lưu vào AuthContext
+ */
 export default function RegisterRoute() {
   const router = useRouter();
-  //  setAuthData để lưu thông tin đăng nhập khi Google Login thành công
+  // Lấy hàm setAuthData từ AuthContext để lưu thông tin đăng nhập khi Google Login thành công
   const { setAuthData } = useAuth();
 
+  // State quản lý các trường nhập liệu
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  // State quản lý hiển thị mật khẩu
   const [showPasswords, setShowPasswords] = useState(false);
+
+  // State quản lý lỗi và trạng thái
   const [error, setError] = useState("");
   const [imageError, setImageError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Hàm đăng ký bằng email/pass
+  /**
+   * HÀM XỬ LÝ ĐĂNG KÝ BẰNG EMAIL/PASSWORD
+   *
+   * FLOW CHI TIẾT:
+   * 1. Validate client-side:
+   *    - Password >= 6 ký tự
+   *    - Password và confirm password khớp
+   * 2. Gọi API register với thông tin user
+   * 3. Nếu thành công:
+   *    - Redirect đến verify-otp với email trong query params
+   * 4. Nếu thất bại:
+   *    - Xử lý lỗi từ backend (ưu tiên details -> message -> fallback)
+   *
+   * SECURITY NOTE:
+   * - Password validation chỉ ở client, server sẽ validate lại
+   * - Email sẽ được encode trong URL để tránh XSS
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    setError(""); // Reset lỗi trước khi validate
+
+    // 1. VALIDATION CLIENT-SIDE
     if (password.length < 6) {
       setError("Mật khẩu phải có ít nhất 6 ký tự");
       return;
     }
+
+    // Validation xác nhận mật khẩu
     if (password !== confirmPassword) {
       setError("Mật khẩu và mật khẩu xác nhận không khớp");
       return;
     }
-    setIsLoading(true);
+    setIsLoading(true); // Bắt đầu loading
     try {
+      // 2. GỌI API ĐĂNG KÝ
       await authService.register({
         username,
         email,
         password,
         confirmPassword,
       });
+      // 3. THÀNH CÔNG: Redirect đến verify OTP
       toast.success("Đăng ký thành công! Vui lòng kiểm tra email để xác thực.");
+
+      // Encode email để đảm bảo an toàn trong URL
       router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
     } catch (err: any) {
       setIsLoading(false);
+
+      // --- XỬ LÝ LỖI CHI TIẾT TỪ BACKEND ---
       // Kiểm tra cấu trúc lỗi { error: { code, message, details } }
       if (err.response && err.response.data && err.response.data.error) {
         const { message, details } = err.response.data.error;
@@ -94,7 +146,25 @@ export default function RegisterRoute() {
     }
   };
 
-  // Hàm signInWithGoogle
+  /**
+   * HÀM XỬ LÝ ĐĂNG NHẬP/ĐĂNG KÝ BẰNG GOOGLE
+   *
+   * FLOW PHỨC TẠP - XỬ LÝ 2 TRƯỜNG HỢP:
+   * 1. USER ĐÃ TỒN TẠI TRONG DB:
+   *    - Firebase auth thành công
+   *    - Gửi idToken đến backend
+   *    - Backend trả về JWT của user -> login thẳng
+   *
+   * 2. USER MỚI (CHƯA ĐĂNG KÝ):
+   *    - Firebase auth thành công
+   *    - Backend trả 409/404 (user not found)
+   *    - Redirect đến /google-complete để hoàn tất đăng ký
+   *
+   * FIREBASE AUTH FLOW:
+   * 1. signInWithPopup: Mở popup Google login
+   * 2. getUser().getIdToken(): Lấy Firebase idToken
+   * 3. Gửi idToken đến backend để verify
+   */
   const signInWithGoogle = async () => {
     setIsLoading(true);
     const provider = new GoogleAuthProvider();
@@ -103,10 +173,10 @@ export default function RegisterRoute() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      // 2. Lấy idToken từ Firebase
+      // 2. LẤY idToken TỪ FIREBASE (JWT của Firebase)
       const idToken = await user.getIdToken();
 
-      // 3. Gửi idToken đến backend
+      // 3. GỬI idToken ĐẾN BACKEND ĐỂ VERIFY/CREATE ACCOUNT
       const response = await authService.loginWithGoogle({ idToken });
 
       // 4. Xử lý response từ backend
@@ -117,6 +187,7 @@ export default function RegisterRoute() {
         roles,
       } = response.data;
 
+      // TRƯỜNG HỢP 1: USER ĐÃ TỒN TẠI VÀ ĐĂNG NHẬP THÀNH CÔNG
       if (backendToken && backendUsername && backendEmail) {
         // Backend trả về 200 OK -> User ĐÃ TỒN TẠI VÀ ĐĂNG NHẬP THÀNH CÔNG
         const decodedPayload: any = jwtDecode(backendToken);
@@ -128,9 +199,9 @@ export default function RegisterRoute() {
           isPremium: false,
         };
 
-        // Đăng nhập thành công
+        // Lưu thông tin đăng nhập vào context và localStorage
         setAuthData(userToSet, backendToken);
-        // AuthContext sẽ tự động chuyển hướng
+        // AuthContext sẽ tự động chuyển hướng sau khi setAuthData
       } else {
         // Trường hợp Backend trả về 200 OK nhưng thiếu token/username/email
         toast.error("Đăng nhập Google thất bại: Dữ liệu trả về không đầy đủ.");
@@ -193,18 +264,34 @@ export default function RegisterRoute() {
       }
     }
   };
-
-  // Error image SVG (base64)
+  /**
+   * ẢNH FALLBACK KHI ẢNH CHÍNH BỊ LỖI
+   *
+   * KỸ THUẬT: Sử dụng base64 encoded SVG để không phụ thuộc external URL
+   * ƯU ĐIỂM: Luôn available, không cần network request
+   */
   const ERROR_IMG_SRC =
     "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==";
 
   // --- Toàn bộ JSX từ RegisterPage được chuyển vào đây ---
+  /**
+   * RENDER CHÍNH CỦA TRANG ĐĂNG KÝ
+   *
+   * LAYOUT 2 CỘT:
+   * - Left (Desktop only): Visual với hình ảnh và mô tả
+   * - Right: Form đăng ký
+   *
+   * RESPONSIVE:
+   * - Mobile: Chỉ hiển thị form, logo trên cùng
+   * - Desktop: Split 50/50
+   */
   return (
     <div className="min-h-screen flex">
-      {/* Left Side - Visual */}
+      {/* Left Side - Visual (Chỉ hiện trên desktop) */}
       <div className="hidden lg:flex lg:w-1/2 bg-primary relative overflow-hidden">
         <div className="absolute inset-0">
           {imageError ? (
+            // Fallback khi ảnh lỗi
             <div className="w-full h-full flex items-center justify-center bg-gray-100 opacity-20">
               <img
                 src={ERROR_IMG_SRC}
@@ -214,15 +301,18 @@ export default function RegisterRoute() {
             </div>
           ) : (
             <img
+              // Ảnh background chính
               src="https://images.unsplash.com/photo-1615714901965-277d5a9f11d1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxlYm9vayUyMHJlYWRpbmclMjBhdWRpb2Jvb2t8ZW58MXx8fHwxNzYxMTI5Mjg4fDA&ixlib=rb-4.1.0&q=80&w=1080"
               alt="Reading experience"
               className="w-full h-full object-cover opacity-20"
-              onError={() => setImageError(true)}
+              onError={() => setImageError(true)} // Xử lý lỗi load ảnh
             />
           )}
         </div>
+        {/* Overlay content trên ảnh */}
         <div className="relative z-10 flex flex-col justify-center items-center w-full p-12 text-primary-foreground">
           <div className="max-w-md text-center space-y-6">
+            {/* Logo Icon */}
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary-foreground/20 backdrop-blur-sm mb-4">
               <BookOpen className="h-10 w-10" />
             </div>
@@ -231,6 +321,7 @@ export default function RegisterRoute() {
             <p className="text-xl">
               Nền tảng đọc truyện tương tác với AI Voice
             </p>
+            {/* Brand và mô tả */}
             <div className="flex justify-center gap-8 pt-8">
               <div className="flex flex-col items-center gap-2">
                 <Volume2 className="h-8 w-8" />
@@ -249,10 +340,10 @@ export default function RegisterRoute() {
         </div>
       </div>
 
-      {/* Right Side - Form */}
+      {/* Right Side - Form (Hiển thị trên cả mobile và desktop) */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
         <div className="w-full max-w-md space-y-8">
-          {/* Mobile Logo */}
+          {/* Mobile Logo (Chỉ hiện trên mobile) */}
           <div className="lg:hidden text-center">
             <h1 className="text-3xl text-primary mb-2">Tora Novel</h1>
             <p className="text-muted-foreground">
@@ -261,14 +352,16 @@ export default function RegisterRoute() {
           </div>
 
           <div className="space-y-6">
+            {/* Form Header */}
             <div className="space-y-2 text-center lg:text-left">
               <h2 className="text-3xl">Đăng ký</h2>
               <p className="text-muted-foreground">
                 Tạo tài khoản để bắt đầu hành trình đọc truyện
               </p>
             </div>
-
+            {/* Form chính */}
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Username Field */}
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
                 <Input
@@ -282,7 +375,7 @@ export default function RegisterRoute() {
                   className="h-11"
                 />
               </div>
-
+              {/* Email Field */}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -296,7 +389,7 @@ export default function RegisterRoute() {
                   className="h-11"
                 />
               </div>
-
+              {/* Password Field với toggle visibility */}
               <div className="space-y-2">
                 <Label htmlFor="password">Mật khẩu</Label>
                 <div className="relative">
@@ -310,6 +403,7 @@ export default function RegisterRoute() {
                     disabled={isLoading}
                     className="h-11 pr-10"
                   />
+                  {/* Toggle Password Visibility Button */}
                   <button
                     type="button"
                     onClick={() => setShowPasswords(!showPasswords)}
@@ -328,7 +422,7 @@ export default function RegisterRoute() {
                   Mật khẩu phải có ít nhất 6 ký tự
                 </p>
               </div>
-
+              {/* Confirm Password Field */}
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">Xác nhận mật khẩu</Label>
                 <div className="relative">
@@ -357,14 +451,14 @@ export default function RegisterRoute() {
                   </button>
                 </div>
               </div>
-
+              {/* Error Message Display */}
               {error && (
                 <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md flex items-center gap-2">
                   {/* <AlertTriangle className="h-4 w-4" /> */}
                   <span>{error}</span>
                 </div>
               )}
-
+              {/* Submit Button */}
               <Button
                 type="submit"
                 disabled={isLoading}
@@ -377,7 +471,7 @@ export default function RegisterRoute() {
                 )}
               </Button>
             </form>
-
+            {/* Separator "Hoặc tiếp tục với" */}
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <Separator />
@@ -388,7 +482,7 @@ export default function RegisterRoute() {
                 </span>
               </div>
             </div>
-
+            {/* Google Sign-in Button */}
             <Button
               type="button"
               variant="outline"
@@ -419,7 +513,7 @@ export default function RegisterRoute() {
               </svg>
               Đăng ký với Google
             </Button>
-
+            {/* Link đến trang Login */}
             <p className="text-center text-sm text-muted-foreground">
               Đã có tài khoản?{" "}
               <Link href="/login" className="text-primary hover:underline">
