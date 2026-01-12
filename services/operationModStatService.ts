@@ -109,3 +109,36 @@ export const rejectWithdrawRequest = async (requestId: string, note: string) => 
   });
   return res.data;
 };
+
+// 1. Lấy dữ liệu Traffic (User Growth)
+export const getTrafficUsers = async (period: string) => {
+  // period: 'day', 'week', 'month'
+  const res = await apiClient.get("/api/OperationModStat/traffic/users", {
+    params: { Period: period }
+  });
+  return res.data;
+};
+
+// 2. Lấy dữ liệu Tương tác (Engagement Behavior)
+export const getTrafficEngagement = async (period: string) => {
+  const res = await apiClient.get("/api/OperationModStat/traffic/engagement", {
+    params: { Period: period }
+  });
+  return res.data;
+};
+
+// 3. Lấy Top Truyện (Content Behavior)
+export const getTrendingStories = async (period: string, limit: number = 5) => {
+  const res = await apiClient.get("/api/OperationModStat/traffic/stories/trending", {
+    params: { Period: period, limit }
+  });
+  return res.data;
+};
+
+// 4. Lấy Top Thể loại (User Preference Behavior)
+export const getTopTags = async (period: string, limit: number = 5) => {
+  const res = await apiClient.get("/api/OperationModStat/traffic/tags/top", {
+    params: { Period: period, limit }
+  });
+  return res.data;
+};
