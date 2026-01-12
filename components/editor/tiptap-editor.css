@@ -1,8 +1,41 @@
 /* Tiptap Editor Styles */
+/*compoenents/editor/tiptap-editor.css*/
+
+/**
+ * MỤC ĐÍCH: File CSS định dạng giao diện cho rich text editor Tiptap
+ * CHỨC NĂNG CỐT LÕI:
+ * 1. Định dạng tất cả phần tử văn bản trong editor (headings, paragraphs, lists, links, code blocks, etc.)
+ * 2. Hỗ trợ chế độ Dark Mode tự động với class .dark
+ * 3. Tạo placeholder gợi ý khi editor trống
+ * 4. Style giao diện người dùng cho tất cả thành phần của Tiptap/ProseMirror
+ * 
+ * CẤU TRÚC STYLING:
+ * - Base styling: Reset và cấu hình cơ bản
+ * - Element formatting: Định dạng từng loại element (h1-h3, p, strong, em, s)
+ * - Complex elements: Blockquotes, lists, links, code blocks
+ * - Dark mode: Override styles cho chế độ tối
+ * 
+ * LƯU Ý:
+ * - Tất cả styles áp dụng cho class .ProseMirror (class mặc định của Tiptap)
+ * - Dark mode styles áp dụng với parent có class .dark
+ * - Sử dụng CSS variables tương thích với hệ thống design tokens
+ */
+
+/**
+ * CSS cho editor Tiptap - Định dạng giao diện hiển thị nội dung rich text
+ * Các class .ProseMirror là class mặc định của Tiptap/ProseMirror
+ */
+
+/* Xóa outline mặc định khi focus vào editor */
 .ProseMirror {
   outline: none;
 }
 
+/**
+ * Placeholder cho editor khi rỗng
+ * Hiển thị văn bản gợi ý với màu xám nhạt
+ * Sử dụng pseudo-element ::before và data-placeholder attribute
+ */
 .ProseMirror p.is-editor-empty:first-child::before {
   color: #adb5bd;
   content: attr(data-placeholder);
@@ -10,7 +43,7 @@
   height: 0;
   pointer-events: none;
 }
-
+/* Định dạng cho heading 1 */
 .ProseMirror h1 {
   font-size: 2em;
   font-weight: 700;
@@ -18,7 +51,7 @@
   margin-top: 1.5rem;
   margin-bottom: 0.75rem;
 }
-
+/* Định dạng cho heading 2 */
 .ProseMirror h2 {
   font-size: 1.5em;
   font-weight: 600;
@@ -26,7 +59,7 @@
   margin-top: 1.25rem;
   margin-bottom: 0.625rem;
 }
-
+/* Định dạng cho heading 3 */
 .ProseMirror h3 {
   font-size: 1.25em;
   font-weight: 600;
@@ -34,24 +67,28 @@
   margin-top: 1rem;
   margin-bottom: 0.5rem;
 }
-
+/* Định dạng cho đoạn văn */
 .ProseMirror p {
   margin-bottom: 0.75rem;
   line-height: 1.75;
 }
-
+/* Định dạng cho chữ in đậm */
 .ProseMirror strong {
   font-weight: 700;
 }
-
+/* Định dạng cho chữ in nghiêng */
 .ProseMirror em {
   font-style: italic;
 }
-
+/* Định dạng cho chữ gạch ngang */
 .ProseMirror s {
   text-decoration: line-through;
 }
 
+/**
+ * Định dạng cho blockquote (trích dẫn)
+ * Sử dụng border-left để tạo đường viền bên trái
+ */
 .ProseMirror blockquote {
   border-left: 4px solid #e9ecef;
   padding-left: 1rem;
@@ -59,40 +96,44 @@
   font-style: italic;
   color: #6c757d;
 }
-
+/* Định dạng chung cho danh sách (ul và ol) */
 .ProseMirror ul,
 .ProseMirror ol {
   padding-left: 1.5rem;
   margin: 0.75rem 0;
 }
-
+/* Định dạng riêng cho danh sách không thứ tự */
 .ProseMirror ul {
   list-style-type: disc;
 }
-
+/* Định dạng riêng cho danh sách có thứ tự */
 .ProseMirror ol {
   list-style-type: decimal;
 }
-
+/* Định dạng cho từng item trong danh sách */
 .ProseMirror li {
   margin-bottom: 0.25rem;
   line-height: 1.75;
 }
-
+/* Đoạn văn trong list item không có margin */
 .ProseMirror li p {
   margin: 0;
 }
-
+/* Định dạng cho liên kết */
 .ProseMirror a {
   color: #2563eb;
   text-decoration: underline;
   cursor: pointer;
 }
-
+/* Định dạng cho liên kết */
 .ProseMirror a:hover {
   color: #1d4ed8;
 }
 
+/**
+ * Định dạng cho code inline
+ * Background sáng, padding nhỏ và font monospace
+ */
 .ProseMirror code {
   background-color: #f1f3f5;
   padding: 0.2em 0.4em;
@@ -101,6 +142,10 @@
   font-family: "Courier New", Courier, monospace;
 }
 
+/**
+ * Định dạng cho code block (pre)
+ * Background sáng, padding lớn hơn và có thể scroll ngang
+ */
 .ProseMirror pre {
   background-color: #f1f3f5;
   padding: 1rem;
@@ -108,30 +153,34 @@
   overflow-x: auto;
   margin: 1rem 0;
 }
-
+/* Code trong pre không cần background riêng */
 .ProseMirror pre code {
   background: none;
   padding: 0;
 }
 
-/* Dark mode support */
+/* ============================= */
+/* DARK MODE SUPPORT - Chế độ tối */
+/* ============================= */
+
+/* Blockquote trong chế độ tối */
 .dark .ProseMirror blockquote {
   border-left-color: #3f3f46;
   color: #a1a1aa;
 }
-
+/* Code inline trong chế độ tối */
 .dark .ProseMirror code {
   background-color: #27272a;
 }
-
+/* Code block trong chế độ tối */
 .dark .ProseMirror pre {
   background-color: #27272a;
 }
-
+/* Liên kết trong chế độ tối */
 .dark .ProseMirror a {
   color: #60a5fa;
 }
-
+/* Hiệu ứng hover cho liên kết trong chế độ tối */
 .dark .ProseMirror a:hover {
   color: #3b82f6;
 }

@@ -1,4 +1,32 @@
 //components/reader/LockedOverlay.tsx
+/*
+MỤC ĐÍCH & CHỨC NĂNG:
+────────────────────────────────────────────────────────────────────────────
+Component LockedOverlay hiển thị khi chương truyện bị khóa (cần mua).
+Nó cung cấp giao diện để user mở khóa chương bằng Dias (tiền ảo trong app).
+
+CHỨC NĂNG CHÍNH:
+1. Hiển thị thông tin chương khóa và giá mở khóa
+2. Kiểm tra số dư Dias của user
+3. Hiển thị thông báo khi số dư không đủ
+4. Hiển thị confirm dialog trước khi mua
+5. Gọi API mua chương và xử lý kết quả
+6. Cung cấp nút nạp Dias để chuyển sang TopUpModal
+
+CÁCH HOẠT ĐỘNG:
+- Nhận thông tin chapter, giá, số dư từ component cha
+- Kiểm tra số dư trước khi hiển thị confirm dialog
+- Gọi API chapterPurchaseApi.buyChapter khi user confirm
+- Xử lý các trường hợp lỗi: đã mua, số dư không đủ, lỗi server
+- Hiển thị toast notifications cho user
+
+LIÊN KẾT VỚI CÁC COMPONENT KHÁC:
+- Được sử dụng bởi ChapterReader khi chapter.isLocked = true
+- Gọi API từ services/chapterPurchaseService
+- Sử dụng Dialog component từ ui/dialog cho confirm dialog
+- Gọi setShowTopUpModal để mở modal nạp tiền
+- Sử dụng toast từ sonner để hiển thị thông báo
+*/
 
 "use client";
 
@@ -25,6 +53,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
+/**
+ * Props interface cho LockedOverlay
+ * @param {string} chapterId - ID của chapter bị khóa
+ * @param {number} priceDias - Giá mở khóa (tính bằng Dias)
+ * @param {() => void} onUnlockSuccess - Callback khi mở khóa thành công
+ * @param {number} currentBalance - Số dư Dias hiện tại của user
+ * @param {(show: boolean) => void} setShowTopUpModal - Callback để hiển thị modal nạp tiền
+ * @param {string} storyTitle - Tiêu đề truyện (optional)
+ * @param {string} chapterTitle - Tiêu đề chapter (optional)
+ * @param {number} chapterNo - Số thứ tự chapter (optional)
+ */
 interface LockedOverlayProps {
   chapterId: string;
   priceDias: number;
@@ -36,6 +76,14 @@ interface LockedOverlayProps {
   chapterNo?: number;
 }
 
+/**
+ * Component LockedOverlay: Hiển thị khi chapter bị khóa (cần mua)
+ * - Hiển thị thông tin giá và số dư
+ * - Kiểm tra số dư trước khi mua
+ * - Hiển thị confirm dialog trước khi mua
+ * - Xử lý API mua chapter
+ * - Hiển thị thông báo lỗi/success
+ */
 export const LockedOverlay: React.FC<LockedOverlayProps> = ({
   chapterId,
   priceDias,
@@ -46,10 +94,17 @@ export const LockedOverlay: React.FC<LockedOverlayProps> = ({
   chapterTitle = "",
   chapterNo = 0,
 }) => {
-  const [buying, setBuying] = useState(false);
+  const [buying, setBuying] = useState(false); // State loading khi đang mua
 
-  const [insufficientBalance, setInsufficientBalance] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false); // State bật tắt popup xác nhận
+  const [insufficientBalance, setInsufficientBalance] = useState(false); // State số dư không đủ
+  const [showConfirm, setShowConfirm] = useState(false); // State hiển thị confirm dialog
+
+  /**
+   * Kiểm tra số dư trước khi mua
+   * - So sánh currentBalance với priceDias
+   * - Nếu không đủ: hiển thị thông báo lỗi, set insufficientBalance = true
+   * - Nếu đủ: mở confirm dialog
+   */
   const handlePreCheck = () => {
     if (currentBalance < priceDias) {
       setInsufficientBalance(true);
@@ -68,13 +123,24 @@ export const LockedOverlay: React.FC<LockedOverlayProps> = ({
     setInsufficientBalance(false);
     setShowConfirm(true); // Mở Modal xác nhận
   };
+
+  /**
+   * Xử lý mua chapter sau khi confirm
+   * - Gọi API mua chapter
+   * - Xử lý các trường hợp lỗi:
+   *   + 409: Đã mua chapter này → mở khóa ngay
+   *   + 400: Số dư không đủ
+   *   + Các lỗi khác: Hiển thị thông báo
+   */
   const handleConfirmBuy = async () => {
     setBuying(true);
     try {
-      // Gọi API
+      // Gọi API mua chapter
       const result = await chapterPurchaseApi.buyChapter(chapterId);
 
-      setShowConfirm(false); // Đóng modal
+      setShowConfirm(false); // Đóng modal confirm
+
+      // Hiển thị thông báo thành công với số dư còn lại
       toast.success("Mở khóa thành công!", {
         description: (
           <span className="flex items-center gap-1">
@@ -84,70 +150,35 @@ export const LockedOverlay: React.FC<LockedOverlayProps> = ({
         ),
       });
 
-      onUnlockSuccess();
+      onUnlockSuccess(); // Callback để component cha load nội dung
     } catch (error: any) {
-      // Logic xử lý lỗi cũ của bạn
+      // Logic xử lý lỗi
       if (error.response && error.response.status === 409) {
+        // Lỗi 409: Đã mua chapter này rồi
         toast.success("Bạn đã sở hữu chương này!", {
           description: "Đang tải nội dung...",
         });
-        onUnlockSuccess();
+        onUnlockSuccess(); // Vẫn mở khóa vì đã mua rồi
         setShowConfirm(false);
       } else if (error.response?.status === 400) {
+        // Lỗi 400: Số dư không đủ (dự phòng cho trường hợp race condition)
         setInsufficientBalance(true);
         setShowConfirm(false);
         toast.error("Số dư không đủ");
       } else {
+        // Các lỗi khác
         const msg =
           error.response?.data?.error?.message || "Lỗi không xác định.";
         toast.error("Không thể mở khóa", { description: msg });
       }
     } finally {
-      setBuying(false);
+      setBuying(false); // Tắt trạng thái loading
     }
   };
-  // const handleBuy = async () => {
-  //   // Kiểm tra số dư trước khi mua
-  //   if (currentBalance < priceDias) {
-  //     setInsufficientBalance(true);
-  //     return;
-  //   }
-
-  //   setBuying(true);
-  //   try {
-  //     await chapterPurchaseApi.buyChapter(chapterId);
-  //     toast.success("Mở khóa thành công!", {
-  //       description: "Chúc bạn đọc truyện vui vẻ.",
-  //     });
-  //     onUnlockSuccess();
-  //   } catch (error: any) {
-  //     //  LOGIC MỚI: BẮT LỖI 409 (ChapterPurchased)
-  //     if (error.response && error.response.status === 409) {
-  //       toast.success("Bạn đã sở hữu chương này!", {
-  //         description: "Đang tải nội dung...",
-  //         icon: <Check className="w-4 h-4 text-green-500" />,
-  //       });
-  //       onUnlockSuccess();
-  //     } else if (error.response?.status === 400) {
-  //       // Lỗi số dư không đủ
-  //       setInsufficientBalance(true);
-  //       toast.error("Số dư không đủ", {
-  //         description: `Bạn cần ${priceDias} Dias nhưng chỉ có ${currentBalance} Dias.`,
-  //       });
-  //     } else {
-  //       const msg =
-  //         error.response?.data?.error?.message || "Lỗi không xác định.";
-  //       toast.error("Không thể mở khóa", {
-  //         description: msg,
-  //       });
-  //     }
-  //   } finally {
-  //     setBuying(false);
-  //   }
-  // };
 
   return (
     <>
+      {/* Overlay chính */}
       <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 md:p-12 border border-dashed border-orange-300 bg-orange-50/50 dark:bg-orange-950/10 rounded-2xl my-8 animate-in zoom-in-95 duration-500">
         <div className="relative">
           <div className="absolute -inset-4 bg-orange-200 rounded-full opacity-30 blur-lg"></div>
@@ -208,8 +239,7 @@ export const LockedOverlay: React.FC<LockedOverlayProps> = ({
         <div className="w-full max-w-xs space-y-3">
           {/* Nút Mở khóa chính */}
           <Button
-            // onClick={handleBuy}
-            onClick={handlePreCheck}
+            onClick={handlePreCheck} // Kiểm tra trước khi mua
             disabled={buying}
             size="lg"
             className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white shadow-orange-200 shadow-xl transition-all hover:scale-[1.02]"

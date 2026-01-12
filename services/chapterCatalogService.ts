@@ -72,53 +72,6 @@ export const chapterCatalogApi = {
       .then((response) => response.data);
   },
 
-  // Lấy chi tiết chương
-  // getChapterDetail: async (chapterId: string): Promise<ChapterDetail> => {
-  //   try {
-  //     const response = await apiClient.get(
-  //       `/api/ChapterCatalog/${chapterId}?_t=${new Date().getTime()}`
-  //     );
-  //     return response.data;
-  //   } catch (error: any) {
-  //     //  XỬ LÝ LỖI 403 - CHAPTER BỊ KHÓA
-  //     if (
-  //       error.response?.status === 403 &&
-  //       error.response?.data?.error?.code === "ChapterLocked"
-  //     ) {
-  //       // Lấy data lỗi từ backend
-  //       const errorData = error.response.data.error;
-  //       console.log(
-  //         "🎯 Chapter bị khóa (ChapterLocked), trả về chapter detail với isLocked: true"
-  //       );
-
-  //       // Lấy thông tin cơ bản từ response nếu có, hoặc dùng giá trị mặc định
-  //       const lockedChapter: ChapterDetail = {
-  //         chapterId: chapterId,
-  //         storyId: "", // Sẽ được điền sau khi fetch all chapters
-  //         // chapterNo: 0,
-  //         // title: "Chương bị khóa",
-  //         // Ưu tiên lấy chapterNo và title từ backend trả về trong lỗi
-  //         chapterNo: errorData.details?.chapterNo || 0,
-  //         title: errorData.details?.title || "Chương bị khóa",
-  //         contentUrl: "",
-  //         wordCount: 0,
-  //         charCount: 0,
-  //         publishedAt: "",
-  //         isLocked: true,
-  //         isOwned: false,
-  //         languageCode: "vi-VN",
-  //         accessType: "dias",
-  //         priceDias: error.response?.data?.error?.details?.price || 0, // Lấy giá nếu có
-  //         voices: [],
-  //       };
-  //       return lockedChapter;
-  //     }
-
-  //     // Các lỗi khác vẫn ném ra bình thường
-  //     console.error("Lỗi khác khi tải chapter:", error);
-  //     throw error;
-  //   }
-  // },
   getChapterDetail: async (chapterId: string): Promise<ChapterDetail> => {
     try {
       // Thêm timestamp để tránh cache trình duyệt

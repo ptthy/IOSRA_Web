@@ -20,14 +20,26 @@ import {
   Frown,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-
+/**
+ * MỤC ĐÍCH: Popup hiển thị chi tiết phản ứng (likes/dislikes) của một comment
+ * CHỨC NĂNG CHÍNH:
+ * 1. Hiển thị danh sách người dùng đã like/dislike comment
+ * 2. Phân trang cho danh sách reactions (20 items/page)
+ * 3. Tabs chuyển đổi giữa Likes và Dislikes
+ * 4. Click vào user để chuyển đến trang profile
+ * 5. Refresh dữ liệu khi cần
+ *
+ * KẾT NỐI VỚI:
+ * - CommentItem.tsx (mở popup từ nút reactions)
+ * - chapterCommentService (API lấy danh sách reactions)
+ */
 interface ReactionsPopupProps {
-  chapterId: string;
-  commentId: string;
-  likeCount: number;
-  dislikeCount: number;
-  isOpen: boolean;
-  onClose: () => void;
+  chapterId: string; // ID chương (cần cho API call)
+  commentId: string; // ID comment (cần cho API call)
+  likeCount: number; // Tổng số like (hiển thị trên tab)
+  dislikeCount: number; // Tổng số dislike (hiển thị trên tab)
+  isOpen: boolean; // Trạng thái mở/đóng popup
+  onClose: () => void; // Callback đóng popup
 }
 
 export function ReactionsPopup({
@@ -38,16 +50,33 @@ export function ReactionsPopup({
   isOpen,
   onClose,
 }: ReactionsPopupProps) {
+  /**
+   * STATE QUẢN LÝ UI VÀ DỮ LIỆU:
+   * - activeTab: Tab đang active (likes/dislikes)
+   * - likes/dislikes: Danh sách reactions đã load
+   * - loading states: Trạng thái loading cho từng tab
+   * - pagination states: Quản lý phân trang (page, hasMore)
+   */
   const [activeTab, setActiveTab] = useState<"likes" | "dislikes">("likes");
   const [likes, setLikes] = useState<CommentReaction[]>([]);
   const [dislikes, setDislikes] = useState<CommentReaction[]>([]);
   const [likesLoading, setLikesLoading] = useState(false);
   const [dislikesLoading, setDislikesLoading] = useState(false);
+  // Phân trang cho likes và dislikes
   const [likesPage, setLikesPage] = useState(1);
   const [dislikesPage, setDislikesPage] = useState(1);
   const [hasMoreLikes, setHasMoreLikes] = useState(true);
   const [hasMoreDislikes, setHasMoreDislikes] = useState(true);
+
   const router = useRouter();
+  /**
+   * EFFECT RESET VÀ LOAD DỮ LIỆU KHI MỞ POPUP:
+   * Khi isOpen hoặc commentId thay đổi:
+   * 1. Reset tất cả state về giá trị ban đầu
+   * 2. Load dữ liệu likes và dislikes ban đầu
+   *
+   * Quan trọng: Thêm commentId vào dependency để reload khi chọn comment khác
+   */
   useEffect(() => {
     if (isOpen) {
       // Reset state khi mở popup
@@ -60,34 +89,54 @@ export function ReactionsPopup({
       loadInitialReactions();
     }
   }, [isOpen, commentId]); // Thêm commentId vào dependency
-  //  Hàm xử lý click user trong popup
+  /**
+   * HÀM XỬ LÝ CLICK USER TRONG POPUP:
+   * Chuyển đến trang profile khi click vào một user
+   * @param readerId - ID người dùng cần xem profile
+   */
   const handleUserClick = (readerId: string) => {
     // Có thể đóng popup trước khi chuyển trang nếu muốn: onClose();
     router.push(`/profile/${readerId}`);
   };
+  /**
+   * LOAD CẢ LIKES VÀ DISLIKES BAN ĐẦU SONG SONG:
+   * Sử dụng Promise.all để tối ưu performance
+   * Load page 1 của cả hai tab cùng lúc
+   */
   const loadInitialReactions = async () => {
     // Tải cả likes và dislikes ban đầu
     await Promise.all([loadLikes(1, true), loadDislikes(1, true)]);
   };
-
+  /**
+   * HÀM LOAD LIKES VỚI PHÂN TRANG:
+   * @param page - Trang cần load
+   * @param isInitial - Có phải load lần đầu không (để reset hay append)
+   *
+   * Flow:
+   * 1. Kiểm tra chapterId và commentId
+   * 2. Gọi API getLikes với page và limit 20
+   * 3. Cập nhật state likes (reset hoặc append)
+   * 4. Kiểm tra hasMore: nếu trả về đủ 20 items → còn data
+   */
   const loadLikes = async (page: number = 1, isInitial: boolean = false) => {
     if (!chapterId || !commentId) return;
 
     setLikesLoading(true);
     try {
+      // Gọi API lấy danh sách likes
       const response = await chapterCommentService.getLikes(
         chapterId,
         commentId,
         page,
-        20
+        20 // Limit 20 items per page
       );
 
       if (isInitial) {
-        setLikes(response.items);
+        setLikes(response.items); // Reset danh sách
       } else {
-        setLikes((prev) => [...prev, ...response.items]);
+        setLikes((prev) => [...prev, ...response.items]); // Append thêm
       }
-
+      // Kiểm tra xem còn dữ liệu để load không
       setHasMoreLikes(response.items.length === 20);
       setLikesPage(page);
     } catch (error) {
@@ -96,7 +145,10 @@ export function ReactionsPopup({
       setLikesLoading(false);
     }
   };
-
+  /**
+   * HÀM LOAD DISLIKES TƯƠNG TỰ LOADLIKES:
+   * Gọi API getDislikes thay vì getLikes
+   */
   const loadDislikes = async (page: number = 1, isInitial: boolean = false) => {
     if (!chapterId || !commentId) return;
 
@@ -124,18 +176,28 @@ export function ReactionsPopup({
     }
   };
 
+  /**
+   * LOAD THÊM LIKES (PHÂN TRANG):
+   * Gọi loadLikes với page + 1 và isInitial = false
+   */
   const handleLoadMoreLikes = () => {
     if (!likesLoading && hasMoreLikes) {
       loadLikes(likesPage + 1, false);
     }
   };
-
+  /**
+   * LOAD THÊM DISLIKES (PHÂN TRANG):
+   * Gọi loadDislikes với page + 1 và isInitial = false
+   */
   const handleLoadMoreDislikes = () => {
     if (!dislikesLoading && hasMoreDislikes) {
       loadDislikes(dislikesPage + 1, false);
     }
   };
-
+  /**
+   * REFRESH DỮ LIỆU CỦA TAB ĐANG ACTIVE:
+   * Load lại page 1 với isInitial = true
+   */
   const handleRefresh = () => {
     if (activeTab === "likes") {
       loadLikes(1, true);
@@ -143,7 +205,12 @@ export function ReactionsPopup({
       loadDislikes(1, true);
     }
   };
-
+  /**
+   * FORMAT DATE STRING THÀNH ĐỊNH DẠNG DỄ ĐỌC:
+   * @param dateString - String thời gian từ API
+   * @returns String định dạng "02/01/2024 14:30"
+   * Sử dụng Intl.DateTimeFormat cho localization
+   */
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -158,17 +225,21 @@ export function ReactionsPopup({
       return dateString;
     }
   };
-
+  /**
+   * TÍNH TỔNG SỐ PHẢN ỨNG:
+   * @returns Tổng likeCount + dislikeCount
+   */
   const getTotalCount = () => {
     return likeCount + dislikeCount;
   };
 
+  // Nếu popup không mở → không render gì
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-background rounded-lg w-full max-w-md max-h-[80vh] flex flex-col shadow-xl">
-        {/* Header */}
+        {/* Header với nút refresh và close */}
         <div className="flex items-center justify-between p-4 border-b bg-muted/20">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-100 rounded-full">
@@ -208,7 +279,7 @@ export function ReactionsPopup({
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs chuyển đổi giữa Likes và Dislikes */}
         <Tabs
           value={activeTab}
           onValueChange={(v) => setActiveTab(v as "likes" | "dislikes")}
@@ -253,10 +324,12 @@ export function ReactionsPopup({
           <TabsContent value="likes" className="flex-1 m-0 p-0">
             <div className="p-4 max-h-[400px] overflow-y-auto">
               {likesLoading && likes.length === 0 ? (
+                // Loading state
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
               ) : likes.length === 0 ? (
+                // Empty state cho likes
                 <div className="text-center py-8 text-muted-foreground">
                   <ThumbsUp className="h-16 w-16 mx-auto mb-4 opacity-50 text-green-200" />
                   <p className="font-medium">Chưa có lượt thích nào</p>
@@ -266,6 +339,7 @@ export function ReactionsPopup({
                 </div>
               ) : (
                 <>
+                  {/* Danh sách người đã like */}
                   <div className="space-y-3">
                     {likes.map((reaction, index) => (
                       <div
@@ -295,7 +369,7 @@ export function ReactionsPopup({
                     ))}
                   </div>
 
-                  {/* Load More Button for Likes */}
+                  {/* Nút Load More cho likes */}
                   {hasMoreLikes && (
                     <div className="flex justify-center mt-4 pt-4 border-t">
                       <Button
@@ -363,7 +437,7 @@ export function ReactionsPopup({
                     ))}
                   </div>
 
-                  {/* Load More Button for Dislikes */}
+                  {/* Nút Load More cho dislikes */}
                   {hasMoreDislikes && (
                     <div className="flex justify-center mt-4 pt-4 border-t">
                       <Button

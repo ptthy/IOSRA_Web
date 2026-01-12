@@ -1,34 +1,107 @@
 {
   "compilerOptions": {
+    /**
+     * target: Phiên bản ECMAScript mục tiêu để biên dịch
+     * ES2017 = ES8, hỗ trợ async/await, Object.values, Object.entries
+     */
     "target": "ES2017",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    /**
+     * lib: Các thư viện TypeScript mặc định được bao gồm
+     * - dom: API DOM (document, window)
+     * - dom.iterable: Các phương thức lặp DOM (forEach, map)
+     * - esnext: Các tính năng ECMAScript mới nhất
+     */
+    "lib": ["dom", "dom.iterable", "esnext"],
+    /**
+     * allowJs: Cho phép biên dịch file JavaScript
+     * Cần thiết khi dự án có cả file .js và .ts
+     */
+
     "allowJs": true,
+    /**
+     * skipLibCheck: Bỏ qua kiểm tra kiểu trong file thư viện
+     * Tăng tốc độ biên dịch nhưng có thể bỏ sót lỗi trong thư viện
+     */
     "skipLibCheck": true,
+    /**
+     * strict: Bật tất cả các chế độ kiểm tra nghiêm ngặt
+     * Bao gồm: strictNullChecks, strictFunctionTypes, ...
+     */
     "strict": true,
+    /**
+     * baseUrl: Thư mục gốc để resolve module
+     * "." = thư mục hiện tại, giúp import với alias @/*
+     */
     "baseUrl": ".",
+    /**
+     * noEmit: Không tạo file output khi biên dịch
+     * Next.js tự xử lý biên dịch, không cần file .js output
+     */
     "noEmit": true,
+    /**
+     * esModuleInterop: Hỗ trợ tương thích giữa CommonJS và ES Module
+     * Cho phép import module CommonJS (require) như ES Module (import)
+     */
     "esModuleInterop": true,
+    /**
+     * module: Hệ thống module đầu ra
+     * esnext = ES Module, phù hợp với bundler hiện đại như webpack
+     */
     "module": "esnext",
+    /**
+     * moduleResolution: Cách TypeScript resolve module
+     * bundler = tương thích với bundler (webpack, vite)
+     */
     "moduleResolution": "bundler",
+
+    /**
+     * resolveJsonModule: Cho phép import file JSON như module
+     * Ví dụ: import data from './data.json'
+     */
     "resolveJsonModule": true,
+
+    /**
+     * isolatedModules: Yêu cầu mỗi file phải là module độc lập
+     * Bắt buộc khi dùng Babel hoặc SWC (Next.js dùng SWC)
+     */
     "isolatedModules": true,
+    /**
+     * jsx: Cách xử lý JSX
+     * react-jsx = Sử dụng hàm jsx() thay vì React.createElement()
+     * Giúp tối ưu bundle size và performance
+     */
     "jsx": "react-jsx",
+
+    /**
+     * incremental: Bật chế độ biên dịch tăng dần
+     * Chỉ biên dịch những file thay đổi, tăng tốc build time
+     */
     "incremental": true,
+    /**
+     * plugins: Plugin TypeScript
+     * next: Plugin của Next.js cung cấp type checking cho Next.js features
+     */
     "plugins": [
       {
         "name": "next"
       }
     ],
+    /**
+     * paths: Cấu hình alias (bí danh) cho import
+     * "@/*": ["./*"] = import từ '@/components' sẽ trỏ đến './components'
+     * Giúp import ngắn gọn, tránh relative path phức tạp
+     */
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     }
   },
+  /**
+   * include: Danh sách file TypeScript cần biên dịch
+   * - next-env.d.ts: Type definitions cho Next.js
+   * - : Tất cả file TypeScript
+   * - .next/types/** type definitions tự động tạo bởi Next.js
+   * - next.config.js: Cấu hình Next.js (dù là .js nhưng cần type checking)
+   */
   "include": [
     "next-env.d.ts",
     "**/*.ts",
@@ -37,7 +110,9 @@
     "next.config.js",
     ".next/dev/types/**/*.ts"
   ],
-  "exclude": [
-    "node_modules"
-  ]
+  /**
+   * exclude: Danh sách file/thư mục loại trừ khỏi biên dịch
+   * node_modules: Bỏ qua thư viện bên ngoài
+   */
+  "exclude": ["node_modules"]
 }

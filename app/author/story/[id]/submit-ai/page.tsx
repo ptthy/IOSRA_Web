@@ -1,4 +1,33 @@
 //app/author/story/[id]/submit-ai/page.tsx
+
+/**
+ * MỤC ĐÍCH:
+ * - Trình gửi truyện cho hệ thống AI phân tích và chấm điểm
+ * - Bước 2 trong quy trình xuất bản truyện (sau khi tạo/đăng ký truyện)
+ *
+ * CHỨC NĂNG CHÍNH:
+ * 1. Hiển thị review thông tin truyện trước khi gửi AI
+ * 2. Gửi yêu cầu phân tích AI qua API
+ * 3. Giải thích quy trình chấm điểm AI:
+ *    - Điểm > 7: Tự động xuất bản
+ *    - Điểm 5-7: ContentMod duyệt thủ công
+ *    - Điểm < 5: Từ chối, cần tạo truyện mới
+ * 4. Chuyển hướng đến trang kết quả AI sau khi submit
+ *
+ * ĐẶC ĐIỂM:
+ * - Giao diện xem lại thông tin truyện đẹp mắt với hình ảnh cover
+ * - Card giải thích quy trình chấm điểm rõ ràng
+ * - Xử lý lỗi API thống nhất (dùng helper function)
+ * - Hiển thị loading state khi đang xử lý
+ *
+ * QUY TRÌNH XỬ LÝ:
+ * 1. Load thông tin truyện từ API
+ * 2. Hiển thị chi tiết để tác giả review
+ * 3. Tác giả nhấn "Bắt đầu Phân tích"
+ * 4. Gửi request đến AI service
+ * 5. Chuyển hướng đến trang kết quả
+ */
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -20,10 +49,25 @@ export default function SubmitAIPage() {
   const params = useParams();
   const router = useRouter();
   const storyId = params.id as string;
+  // State quản lý
+  const [story, setStory] = useState<Story | null>(null); // Lưu thông tin truyện
+  const [isLoading, setIsLoading] = useState(true); // Trạng thái đang tải truyện
+  const [isSubmitting, setIsSubmitting] = useState(false); // Trạng thái đang gửi AI
 
-  const [story, setStory] = useState<Story | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  /**
+   * HELPER FUNCTION XỬ LÝ LỖI API - GIỐNG CÁC FILE KHÁC
+   *
+   * LOGIC XỬ LÝ:
+   * 1. Ưu tiên kiểm tra lỗi validation từ backend (có details)
+   * 2. Nếu có validation errors -> hiển thị lỗi đầu tiên
+   * 3. Nếu có message từ backend -> hiển thị message đó
+   * 4. Fallback: dùng message mặc định hoặc từ response
+   *
+   * TẠI SAO CẦN CONSISTENCY TRONG ERROR HANDLING:
+   * - Người dùng nhận được thông báo lỗi nhất quán
+   * - Dễ debug: biết chính xác lỗi đến từ đâu
+   * - Xử lý được nhiều response format khác nhau
+   */
   const handleApiError = (error: any, defaultMessage: string) => {
     // 1. Check lỗi Validation/Logic từ Backend
     if (error.response && error.response.data && error.response.data.error) {
@@ -51,48 +95,66 @@ export default function SubmitAIPage() {
     const fallbackMsg = error.response?.data?.message || defaultMessage;
     toast.error(fallbackMsg);
   };
-  // -------------------
+  /**
+   * LOAD THÔNG TIN TRUYỆN KHI COMPONENT MOUNT
+   *
+   * FLOW XỬ LÝ:
+   * 1. Set isLoading = true để hiển thị loading
+   * 2. Gọi API getStoryDetails để lấy thông tin đầy đủ
+   * 3. Lưu vào state để hiển thị
+   * 4. Xử lý lỗi nếu có
+   * 5. Set isLoading = false để hiển thị content
+   *
+   * TẠI SAO DÙNG getStoryDetails THAY VÌ getStoryById:
+   * - getStoryDetails trả về đầy đủ thông tin bao gồm tags
+   * - Có thể include các relations (tags, chapters, etc.)
+   * - Đảm bảo hiển thị đủ thông tin để review
+   */
   useEffect(() => {
     loadStory();
-  }, [storyId]);
+  }, [storyId]); // Chỉ chạy lại khi storyId thay đổi
 
   const loadStory = async () => {
     setIsLoading(true);
     try {
-      // Sửa: dùng getStoryDetails thay vì getStoryById
+      // Gọi API lấy thông tin truyện chi tiết
       const data = await storyService.getStoryDetails(storyId);
       setStory(data);
-      // } catch (error) {
-      //   console.error("Error loading story:", error);
-      // } finally {
-      //   setIsLoading(false);
-      // }
     } catch (error: any) {
-      // --- DÙNG HELPER ---
+      // Xử lý lỗi bằng helper function
       handleApiError(error, "Không thể tải thông tin truyện.");
     } finally {
       setIsLoading(false);
     }
   };
-
+  /**
+   * SUBMIT TRUYỆN CHO AI REVIEW
+   *
+   * FLOW XỬ LÝ:
+   * 1. Set isSubmitting = true để disable button và hiển thị loading
+   * 2. Gọi API submitStoryForReview (gửi truyện cho AI phân tích)
+   * 3. Nếu thành công -> navigate đến trang kết quả AI
+   * 4. Nếu lỗi -> hiển thị thông báo và reset isSubmitting
+   *
+   * TẠI SAO PHẢI NAVIGATE SAU KHI SUBMIT THÀNH CÔNG:
+   * - AI phân tích mất thời gian (30s-2p), không thể show result ngay
+   * - Chuyển sang trang khác để user đợi và xem kết quả sau
+   * - Tránh user submit nhiều lần trong lúc đợi
+   */
   const handleSubmitAI = async () => {
     setIsSubmitting(true);
     try {
-      // Sửa: dùng submitStoryForReview thay vì submitForAIScoring
+      // Gọi API submit story cho AI review
       await storyService.submitStoryForReview(storyId);
       // Navigate to result page
       router.push(`/author/story/${storyId}/ai-result`);
-      // } catch (error) {
-      //   console.error("Error submitting to AI:", error);
-      //   setIsSubmitting(false);
-      // }
     } catch (error: any) {
       // --- DÙNG HELPER ---
       handleApiError(error, "Gửi phân tích thất bại. Vui lòng thử lại.");
-      setIsSubmitting(false); // Tắt loading khi lỗi
+      setIsSubmitting(false); // Tắt loading khi lỗi (không navigate)
     }
   };
-
+  // Hiển thị loading spinner khi đang tải dữ liệu truyện
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -101,6 +163,7 @@ export default function SubmitAIPage() {
     );
   }
 
+  // Hiển thị thông báo nếu không tìm thấy truyện
   if (!story) {
     return (
       <div className="text-center py-16">
@@ -114,7 +177,7 @@ export default function SubmitAIPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-8">
-      {/* Back Button */}
+      {/* Nút quay lại dashboard */}
       <Button
         variant="ghost"
         onClick={() => router.push("/author/overview")}
@@ -124,7 +187,7 @@ export default function SubmitAIPage() {
         Quay lại Dashboard
       </Button>
 
-      {/* Header */}
+      {/* Header với tiêu đề và mô tả bước 2 */}
       <div>
         <h1 className="text-2xl mb-2">Gửi AI Chấm Điểm</h1>
         <p className="text-sm text-muted-foreground">
@@ -132,7 +195,7 @@ export default function SubmitAIPage() {
         </p>
       </div>
 
-      {/* Story Info - Read Only */}
+      {/* Story Info - Read Only - Card hiển thị thông tin truyện để review */}
       <Card className="bg-card border-2 shadow-sm overflow-hidden">
         {/* CardHeader mới với Icon được thiết kế lại */}
         <CardHeader className="bg-muted/30 border-b py-5 px-6">
@@ -259,7 +322,7 @@ export default function SubmitAIPage() {
         </CardContent>
       </Card>
 
-      {/* Main AI Submit Card */}
+      {/* Main AI Submit Card - Card chính để submit AI */}
       <Card className="border-primary/30">
         <CardHeader>
           <div className="flex items-start gap-3">
@@ -278,7 +341,7 @@ export default function SubmitAIPage() {
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* Info Box */}
+          {/* Info Box giải thích quy trình chấm điểm */}
           <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg">
             <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
             <div className="space-y-2">
@@ -302,7 +365,7 @@ export default function SubmitAIPage() {
             </div>
           </div>
 
-          {/* Submit Button */}
+          {/* Nút submit AI - Disable khi đang submitting */}
           <Button
             onClick={handleSubmitAI}
             disabled={isSubmitting}
@@ -321,7 +384,7 @@ export default function SubmitAIPage() {
               </>
             )}
           </Button>
-
+          {/* Thông báo thời gian phân tích */}
           <p className="text-sm text-center text-muted-foreground">
             Quá trình phân tích thường mất từ 30 giây đến 2 phút
           </p>

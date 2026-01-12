@@ -1,4 +1,32 @@
 // app/author/create-story/page.tsx
+/* 
+MỤC ĐÍCH: Trang tạo truyện mới (standalone page, không reusable)
+CHỨC NĂNG CHÍNH:
+- Giao diện đầy đủ để tác giả tạo truyện mới
+- Form nhập thông tin tương tự CreateStoryForm nhưng độc lập
+- Xử lý tạo ảnh bìa AI và preview
+- Logic đặc biệt cho trường hợp từ chối ảnh AI (state management)
+- Điều hướng sau khi tạo thành công
+- Xử lý lỗi tài khoản bị hạn chế đăng bài (AccountRestricted)
+
+KHÁC BIỆT VỚI CreateStoryForm COMPONENT:
+- Đây là STANDALONE PAGE: có routing, không có props
+- Xử lý logic AI cover từ chối PHỨC TẠP HƠN
+- Có xử lý lỗi AccountRestricted đặc biệt
+- Redirect flow khác biệt
+
+LOGIC FLOW CHÍNH:
+1. User điền form → submit
+2. Nếu chọn upload ảnh → tạo truyện → redirect
+3. Nếu chọn AI → tạo truyện → hiển thị preview
+4. User chấp nhận AI → redirect
+5. User từ chối AI → chuyển sang upload mode (vẫn giữ storyId)
+
+QUAN HỆ VỚI HỆ THỐNG:
+- Kế thừa layout: app/author/layout.tsx
+- Service: @/services/storyService
+- API: POST /story/draft (tạo truyện), PUT /story/draft/{id}/cover (update ảnh)
+*/
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -59,8 +87,13 @@ import type { Tag, CreateStoryRequest } from "@/services/apiTypes";
 import { toast } from "sonner";
 import { ImageWithFallback } from "@/components/ui/ImageWithFallback";
 
-//const LOCAL_STORAGE_KEY = "create-story-draft-v5";
-
+/**
+ * OPTIONS CHO ĐỘ DÀI DỰ KIẾN - copy từ CreateStoryForm
+ * LÝ DO COPY LẠI:
+ * - Page này độc lập với CreateStoryForm component
+ * - Tránh import phức tạp (circular dependency)
+ * - Đơn giản hóa kiến trúc: page standalone
+ */
 const LENGTH_PLAN_OPTIONS = [
   { value: "super_short", label: "Siêu ngắn (từ 1-5 chương)" },
   { value: "short", label: "Ngắn (từ 6-20 chương)" },
@@ -69,6 +102,12 @@ const LENGTH_PLAN_OPTIONS = [
 
 export default function CreateStoryPage() {
   const router = useRouter();
+
+  // ================ STATE DECLARATIONS ================
+
+  /**
+   * STATE MANAGEMENT - tương tự CreateStoryForm nhưng có thêm logic đặc biệt
+   */
   const [tags, setTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -88,10 +127,10 @@ export default function CreateStoryPage() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPrompt, setCoverPrompt] = useState("");
 
-  // AI state
+  // AI state - QUAN TRỌNG: xử lý từ chối AI
   const [generatedAICover, setGeneratedAICover] = useState<string | null>(null);
   const [hasUsedAICover, setHasUsedAICover] = useState(false);
-  const [createdStoryId, setCreatedStoryId] = useState<string | null>(null);
+  const [createdStoryId, setCreatedStoryId] = useState<string | null>(null); // Lưu storyId khi từ chối AI
 
   // Character counters
   const [titleLength, setTitleLength] = useState(0);
@@ -101,67 +140,7 @@ export default function CreateStoryPage() {
   const [languageCode, setLanguageCode] = useState<
     "vi-VN" | "en-US" | "zh-CN" | "ja-JP"
   >("vi-VN");
-
-  //const LIMITS = { TITLE: 100, OUTLINE: 3000, PROMPT: 500 };
-  // const handleApiError = (error: any, defaultMessage: string) => {
-  //   if (error.response?.data?.error) {
-  //     const { code, message, details } = error.response.data.error;
-  //     // 1. Check lỗi Validation/Logic từ Backend
-  //     // --- A. Xử lý riêng cho AccountRestricted (để format ngày cho đẹp) ---
-  //     if (code === "AccountRestricted") {
-  //       // Backend trả: "Your account is restricted from posting until 2025-12-19T08:25:29..."
-  //       // Ta format lại tiếng Việt cho thân thiện
-  //       const dateMatch = message.match(
-  //         /(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/
-  //       );
-  //       if (dateMatch) {
-  //         const date = new Date(dateMatch[0]);
-  //         const dateStr = date.toLocaleString("vi-VN"); // Ra dạng: 08:25:29 19/12/2025
-  //         toast.error(`Tài khoản bị hạn chế đăng bài đến: ${dateStr}`);
-  //         return;
-  //       }
-  //       // Nếu không parse được ngày thì hiển thị luôn message gốc
-  //       toast.error(message);
-  //       return;
-  //     }
-
-  //     // --- B. Nếu có message từ Backend -> HIỂN THỊ LUÔN ---
-  //     // Đây là chỗ giúp "lỗi gì cũng trả ra được message"
-  //     if (message) {
-  //       toast.error(message);
-  //       return;
-  //     }
-
-  //     // --- C. Nếu là lỗi Validation (có details) ---
-  //     if (details) {
-  //       // --- Bắt riêng lỗi Dàn ý (Outline) để việt hóa ---
-  //       if (details.Outline) {
-  //         toast.error("Dàn ý cốt truyện phải có ít nhất 20 ký tự.");
-  //         return;
-  //       }
-  //       const firstKey = Object.keys(details)[0];
-  //       if (firstKey && details[firstKey].length > 0) {
-  //         toast.error(details[firstKey].join(" "));
-  //         return;
-  //       }
-  //     }
-  //     // 3. Sau đó mới hiển thị message chung (nếu không có details)
-  //     if (message) {
-  //       // Nếu message là "Validation failed." mà không có details thì mới hiện
-  //       // hoặc các lỗi logic khác từ backend
-  //       if (message !== "Validation failed.") {
-  //         toast.error(message);
-  //       } else {
-  //         toast.error("Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.");
-  //       }
-  //       return;
-  //     }
-  //   }
-
-  //   // 2. Các lỗi khác (Mất mạng, Server sập, 401 không có body...)
-  //   const fallbackMsg = error.message || defaultMessage;
-  //   toast.error(fallbackMsg);
-  // };
+  // Validation limits
   const LIMITS = {
     TITLE_MIN: 10,
     TITLE_MAX: 50,
@@ -171,68 +150,18 @@ export default function CreateStoryPage() {
     OUTLINE_MAX: 5000,
     PROMPT: 500,
   };
-  // const handleApiError = (error: any, defaultMessage: string) => {
-  //   if (error.response?.data?.error) {
-  //     const { code, message, details } = error.response.data.error;
-
-  //     // 1. ƯU TIÊN KIỂM TRA DETAILS TRƯỚC (Bắt các lỗi như Title, Outline ít hơn 20 ký tự)
-  //     if (details) {
-  //       // Duyệt qua tất cả các field bị lỗi (ví dụ: Title, Outline)
-  //       const errorEntries = Object.entries(details);
-
-  //       if (errorEntries.length > 0) {
-  //         errorEntries.forEach(([field, messages]) => {
-  //           if (Array.isArray(messages)) {
-  //             messages.forEach((msg) => {
-  //               // Việt hóa thông báo dựa trên field và nội dung lỗi từ server
-  //               if (
-  //                 field === "Title" &&
-  //                 msg.includes("minimum length of '20'")
-  //               ) {
-  //                 toast.error("Tên truyện phải có ít nhất 20 ký tự.");
-  //               } else if (
-  //                 field === "Outline" &&
-  //                 msg.includes("minimum length of '20'")
-  //               ) {
-  //                 toast.error("Dàn ý cốt truyện phải có ít nhất 20 ký tự.");
-  //               } else {
-  //                 toast.error(msg); // Hiện các thông báo chi tiết khác từ server
-  //               }
-  //             });
-  //           }
-  //         });
-  //         return; // Dừng lại sau khi đã hiện xong các lỗi chi tiết, không chạy xuống phần message chung
-  //       }
-  //     }
-
-  //     // 2. Xử lý AccountRestricted
-  //     if (code === "AccountRestricted") {
-  //       const dateMatch = message.match(
-  //         /(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/
-  //       );
-  //       if (dateMatch) {
-  //         const date = new Date(dateMatch[0]);
-  //         const dateStr = date.toLocaleString("vi-VN");
-  //         toast.error(`Tài khoản bị hạn chế đăng bài đến: ${dateStr}`);
-  //         return;
-  //       }
-  //       toast.error(message);
-  //       return;
-  //     }
-
-  //     // 3. Nếu không có details thì mới hiển thị message chung
-  //     // Bỏ qua nếu message là "Validation failed." vì đã xử lý ở phần details phía trên
-  //     if (message && message !== "Validation failed.") {
-  //       toast.error(message);
-  //       return;
-  //     }
-  //   }
-
-  //   // 4. Fallback cho các lỗi khác (Mạng, Server lỗi...)
-  //   const fallbackMsg = error.message || defaultMessage;
-  //   toast.error(fallbackMsg);
-  // };
-
+  /**
+   * HÀM XỬ LÝ LỖI TỪ API - CÓ THÊM XỬ LÝ AccountRestricted ĐẶC BIỆT
+   * LÝ DO THÊM TRANG NÀY:
+   * - Trang create story có thể bị lỗi AccountRestricted (tài khoản bị ban)
+   * - Cần format ngày tiếng Việt cho thông báo dễ hiểu
+   *
+   * FLOW XỬ LÝ LỖI:
+   * 1. Ưu tiên: AccountRestricted (format ngày VN)
+   * 2. Validation details
+   * 3. Message chung
+   * 4. Fallback
+   */
   const handleApiError = (error: any, defaultMessage: string) => {
     // 1. Kiểm tra cấu trúc lỗi từ Backend
     if (error.response && error.response.data && error.response.data.error) {
@@ -240,12 +169,13 @@ export default function CreateStoryPage() {
 
       // --- A. GIỮ LẠI: Xử lý AccountRestricted (Format ngày tiếng Việt) ---
       if (code === "AccountRestricted") {
+        // Regex tìm date string ISO trong message
         const dateMatch = message.match(
           /(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/
         );
         if (dateMatch) {
           const date = new Date(dateMatch[0]);
-          const dateStr = date.toLocaleString("vi-VN");
+          const dateStr = date.toLocaleString("vi-VN"); // Format: "dd/MM/yyyy, HH:mm:ss"
           toast.error(`Tài khoản bị hạn chế đăng bài đến: ${dateStr}`);
           return;
         }
@@ -274,22 +204,27 @@ export default function CreateStoryPage() {
     const fallbackMsg = error.response?.data?.message || defaultMessage;
     toast.error(fallbackMsg);
   };
-  // -------------------
-  // Load tags
+  // ================ EFFECTS ================
+
+  /**
+   * useEffect: LOAD TAGS KHI COMPONENT MOUNT
+   * Tương tự CreateStoryForm
+   */
+  // Load tags khi componentvừa hiện lên lần đầu tiên
   useEffect(() => {
     loadTags();
   }, []);
-
+  /**
+   * Hàm load tags từ API
+   * LÝ DO TÁCH RIÊNG:
+   * - Có thể gọi lại khi cần refresh
+   * - Dùng helper handleApiError để xử lý lỗi thống nhất
+   */
   const loadTags = async () => {
     setIsLoading(true);
     try {
       const data = await storyService.getAllTags();
       setTags(data);
-      // } catch (error) {
-      //   toast.error("Không thể tải danh sách thể loại");
-      // } finally {
-      //   setIsLoading(false);
-      // }
     } catch (error: any) {
       // --- DÙNG HELPER ---
       handleApiError(error, "Không thể tải danh sách thể loại");
@@ -297,54 +232,9 @@ export default function CreateStoryPage() {
       setIsLoading(false);
     }
   };
-
-  // // Load draft
-  // useEffect(() => {
-  //   const draft = localStorage.getItem(LOCAL_STORAGE_KEY);
-  //   if (draft) {
-  //     try {
-  //       const data = JSON.parse(draft);
-  //       setTitle(data.title || "");
-  //       setDescription(data.description || "");
-  //       setOutline(data.outline || "");
-  //       setLengthPlan(data.lengthPlan || "short");
-  //       setSelectedTagIds(data.selectedTagIds || []);
-  //       setCoverMode(data.coverMode || "upload");
-  //       setCoverPrompt(data.coverPrompt || "");
-  //       setHasUsedAICover(data.hasUsedAICover || false);
-  //       setCreatedStoryId(data.createdStoryId || null);
-  //     } catch (e) {
-  //       console.error("Error loading draft:", e);
-  //     }
-  //   }
-  // }, []);
-
-  // // Save draft
-  // useEffect(() => {
-  //   const draft = {
-  //     title,
-  //     description,
-  //     outline,
-  //     lengthPlan,
-  //     selectedTagIds,
-  //     coverMode,
-  //     coverPrompt,
-  //     hasUsedAICover,
-  //     createdStoryId,
-  //   };
-  //   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(draft));
-  // }, [
-  //   title,
-  //   description,
-  //   outline,
-  //   lengthPlan,
-  //   selectedTagIds,
-  //   coverMode,
-  //   coverPrompt,
-  //   hasUsedAICover,
-  //   createdStoryId,
-  // ]);
-
+  /**
+   * Hàm toggle tag selection - giống CreateStoryForm
+   */
   const toggleTag = (tagId: string) => {
     setSelectedTagIds((prev) =>
       prev.includes(tagId)
@@ -352,7 +242,12 @@ export default function CreateStoryPage() {
         : [...prev, tagId]
     );
   };
-
+  /**
+   * Xử lý thay đổi cover mode
+   * LOGIC ĐƠN GIẢN HƠN CreateStoryForm (không có edit mode):
+   * - Chỉ check đã dùng AI chưa
+   * - Hiển thị cảnh báo khi chọn AI
+   */
   const handleCoverModeChange = (value: "upload" | "generate") => {
     if (value === "generate" && hasUsedAICover) {
       toast.error("Bạn đã dùng lượt tạo ảnh AI. Không thể chọn lại.");
@@ -361,23 +256,36 @@ export default function CreateStoryPage() {
     setCoverMode(value);
     if (value === "generate") setShowAIWarning(true);
   };
-
+  /**
+   * Xử lý khi user chấp nhận ảnh AI
+   * LOGIC:
+   * - Đánh dấu đã dùng AI
+   * - Redirect đến trang submit AI (bước tiếp theo)
+   */
   const handleAcceptAICover = () => {
     setShowAIPreview(false);
     setHasUsedAICover(true);
-    // localStorage.removeItem(LOCAL_STORAGE_KEY);
+
     toast.success("Đã dùng ảnh bìa AI");
     router.push(`/author/story/${createdStoryId}/submit-ai`);
   };
-
+  /**
+   * XỬ LÝ KHI USER TỪ CHỐI ẢNH AI - LOGIC QUAN TRỌNG
+   * FLOW:
+   * 1. Reset preview
+   * 2. Chuyển sang upload mode
+   * 3. ĐÁNH DẤU ĐÃ DÙNG AI (quan trọng: không được dùng lại)
+   * 4. Thông báo cho user upload ảnh mới
+   *
+   * LƯU Ý: createdStoryId vẫn được giữ lại để update cover sau
+   */
   const handleRejectAICover = () => {
     setShowAIPreview(false);
     setShowAIPreview(false);
     setGeneratedAICover(null);
     setCoverMode("upload");
     setHasUsedAICover(true); // <<<--- THÊM DÒNG NÀY VÀO!!!
-
-    // Xóa draft cũ nhưng lưu lại createdStoryId để không bị mất khi reload
+    // Có thể lưu draft state nếu cần (cho UX)
     const newDraft = {
       title,
       description,
@@ -389,66 +297,25 @@ export default function CreateStoryPage() {
       hasUsedAICover: true,
       createdStoryId, // giữ lại cái quan trọng nhất
     };
-    // localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newDraft));
-
     toast.info("Đã từ chối ảnh AI → Vui lòng upload ảnh mới");
   };
-
-  // const handleSubmit = async () => {
-  //   if (!title.trim()) return toast.error("Vui lòng nhập tên truyện");
-  //   if (!outline.trim()) return toast.error("Vui lòng nhập dàn ý cốt truyện");
-  //   if (selectedTagIds.length === 0)
-  //     return toast.error("Vui lòng chọn ít nhất 1 thể loại");
-  //   if (coverMode === "upload" && !coverFile && !createdStoryId)
-  //     return toast.error("Vui lòng chọn ảnh bìa");
-  //   if (coverMode === "generate" && !coverPrompt.trim())
-  //     return toast.error("Vui lòng nhập mô tả ảnh AI");
-
-  //   setIsSubmitting(true);
-
-  //   try {
-  //     if (!createdStoryId) {
-  //       // Dùng CreateStoryRequest object – sạch sẽ, không cần FormData thủ công
-  //       const requestData: CreateStoryRequest = {
-  //         title,
-  //         description: description || "",
-  //         outline,
-  //         lengthPlan,
-  //         tagIds: selectedTagIds,
-  //         coverMode,
-  //         coverFile: coverMode === "upload" ? coverFile! : undefined,
-  //         coverPrompt: coverMode === "generate" ? coverPrompt : undefined,
-  //       };
-
-  //       const res = await storyService.createStory(requestData);
-
-  //       setCreatedStoryId(res.storyId);
-  //       localStorage.removeItem(LOCAL_STORAGE_KEY);
-
-  //       if (coverMode === "generate" && res.coverUrl) {
-  //         setGeneratedAICover(res.coverUrl);
-  //         setHasUsedAICover(true);
-  //         setShowAIPreview(true);
-  //       } else {
-  //         toast.success("Tạo truyện thành công!");
-  //         router.push(`/author/story/${res.storyId}/submit-ai`);
-  //       }
-  //     }
-  //     // Từ chối AI → upload ảnh mới
-  //     else if (createdStoryId && coverMode === "upload" && coverFile) {
-  //       await storyService.replaceDraftCover(createdStoryId, coverFile);
-  //       localStorage.removeItem(LOCAL_STORAGE_KEY);
-  //       toast.success("Cập nhật ảnh bìa thành công!");
-  //       router.push(`/author/story/${createdStoryId}/submit-ai`);
-  //     }
-  //   } catch (err: any) {
-  //     toast.error(err.message || "Có lỗi xảy ra");
-  //   } finally {
-  //     setIsSubmitting(false);
-  //   }
-  // };
+  /**
+   * HÀM SUBMIT CHÍNH - CHỈ XỬ LÝ CREATE MODE (không có edit mode)
+   * LOGIC PHÂN BIỆT 2 TRƯỜNG HỢP:
+   * 1. Tạo mới hoàn toàn (chưa có createdStoryId)
+   * 2. Đã có storyId (do từ chối AI trước đó) → chỉ update ảnh bìa
+   *
+   * FLOW CHI TIẾT:
+   * A. Tạo mới:
+   *    - Gọi API createStory
+   *    - Nếu AI: hiển thị preview
+   *    - Nếu upload: redirect
+   * B. Đã có ID (từ chối AI):
+   *    - Gọi API replaceDraftCover
+   *    - Redirect
+   */
   const handleSubmit = async () => {
-    // Validation cơ bản
+    // ===== VALIDATION =====
     if (!title.trim()) return toast.error("Vui lòng nhập tên truyện");
     if (!outline.trim()) return toast.error("Vui lòng nhập dàn ý cốt truyện");
     if (title.length < LIMITS.TITLE_MIN || title.length > LIMITS.TITLE_MAX) {
@@ -475,6 +342,7 @@ export default function CreateStoryPage() {
     }
     if (selectedTagIds.length === 0)
       return toast.error("Vui lòng chọn ít nhất 1 thể loại");
+    // Cover validation đặc biệt: nếu đã có createdStoryId (từ chối AI) thì không require coverFile
     if (coverMode === "upload" && !coverFile && !createdStoryId)
       return toast.error("Vui lòng chọn ảnh bìa");
     if (coverMode === "generate" && !coverPrompt.trim())
@@ -493,89 +361,48 @@ export default function CreateStoryPage() {
           languageCode,
           tagIds: selectedTagIds,
           coverMode,
-          coverFile: coverMode === "upload" ? coverFile! : undefined,
+          coverFile: coverMode === "upload" ? coverFile! : undefined, // Non-null assertion vì đã validate
           coverPrompt: coverMode === "generate" ? coverPrompt : undefined,
         };
-
+        // Gọi API tạo truyện
         const res = await storyService.createStory(requestData);
-
+        // Lưu storyId để dùng sau này (khi từ chối AI)
         setCreatedStoryId(res.storyId);
-        //  localStorage.removeItem(LOCAL_STORAGE_KEY);
-
+        // ===== XỬ LÝ RESPONSE =====
+        // Nếu dùng AI và có coverUrl → hiển thị preview
         if (coverMode === "generate" && res.coverUrl) {
           setGeneratedAICover(res.coverUrl);
-          setHasUsedAICover(true);
-          setShowAIPreview(true);
+          setHasUsedAICover(true); // Đánh dấu đã dùng AI
+          setShowAIPreview(true); // Hiển thị dialog preview
         } else {
+          // Nếu upload ảnh thường -> redirect thẳng
           toast.success("Tạo truyện thành công!");
           router.push(`/author/story/${res.storyId}/submit-ai`);
         }
       }
-      // TRƯỜNG HỢP 2: Đã có ID (do từ chối AI trước đó) -> Gọi Update ảnh bìa
+      // ===== TRƯỜNG HỢP 2: ĐÃ CÓ ID (do từ chối AI trước đó) → UPDATE COVER =====
       else if (createdStoryId && coverMode === "upload" && coverFile) {
+        // Chỉ update ảnh bìa (giữ nguyên các field khác)
         await storyService.replaceDraftCover(createdStoryId, coverFile);
 
-        //  localStorage.removeItem(LOCAL_STORAGE_KEY);
         toast.success("Cập nhật ảnh bìa thành công!");
         router.push(`/author/story/${createdStoryId}/submit-ai`);
       }
-      // } catch (err: any) {
-      //   console.error(err);
-
-      //   // === XỬ LÝ LOGIC NẾU ID BỊ LỖI (NOT FOUND) ===
-      //   if (
-      //     err.code === "STORY_NOT_FOUND" ||
-      //     err.message === "Truyện không tồn tại"
-      //   ) {
-      //     toast.error(
-      //       "Truyện cũ không tìm thấy. Hệ thống sẽ tạo truyện mới khi bạn lưu lại."
-      //     );
-
-      //     // Reset ID để lần sau bấm nút sẽ nhảy vào TRƯỜNG HỢP 1 (Tạo mới)
-      //     setCreatedStoryId(null);
-
-      //     // Cập nhật lại localStorage để xóa ID lỗi đi
-      //     const currentDraft = JSON.parse(
-      //       localStorage.getItem(LOCAL_STORAGE_KEY) || "{}"
-      //     );
-      //     delete currentDraft.createdStoryId;
-      //     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentDraft));
-      //   } else {
-      //     // Các lỗi khác thì hiển thị bình thường
-      //     toast.error(err.message || "Có lỗi xảy ra");
-      //   }
-      // } finally {
-      //   setIsSubmitting(false);
-      // }
     } catch (error: any) {
       // Đổi tên biến thành error cho đồng bộ
       console.error(error);
 
-      // === GIỮ NGUYÊN LOGIC NẾU ID BỊ LỖI (NOT FOUND) ===
-      // if (
-      //   error.code === "STORY_NOT_FOUND" ||
-      //   error.message === "Truyện không tồn tại"
-      // ) {
-      //   toast.error(
-      //     "Truyện cũ không tìm thấy. Hệ thống sẽ tạo truyện mới khi bạn lưu lại."
-      //   );
-      //   // Reset ID để lần sau bấm nút sẽ nhảy vào TRƯỜNG HỢP 1
-      //   setCreatedStoryId(null);
-
-      //   // // Cập nhật lại localStorage
-      //   // const currentDraft = JSON.parse(
-      //   //   localStorage.getItem(LOCAL_STORAGE_KEY) || "{}"
-      //   // );
-      //   // delete currentDraft.createdStoryId;
-      //   // localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentDraft));
-      // } else {
       // --- DÙNG HELPER CHO CÁC LỖI KHÁC ---
       handleApiError(error, "Có lỗi xảy ra khi tạo truyện");
     } finally {
       setIsSubmitting(false);
     }
   };
+  // ================ UI RENDERING ================
 
+  /**
+   * LOADING STATE: Hiển thị khi đang fetch tags
+   */
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -586,13 +413,14 @@ export default function CreateStoryPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-12">
+      {/* Page Header */}
       <div>
         <h1 className="text-3xl mb-2">Tạo Truyện Mới</h1>
         <p className="text-sm text-muted-foreground">
           Điền thông tin để tạo bản nháp truyện của bạn
         </p>
       </div>
-
+      {/* Main Form Card */}
       <Card>
         <CardHeader>
           <CardTitle>Thông tin truyện</CardTitle>
@@ -603,35 +431,6 @@ export default function CreateStoryPage() {
         <CardContent className="space-y-6">
           {/* Tên truyện */}
           <div className="space-y-2 ">
-            {/* <div className="flex justify-between items-center ">
-              <Label className="text-base font-bold">
-                Tên truyện <span className="text-red-500 text-xl">*</span>
-              </Label>
-              <span
-                className={`text-xs ${
-                  titleLength > LIMITS.TITLE
-                    ? "text-red-500"
-                    : "text-muted-foreground"
-                }`}
-              >
-                {titleLength}/{LIMITS.TITLE}
-              </span>
-            </div>
-            <Input
-              placeholder="Nhập tên truyện của bạn..."
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                setTitleLength(e.target.value.length);
-              }}
-              maxLength={LIMITS.TITLE}
-              className={
-                titleLength > LIMITS.TITLE
-                  ? "border-red-500"
-                  : "dark:border-[#f0ead6]"
-              }
-            />
-          </div> */}
             <div className="flex justify-between items-center">
               <Label className="text-base font-bold">
                 Tên truyện <span className="text-red-500 text-xl">*</span>
@@ -667,15 +466,6 @@ export default function CreateStoryPage() {
 
           {/* Mô tả */}
           <div className="space-y-2">
-            {/* <Label>Mô tả</Label>
-            <Textarea
-              placeholder="Giới thiệu nội dung truyện của bạn..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={5}
-              className="dark:border-[#f0ead6]"
-            />
-          </div> */}
             <div className="flex justify-between items-center">
               <Label className="text-base font-bold">Mô tả</Label>
               <span
@@ -713,32 +503,6 @@ export default function CreateStoryPage() {
 
           {/* Dàn ý cốt truyện */}
           <div className="space-y-2">
-            {/* <div className="flex justify-between items-center">
-              <Label className="text-base font-bold">
-                Dàn ý cốt truyện<span className="text-red-500 text-xl">*</span>
-              </Label>
-              <span
-                className={`text-xs ${
-                  outlineLength > LIMITS.OUTLINE
-                    ? "text-red-500"
-                    : "text-muted-foreground"
-                }`}
-              >
-                {outlineLength}/{LIMITS.OUTLINE}
-              </span>
-            </div>
-            <Textarea
-              placeholder="Viết dàn ý chi tiết dự kiến của truyện..."
-              value={outline}
-              onChange={(e) => {
-                setOutline(e.target.value);
-                setOutlineLength(e.target.value.length);
-              }}
-              rows={8}
-              maxLength={LIMITS.OUTLINE}
-              className="dark:border-[#f0ead6]"
-            />
-          </div> */}
             <div className="flex justify-between items-center">
               <Label className="text-base font-bold">
                 Dàn ý cốt truyện <span className="text-red-500 text-xl">*</span>

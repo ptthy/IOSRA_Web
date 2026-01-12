@@ -1,4 +1,17 @@
 // components/payment/TopUpModal.tsx
+/**
+ * MỤC ĐÍCH: Modal cho phép người dùng nạp kim cương và đăng ký gói Premium
+ * CHỨC NĂNG CHÍNH:
+ * - Hiển thị thông tin gói Premium (bên trái) và các gói nạp kim cương (bên phải)
+ * - Tính toán % bonus dựa trên tỷ lệ kim cương/giá tiền so với gói cơ bản
+ * - Xử lý tạo payment link và redirect đến cổng thanh toán
+ * - Gán theme (màu sắc) cho từng gói dựa trên index (xoay vòng)
+ * LOGIC XỬ LÝ:
+ * - API call lấy danh sách gói nạp và gói Premium khi mở modal
+ * - Tính toán: bonusPercent = ((currentRate - baseRate) / baseRate) * 100
+ * - Theme mapping: themeIndex = idx % THEME_MAPPING.length
+ * - Lưu transactionId vào localStorage để xử lý callback
+ */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -33,12 +46,15 @@ import {
   SubscriptionPlan,
 } from "@/services/subscriptionService";
 interface TopUpModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  currentBalance?: number;
+  isOpen: boolean; // Trạng thái mở/đóng modal
+  onClose: () => void; // Hàm đóng modal
+  currentBalance?: number; // Số dư hiện tại
 }
 
-// Định nghĩa trước các Theme để map theo index của gói
+/**
+ * Mapping theme cho từng gói nạp dựa trên index
+ * Mỗi gói có màu sắc và icon riêng
+ */
 const THEME_MAPPING = [
   {
     // Index 0: Gói Basic (Cyan)
@@ -80,6 +96,12 @@ export function TopUpModal({
   onClose,
   currentBalance = 0,
 }: TopUpModalProps) {
+  /**
+   * State quản lý:
+   * - processingId: ID của gói đang xử lý thanh toán
+   * - premiumPlan: Thông tin gói Premium
+   * - packages: Danh sách gói nạp kim cương
+   */
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [premiumPlan, setPremiumPlan] = useState<SubscriptionPlan | null>(null);
   // State lưu danh sách gói lấy từ API
@@ -87,9 +109,16 @@ export function TopUpModal({
   const [isLoadingPackages, setIsLoadingPackages] = useState(false);
 
   // --- Gọi API lấy gói cước khi mở Modal ---
+  /**
+   * Effect: Lấy dữ liệu gói cước và gói Premium khi modal mở
+   * - Gọi API lấy danh sách gói nạp kim cương
+   * - Gọi API lấy thông tin gói Premium
+   * - Sắp xếp gói nạp theo giá tăng dần
+   */
   useEffect(() => {
     if (isOpen) {
       const fetchPricing = async () => {
+        // Lấy gói Premium
         const subRes = await subscriptionService.getPlans();
         if (subRes.data && subRes.data.length > 0) {
           // Lấy gói đầu tiên hoặc tìm theo code "premium_month"
@@ -98,6 +127,7 @@ export function TopUpModal({
               subRes.data[0]
           );
         }
+        // Lấy danh sách gói nạp kim cương
         setIsLoadingPackages(true);
         try {
           const res = await paymentService.getPricingPackages();
@@ -118,7 +148,12 @@ export function TopUpModal({
       fetchPricing();
     }
   }, [isOpen]);
-
+  /**
+   * Hàm xử lý nạp kim cương
+   * - Tạo payment link với returnUrl và cancelUrl
+   * - Lưu transactionId vào localStorage để xử lý sau
+   * - Redirect đến trang thanh toán
+   */
   const handleTopUp = async (amount: number, pkgId: string) => {
     setProcessingId(pkgId);
     try {
@@ -130,16 +165,18 @@ export function TopUpModal({
         amount: amount,
         returnUrl,
         cancelUrl,
-        pricingId: pkgId,
+        pricingId: pkgId, // Truyền pricingId để xác định gói
       });
 
       if (response.data?.checkoutUrl) {
+        // Lưu transactionId để xử lý callback
         if (response.data.transactionId) {
           localStorage.setItem(
             "pendingTransactionId",
             response.data.transactionId.toString()
           );
         }
+        // Redirect đến trang thanh toán
         window.location.href = response.data.checkoutUrl;
       }
     } catch (error: any) {
@@ -147,7 +184,11 @@ export function TopUpModal({
       setProcessingId(null);
     }
   };
-
+  /**
+   * Hàm xử lý đăng ký Premium
+   * - Tạo subscription link cho gói "premium_month"
+   * - Redirect đến trang thanh toán
+   */
   const handleSubscribe = async () => {
     setProcessingId("subscribe");
     try {
@@ -172,6 +213,7 @@ export function TopUpModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="!w-[95vw] !max-w-none h-[90vh] p-0 overflow-hidden bg-card rounded-xl border shadow-2xl flex flex-col [&>button]:hidden fixed left-[50%] -translate-x-1/2 top-[2%] sm:top-[5%] translate-y-0 duration-200">
+        {/* Nút đóng modal tùy chỉnh */}
         <button
           onClick={onClose}
           className="!flex items-center justify-center absolute top-4 right-4 z-50 p-2 rounded-full transition-all duration-200 bg-white hover:bg-red-50 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-500 hover:text-red-500 dark:text-white shadow-lg shadow-black/10 border-2 border-gray-100 dark:border-zinc-700 hover:scale-110 active:scale-95 cursor-pointer group h-10 w-10"
@@ -180,13 +222,14 @@ export function TopUpModal({
         </button>
 
         <div className="flex h-full w-full">
-          {/* --- CỘT TRÁI: PREMIUM (Giữ nguyên) --- */}
+          {/* --- CỘT TRÁI: PREMIUM  --- */}
           <div className="w-[350px] flex-shrink-0 bg-gradient-to-br from-[#FF9966] via-[#FF5E62] to-[#FF0000] p-6 text-white flex flex-col overflow-y-auto scrollbar-hide">
-            {/* ... Nội dung Premium giữ nguyên ... */}
+            {/* Hiệu ứng nền */}
             <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-[50px] pointer-events-none translate-x-1/2 -translate-y-1/2"></div>
             <div className="absolute bottom-0 left-0 w-32 h-32 bg-yellow-300/20 rounded-full blur-[40px] pointer-events-none -translate-x-1/2 translate-y-1/2"></div>
 
             <div className="relative z-10 flex flex-col h-full gap-4">
+              {/* Header Premium */}
               <div>
                 <div className="inline-flex items-center gap-2 mb-3 bg-white/10 px-3 py-1 rounded-full backdrop-blur-md border border-white/20 shadow-sm">
                   <Crown className="h-4 w-4 text-yellow-300 fill-yellow-300" />
@@ -202,7 +245,7 @@ export function TopUpModal({
                   Truy cập không giới hạn kho truyện VIP.
                 </p>
               </div>
-
+              {/* Card chi tiết gói Premium */}
               <div className="flex-1 flex flex-col justify-start mt-2">
                 <div className="bg-white/10 backdrop-blur-xl rounded-xl p-5 border border-white/20 shadow-lg">
                   <div className="flex justify-between items-start mb-3 border-b border-white/10 pb-3">
@@ -226,7 +269,7 @@ export function TopUpModal({
                       HOT
                     </Badge>
                   </div>
-
+                  {/* Danh sách quyền lợi */}
                   <ul className="space-y-2 mb-5">
                     {[
                       <span
@@ -259,7 +302,7 @@ export function TopUpModal({
                       </li>
                     ))}
                   </ul>
-
+                  {/* Nút đăng ký Premium */}
                   <Button
                     onClick={handleSubscribe}
                     disabled={processingId !== null}
@@ -286,6 +329,7 @@ export function TopUpModal({
 
           {/* --- CỘT PHẢI: GÓI NẠP LẺ (DYNAMIC) --- */}
           <div className="flex-1 min-w-0 p-8 bg-white dark:bg-card overflow-auto flex flex-col">
+            {/* Header */}
             <div className="flex-shrink-0 flex items-center justify-between mb-4 pb-4 border-b border-border/50">
               <div className="pr-12">
                 <DialogTitle className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
@@ -295,7 +339,7 @@ export function TopUpModal({
                   Nạp kim cương để mở khóa các chương truyện
                 </DialogDescription>
               </div>
-
+              {/* Hiển thị số dư */}
               <div className="bg-gray-50 dark:bg-muted px-4 py-2 rounded-lg border shadow-sm mr-8">
                 <p className="text-xs text-muted-foreground font-medium mb-1">
                   Số dư hiện tại
@@ -317,22 +361,29 @@ export function TopUpModal({
                   </p>
                 </div>
               ) : packages.length === 0 ? (
+                // Empty state
                 <div className="text-center py-10 text-muted-foreground bg-gray-50 rounded-lg">
                   Hiện chưa có gói nạp nào.
                 </div>
               ) : (
+                /**
+                 * Hiển thị danh sách gói nạp
+                 * Mỗi gói được map với theme dựa trên index (xoay vòng)
+                 */
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {packages.map((pkg, idx) => {
-                    // Logic chọn Theme dựa trên index, xoay vòng nếu vượt quá 3 gói
-                    // Index 0: Cơ bản, 1: Phổ biến, 2: Đại gia
+                    // Chọn theme dựa trên index, xoay vòng nếu nhiều hơn 3 gói
                     const themeIndex = idx % THEME_MAPPING.length;
                     const theme = THEME_MAPPING[themeIndex];
 
-                    // Logic Popular: Gói thứ 2 (giữa) thường là phổ biến
+                    // Xác định gói phổ biến (thường là gói thứ 2)
                     const isPopular = idx === 1;
 
-                    // Tính Bonus (Optional): So sánh tỷ lệ Kim cương/Giá tiền với gói thấp nhất
-                    // Tỷ lệ cơ bản (Gói 0)
+                    /**
+                     * Tính toán phần trăm bonus:
+                     * So sánh tỷ lệ kim cương/giá tiền với gói cơ bản nhất
+                     * Công thức: ((currentRate - baseRate) / baseRate) * 100
+                     */
                     const baseRate =
                       packages[0].amountVnd > 0
                         ? packages[0].diamondGranted / packages[0].amountVnd
@@ -365,20 +416,23 @@ export function TopUpModal({
                           }
                         `}
                       >
+                        /** * Tính toán phần trăm bonus: * So sánh tỷ lệ kim
+                        cương/giá tiền với gói cơ bản nhất * Công thức:
+                        ((currentRate - baseRate) / baseRate) * 100 */
                         {isPopular && (
                           <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg z-10 tracking-wide uppercase whitespace-nowrap">
                             Phổ biến nhất
                           </div>
                         )}
-
                         <CardContent className="p-5 flex flex-col items-center text-center h-full justify-center gap-4">
+                          {/* Icon gói */}
                           <div
                             className={`h-20 w-20 rounded-2xl flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-110 
                               ${theme.iconBg}`}
                           >
                             <Gem className="h-10 w-10 text-blue-500 fill-blue-500 opacity-80" />
                           </div>
-
+                          {/* Số kim cương */}
                           <div className="space-y-1">
                             <h4 className="font-black text-3xl text-gray-900 dark:text-white">
                               {pkg.diamondGranted.toLocaleString()}
@@ -400,7 +454,7 @@ export function TopUpModal({
                           ) : (
                             <div className="h-[26px]"></div>
                           )}
-
+                          {/* Nút thanh toán */}
                           <div className="w-full mt-2">
                             <div
                               className={`w-full py-3 rounded-xl font-bold text-lg transition-colors shadow-sm flex items-center justify-center
@@ -421,7 +475,7 @@ export function TopUpModal({
                 </div>
               )}
             </div>
-
+            {/* Footer thông tin thanh toán */}
             <div className="flex-shrink-0 border-t border-border/40 pt-4 mt-4">
               <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-muted/50 rounded-lg justify-center">
                 <CreditCard className="h-4 w-4 text-gray-500" />

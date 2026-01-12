@@ -1,14 +1,16 @@
 "use client";
 
 import React from "react";
-// Loại bỏ các import UI không dùng trong giao diện banner này (Input, Select...) để code nhẹ hơn
 
 interface HeroSectionProps {
   onNavigate?: (path: string) => void;
 }
 
 export function HeroSection({ onNavigate }: HeroSectionProps) {
-  // Hàm xử lý khi click vào banner hoặc nút (nếu có sau này)
+  /**
+   * Xử lý khi click vào banner hoặc ảnh
+   * Nếu có callback onNavigate, sẽ chuyển đến trang tìm kiếm
+   */
   const handleBannerClick = () => {
     if (onNavigate) {
       onNavigate("/search");
@@ -17,11 +19,11 @@ export function HeroSection({ onNavigate }: HeroSectionProps) {
 
   return (
     <div className="relative bg-gradient-to-br from-[#F0EAD6] to-[#F5F1E4] dark:from-[#00416A] dark:to-[#003454] rounded-3xl overflow-hidden shadow-sm">
-      {/* Decorative Background Elements */}
+      {/* Decorative Background Elements - hiệu ứng blur lớn */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
       <div className="absolute bottom-0 left-0 w-72 h-72 bg-primary/5 rounded-full blur-3xl" />
 
-      {/* Static Decorative Shapes */}
+      {/* Static Decorative Shapes - các hình trang trí cố định */}
       {/* Top Right - Circles */}
       <div className="absolute top-20 right-32">
         <div className="w-3 h-3 rounded-full bg-primary/20 dark:bg-primary/30" />

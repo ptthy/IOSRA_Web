@@ -1,3 +1,5 @@
+//app/verify-otp/page.tsx
+
 "use client";
 
 // ---  1: IMPORT TẤT CẢ DEPENDENCIES ---
@@ -18,7 +20,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { authService } from "@/services/authService";
 
 // ---  2: TẠO COMPONENT ROUTE CHÍNH ---
-// Component này sẽ là default export, chứa Suspense
+/**
+ * COMPONENT CHÍNH: VERIFY OTP ROUTE
+ *
+ * MỤC ĐÍCH: Bao bọc OTPForm với Suspense để xử lý loading khi useSearchParams chưa sẵn sàng
+ *
+ * VÌ SAO CẦN SUSPENSE:
+ * - useSearchParams() là client component hook
+ * - Trong Next.js 13+, nếu dùng useSearchParams mà không bọc Suspense sẽ gây lỗi
+ * - Suspense hiển thị fallback UI trong khi đang load search params
+ */
 export default function VerifyOTPRoute() {
   return (
     <Suspense
@@ -34,51 +45,94 @@ export default function VerifyOTPRoute() {
   );
 }
 
-// ---3: ĐỊNH NGHĨA OTPFORM (TRƯỚC ĐÂY LÀ SUB-COMPONENT) ---
-// Component này chứa toàn bộ logic và UI
+// ---3: ĐỊNH NGHĨA OTPFORM ---
+// ---3: ĐỊNH NGHĨA OTPFORM ---
+/**
+ * COMPONENT CHÍNH: OTP FORM
+ *
+ * MỤC ĐÍCH: Hiển thị form nhập mã OTP để xác thực email
+ * CHỨC NĂNG:
+ * 1. Hiển thị mã OTP input (6 số)
+ * 2. Đếm ngược thời gian hiệu lực OTP (5 phút)
+ * 3. Cho phép gửi lại OTP khi hết thời gian
+ * 4. Xác thực OTP với backend
+ * 5. Redirect về trang login sau khi xác thực thành công
+ *
+ * FLOW DỮ LIỆU:
+ * 1. Lấy email từ URL query params (?email=abc@gmail.com)
+ * 2. Người dùng nhập 6 số OTP
+ * 3. Tự động submit khi đủ 6 số
+ * 4. Gọi API verifyOtp
+ * 5. Nếu thành công -> redirect /login
+ * 6. Nếu thất bại -> hiển thị lỗi, reset OTP input
+ */
 function OTPForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const email = searchParams.get("email"); // Lấy email từ URL
-
-  const [otp, setOtp] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const email = searchParams.get("email"); // Lấy email từ địa chỉ trình duyệt (VD: /verify-otp?email=abc@gmail.com)
+  // Các State quản lý trạng thái của trang
+  const [otp, setOtp] = useState(""); // Lưu giá trị mã OTP người dùng nhập
+  const [isLoading, setIsLoading] = useState(false); // Trạng thái đang gọi API
   const [countdown, setCountdown] = useState(300); // 5 phút
-  const [canResend, setCanResend] = useState(false);
-  const [imageError, setImageError] = useState(false);
+  const [canResend, setCanResend] = useState(false); // Cho phép gửi lại OTP hay không
+  const [imageError, setImageError] = useState(false); // Lỗi khi tải ảnh background
 
-  // Logic đếm ngược
+  /**
+   * EFFECT ĐẾM NGƯỢC THỜI GIAN OTP
+   *
+   * LOGIC:
+   * 1. Nếu countdown > 0: giảm 1 giây mỗi giây
+   * 2. Khi countdown = 0: set canResend = true (cho phép gửi lại)
+   * 3. Cleanup timer khi component unmount hoặc countdown thay đổi
+   */
   useEffect(() => {
     if (countdown > 0) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(timer);
+      return () => clearTimeout(timer); // Dọn dẹp timer khi component unmount hoặc countdown thay đổi
     } else {
-      setCanResend(true);
+      setCanResend(true); // Khi countdown về 0, cho phép gửi lại OTP
     }
   }, [countdown]);
 
-  // Hàm xử lý xác thực (khi nhập đủ 6 số)
+  /**
+   * HÀM XÁC THỰC OTP
+   *
+   * FLOW CHI TIẾT:
+   * 1. Validate OTP (6 số)
+   * 2. Kiểm tra email có tồn tại không
+   * 3. Gọi API verifyOtp
+   * 4. Nếu thành công: toast success, redirect /login
+   * 5. Nếu lỗi: xử lý lỗi chi tiết từ backend
+   *
+   * XỬ LÝ LỖI THEO THỨ TỰ ƯU TIÊN:
+   * 1. Validation errors (details)
+   * 2. Message từ backend
+   * 3. Fallback message
+   */
   const handleVerify = async (otpValue: string) => {
     if (otpValue.length !== 6) {
       toast.error("Vui lòng nhập đủ 6 số!");
       return;
     }
+    // Kiểm tra email có tồn tại không
     if (!email) {
       toast.error("Không tìm thấy địa chỉ email. Vui lòng quay lại.");
-      router.push("/register"); // Hoặc trang login/register phù hợp
+      router.push("/register"); // Redirect về trang đăng ký
       return;
     }
-    setIsLoading(true);
+    setIsLoading(true); // Bắt đầu loading
 
     try {
+      // Gọi API xác thực OTP
       await authService.verifyOtp({ email, otp: otpValue });
       toast.success("Xác thực thành công! Vui lòng đăng nhập.");
-      router.push("/login");
+      router.push("/login"); // Redirect về trang đăng nhập sau khi thành công
     } catch (err: any) {
+      // Xử lý lỗi chi tiết từ API response
       toast.error(
         err.response?.data?.message || "Mã OTP không đúng hoặc hết hạn."
       );
-      setIsLoading(false);
+      setIsLoading(false); // Kết thúc loading
       setOtp(""); // Xóa OTP khi lỗi
       // --- XỬ LÝ LỖI CHI TIẾT ---
       if (err.response && err.response.data && err.response.data.error) {
@@ -107,14 +161,25 @@ function OTPForm() {
     }
   };
 
-  // Hàm wrapper cho sự kiện onSubmit của form (nếu người dùng nhấn Enter)
-  const handleSubmitForm = (e: React.FormEvent) => {
+  /**
+   * HÀM WRAPPER CHO FORM SUBMIT
+   * Ngăn chặn default form submit behavior
+   */ const handleSubmitForm = (e: React.FormEvent) => {
     e.preventDefault();
     handleVerify(otp);
   };
 
-  // Hàm gửi lại OTP
+  /**
+   * HÀM GỬI LẠI OTP
+   *
+   * LOGIC:
+   * 1. Chỉ gửi khi canResend = true và có email
+   * 2. Gọi API forgotPassword (hoặc resendOtp) để gửi lại mã
+   * 3. Reset countdown về 5 phút
+   * 4. Lock nút resend trong thời gian đếm ngược
+   */
   const handleResend = async () => {
+    // Chỉ gửi lại khi được phép và có email
     if (!canResend || !email) return;
 
     setIsLoading(true); // Hiển thị loading trên nút
@@ -123,9 +188,9 @@ function OTPForm() {
       await authService.forgotPassword({ email });
 
       // Reset timer và state
-      setCountdown(300);
-      setCanResend(false);
-      setOtp(""); // Clear any entered OTP
+      setCountdown(300); // Reset về 5 phút
+      setCanResend(false); // Tạm khóa nút gửi lại
+      setOtp(""); //Xóa mã OTP cũ
       toast.success("Mã OTP mới đã được gửi!");
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Gửi lại mã thất bại.");
@@ -134,14 +199,26 @@ function OTPForm() {
     }
   };
 
-  // Format countdown thành MM:SS
+  /**
+   * FORMAT COUNTDOWN THÀNH MM:SS
+   *
+   * VÍ DỤ: 300 giây -> "5:00", 65 giây -> "1:05"
+   */
   const formatCountdown = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Hàm xử lý khi InputOTP thay đổi
+  /**
+   * HÀM XỬ LÝ KHI OTP INPUT THAY ĐỔI
+   *
+   * LOGIC TỰ ĐỘNG SUBMIT:
+   * 1. Cập nhật state otp
+   * 2. Nếu đủ 6 số -> tự động gọi handleVerify
+   *
+   * UX TỐT: Người dùng không cần nhấn nút, trải nghiệm mượt mà
+   */
   const handleOTPChange = (value: string) => {
     setOtp(value);
 
@@ -151,7 +228,12 @@ function OTPForm() {
     }
   };
 
-  // Che email
+  /**
+   * HÀM CHE EMAIL ĐỂ BẢO MẬT
+   *
+   * VÍ DỤ: "user@gmail.com" -> "us****@gmail.com"
+   * LOGIC: Giữ 2 ký tự đầu, thay phần giữa bằng dấu *
+   */
   const maskedEmail = email
     ? email.replace(/(.{2})(.*)(?=@)/, (_, first, rest) => {
         return first + "*".repeat(rest.length);
@@ -265,6 +347,7 @@ function OTPForm() {
             <h2 className="text-3xl">Nhập mã OTP</h2>
             <p className="text-muted-foreground">Mã xác thực đã được gửi đến</p>
             <p className="font-medium">{maskedEmail}</p>
+            {/* Hiển thị email đã che */}
           </div>
 
           {/* OTP Form */}
@@ -278,6 +361,7 @@ function OTPForm() {
                 disabled={isLoading}
               >
                 <InputOTPGroup>
+                  {/* 6 ô nhập OTP */}
                   <InputOTPSlot index={0} />
                   <InputOTPSlot index={1} />
                   <InputOTPSlot index={2} />
@@ -294,6 +378,7 @@ function OTPForm() {
             {/* Countdown / Resend */}
             <div className="text-center space-y-2">
               {!canResend ? (
+                // Hiển thị thời gian đếm ngược
                 <p className="text-sm text-muted-foreground">
                   Gửi lại mã sau{" "}
                   <span className="font-medium text-foreground">
@@ -301,6 +386,7 @@ function OTPForm() {
                   </span>
                 </p>
               ) : (
+                // Hiển thị nút gửi lại khi hết thời gian
                 <button
                   type="button"
                   onClick={handleResend}
@@ -321,7 +407,7 @@ function OTPForm() {
             <Button
               type="submit"
               className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-              disabled={otp.length !== 6 || isLoading}
+              disabled={otp.length !== 6 || isLoading} // Disable khi chưa đủ 6 số hoặc đang loading
             >
               {isLoading ? (
                 <div className="flex items-center gap-2">

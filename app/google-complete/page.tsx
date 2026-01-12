@@ -18,7 +18,29 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { authService } from "@/services/authService";
 import { toast } from "sonner";
+/**
+ * Trang hoàn tất đăng ký bằng Google
+ *
+ * MỤC ĐÍCH:
+ * - Khi người dùng đăng nhập bằng Google lần đầu, backend trả về mã lỗi 409/404
+ * - Người dùng được chuyển hướng đến trang này để bổ sung thông tin (username, password)
+ * - Sau khi hoàn tất, hệ thống tự động đăng nhập và chuyển hướng về trang chủ
+ *
+ * QUY TRÌNH:
+ * 1. Nhận idToken và email từ URL params (chuyển từ trang login)
+ * 2. Hiển thị form để người dùng nhập username và password
+ * 3. Gọi API completeGoogleLogin để hoàn tất đăng ký
+ * 4. Tự động đăng nhập bằng thông tin vừa tạo
+ * 5. Chuyển hướng về trang chủ
+ *
+ * LIÊN THÔNG VỚI:
+ * - /app/login/page.tsx: Nhận idToken và email từ query params
+ * - @/services/authService: Gọi API completeGoogleLogin
+ * - @/context/AuthContext: Sử dụng hàm login để tự động đăng nhập
+ */
 
+// Sử dụng Suspense để xử lý loading khi useSearchParams chưa sẵn sàng
+// Next.js 15+ yêu cầu Suspense khi dùng useSearchParams trong Server Components
 export default function GoogleCompleteRoute() {
   return (
     <Suspense
@@ -33,35 +55,64 @@ export default function GoogleCompleteRoute() {
   );
 }
 
+// Component chính xử lý logic hoàn tất đăng ký
 function GoogleCompleteContent() {
-  // Logic từ route
+  // Lấy router và searchParams để lấy thông tin từ URL
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useAuth();
+  const { login } = useAuth(); // Lấy hàm login từ AuthContext để đăng nhập sau khi hoàn tất
 
+  // Lấy idToken và email từ query params (truyền từ trang đăng nhập)
   const idToken = searchParams.get("idToken") || "";
   const googleEmail = searchParams.get("email") || "";
 
-  // State loading/lỗi từ route
+  // State quản lý trạng thái loading và lỗi
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // State của form (đã chuyển từ UI component vào đây)
+  // State quản lý các trường nhập liệu trong form
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  // State quản lý hiển thị mật khẩu
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  // State quản lý lỗi tải ảnh
   const [imageError, setImageError] = useState(false);
-
-  // useEffect từ route (kiểm tra params)
+  /**
+   * useEffect kiểm tra tham số URL
+   *
+   * LOGIC:
+   * - Nếu thiếu idToken hoặc email -> đây là truy cập bất hợp lệ
+   * - Hiển thị thông báo lỗi và chuyển hướng về trang đăng nhập
+   * - Ngăn người dùng truy cập trực tiếp mà không qua flow Google
+   */
   useEffect(() => {
     if (!idToken || !googleEmail) {
       toast.error("Thiếu thông tin Google. Đang chuyển về trang đăng nhập...");
       router.push("/login");
     }
   }, [idToken, googleEmail, router]);
-  // --- HELPER: Xử lý lỗi API ---
+  /**
+   * Hàm xử lý lỗi API thống nhất
+   *
+   * XỬ LÝ THEO THỨ TỰ ƯU TIÊN:
+   * 1. Lỗi Validation từ Backend (có details) -> hiển thị lỗi chi tiết
+   * 2. Lỗi message chung từ Backend -> hiển thị message
+   * 3. Lỗi mạng/không xác định -> hiển thị thông báo mặc định
+   *
+   * CẤU TRÚC LỖI BACKEND DỰ KIẾN:
+   * {
+   *   error: {
+   *     message: "Tổng quan lỗi",
+   *     details: {
+   *       username: ["Username đã tồn tại"],
+   *       password: ["Mật khẩu quá yếu"]
+   *     }
+   *   }
+   * }
+   */
   const handleApiError = (err: any, defaultMessage: string) => {
     // 1. Check lỗi Validation/Logic từ Backend (cấu trúc nested)
     if (err.response && err.response.data && err.response.data.error) {
@@ -92,14 +143,23 @@ function GoogleCompleteContent() {
     setError(fallbackMsg);
   };
 
-  // Hàm handler từ route (sẽ dùng cho onSubmit của form)
+  /**
+   * Hàm xử lý submit form hoàn tất đăng ký
+   *
+   * QUY TRÌNH:
+   * 1. Ngăn reload trang với e.preventDefault()
+   * 2. Validation cơ bản phía client
+   * 3. Gọi API completeGoogleLogin với 4 tham số bắt buộc
+   * 4. Nếu thành công -> tự động đăng nhập bằng hàm login
+   * 5. Nếu thất bại -> hiển thị lỗi bằng handleApiError
+   */
   const handleCompleteRegistration = async (
     e: React.FormEvent // Cập nhật để nhận event
   ) => {
-    e.preventDefault(); // Thêm e.preventDefault()
+    e.preventDefault(); // Ngăn chặn reload trang
     setError(""); // Xóa lỗi cũ
 
-    // Validation (từ route)
+    // VALIDATION PHÍA CLIENT (để giảm request không cần thiết)
     if (username.length < 6) {
       setError("Username phải có ít nhất 6 ký tự");
       return;
@@ -116,6 +176,7 @@ function GoogleCompleteContent() {
     setIsLoading(true); // Bắt đầu loading
     try {
       // 1. Gọi API hoàn tất đăng ký bằng authService
+      // Tham số: idToken từ Google + thông tin bổ sung từ người dùng
       await authService.completeGoogleLogin({
         idToken,
         username,
@@ -125,27 +186,22 @@ function GoogleCompleteContent() {
 
       toast.success("Hoàn tất đăng ký! Đang tự động đăng nhập...");
 
-      // 2. Gọi hàm login từ AuthContext để đăng nhập người dùng
+      // 2. Tự động đăng nhập với thông tin vừa tạo
+      // Dùng email từ Google làm identifier và password vừa nhập
       await login({ identifier: googleEmail, password: password });
-      // AuthContext sẽ tự xử lý cập nhật state và chuyển hướng về "/"
-      // } catch (err: any) {
-      //   // Xử lý lỗi từ API
-      //   const errMsg =
-      //     err.response?.data?.message || // Lỗi cụ thể từ backend
-      //     "Hoàn tất đăng ký thất bại. Username có thể đã tồn tại hoặc có lỗi xảy ra.";
-      //   setError(errMsg); // Cập nhật state lỗi để hiển thị
-      //   toast.error(errMsg);
-      //   setIsLoading(false); // Dừng loading khi có lỗi
-      // }
+      // LƯU Ý: Hàm login trong AuthContext sẽ tự xử lý:
+      // - Lưu token vào localStorage
+      // - Cập nhật context
+      // - Chuyển hướng dựa trên role
     } catch (err: any) {
-      // --- THay đổi  CHỖ NÀY ---
+      // Xử lý lỗi chi tiết từ API
       handleApiError(err, "Hoàn tất đăng ký thất bại. Vui lòng thử lại sau.");
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Luôn tắt loading dù thành công hay thất bại
     }
   };
 
-  // Error image (từ UI component)
+  // Ảnh fallback dạng base64 SVG khi ảnh Unsplash bị lỗi
   const ERROR_IMG_SRC =
     "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==";
 
@@ -155,6 +211,7 @@ function GoogleCompleteContent() {
       <div className="hidden lg:flex lg:w-1/2 bg-primary relative overflow-hidden">
         <div className="absolute inset-0">
           {imageError ? (
+            // Hiển thị ảnh fallback khi ảnh chính bị lỗi
             <div className="w-full h-full flex items-center justify-center bg-gray-100 opacity-20">
               <img
                 src={ERROR_IMG_SRC}
@@ -163,11 +220,12 @@ function GoogleCompleteContent() {
               />
             </div>
           ) : (
+            // Ảnh background chính
             <img
               src="https://images.unsplash.com/photo-1543244916-b3da1ba6252c"
               alt="Reading experience"
               className="w-full h-full object-cover opacity-20"
-              onError={() => setImageError(true)}
+              onError={() => setImageError(true)} // Xử lý lỗi tải ảnh
             />
           )}
         </div>

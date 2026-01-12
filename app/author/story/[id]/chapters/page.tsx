@@ -1,4 +1,33 @@
 //app/author/story/[id]/chapters/page.tsx
+/**
+ * TRANG QUẢN LÝ CHƯƠNG TRUYỆN (DANH SÁCH CHAPTERS)
+ *
+ * MỤC ĐÍCH:
+ * - Hiển thị danh sách tất cả chương của một truyện
+ * - Cung cấp giao diện để tác giả quản lý chương (xem, tạo mới)
+ * - Cho phép hoàn thành truyện khi đã đủ điều kiện
+ *
+ * CHỨC NĂNG CHÍNH:
+ * 1. Hiển thị thông tin chi tiết truyện (tiêu đề, thể loại, ngôn ngữ, trạng thái)
+ * 2. Danh sách chương với trạng thái và hành động xem
+ * 3. Nút tạo chương mới
+ * 4. Tính năng hoàn thành truyện với validation:
+ *    - Cần ít nhất 1 chương đã xuất bản
+ *    - Truyện phải ở trạng thái đã xuất bản
+ *    - Truyện chưa hoàn thành
+ * 5. Kiểm tra độ dài truyện theo kế hoạch (super_short, short, novel)
+ *
+ * ĐẶC ĐIỂM:
+ * - Sử dụng ribbon badge hiển thị trạng thái truyện
+ * - Xử lý lỗi API thống nhất với helper function
+ * - Navigation thông minh qua handleNavigate
+ * - Giao diện responsive với card và table
+ *
+ * ĐỐI TƯỢNG SỬ DỤNG: Tác giả quản lý tất cả chương của một truyện
+ * LIÊN KẾT VỚI FILE KHÁC:
+ * - Sử dụng storyService và chapterService để gọi API
+ * - Liên kết đến các trang edit/view chapter
+ */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -48,20 +77,52 @@ import { chapterService } from "@/services/chapterService";
 import type { Story, Chapter } from "@/services/apiTypes";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+
+/**
+ * MAP ĐỘ DÀI TRUYỆN TỪ CODE SANG LABEL HIỂN THỊ
+ *
+ * MỤC ĐÍCH: Dùng cho phần hoàn thành truyện để hiển thị thông tin
+ * CÁC LOẠI:
+ * - super_short: Siêu ngắn (từ 1-5 chương)
+ * - short: Ngắn (từ 6-20 chương)
+ * - novel: Dài (trên 20 chương)
+ */
 const LENGTH_PLAN_MAP: Record<string, string> = {
   super_short: "Siêu ngắn (từ 1-5 chương)",
   short: "Ngắn (từ 6-20 chương)",
   novel: "Dài (trên 20 chương)",
 };
+
+/**
+ * COMPONENT CHÍNH: ManageChaptersPage
+ *
+ * MỤC ĐÍCH: Trang quản lý tất cả chương của một truyện
+ * ĐẶC ĐIỂM:
+ * - Hiển thị danh sách chương
+ * - Cho phép hoàn thành truyện (complete story)
+ * - Có validation về số chương đã xuất bản
+ */
 export default function ManageChaptersPage() {
+  // Lấy params từ URL
   const params = useParams();
   const router = useRouter();
   const storyId = params.id as string;
+  // STATE QUẢN LÝ
+  const [story, setStory] = useState<Story | null>(null); // Thông tin truyện
+  const [chapters, setChapters] = useState<Chapter[]>([]); // Danh sách chương
+  const [isLoading, setIsLoading] = useState(true); // Đang tải dữ liệu
+  const [isCompleting, setIsCompleting] = useState(false); // Đang hoàn thành truyện
 
-  const [story, setStory] = useState<Story | null>(null);
-  const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isCompleting, setIsCompleting] = useState(false);
+  /**
+   * HÀM XỬ LÝ LỖI API THỐNG NHẤT - ĐƯỢC CẢI TIẾN CHI TIẾT
+   *
+   * MỤC ĐÍCH: Xử lý lỗi từ API response theo nhiều cấu trúc khác nhau
+   * FLOW XỬ LÝ:
+   * 1. Log ra console để debug cấu trúc thực tế
+   * 2. Check trường hợp JSON: { "error": { "message": "...", "details": {...} }
+   * 3. Check trường hợp JSON phẳng: { "message": "..." }
+   * 4. Fallback về message mặc định
+   */
   const handleApiError = (error: any, defaultMessage: string) => {
     // 1. Log ra console để kiểm tra cấu trúc thực tế (nhấn F12 để xem)
     console.log("🔥 handleApiError Debug:", {
@@ -107,25 +168,34 @@ export default function ManageChaptersPage() {
     toast.error(defaultMessage);
   };
   // -------------------
+
+  /**
+   * useEffect: TẢI DỮ LIỆU KHI storyId THAY ĐỔI
+   *
+   * MỤC ĐÍCH: Load dữ liệu truyện và chapters khi vào trang
+   * LOGIC: Dùng Promise.all để tải song song → tối ưu performance
+   * DEPENDENCIES: [storyId] → chạy lại khi storyId thay đổi
+   */
   useEffect(() => {
     loadData();
   }, [storyId]);
 
+  /**
+   * HÀM TẢI DỮ LIỆU CHÍNH
+   *
+   * MỤC ĐÍCH: Tải song song thông tin truyện và danh sách chương
+   * LOGIC: Promise.all để tối ưu thời gian loading
+   */
   const loadData = async () => {
     setIsLoading(true);
     try {
+      // Promise.all để tải song song → tối ưu performance
       const [storyData, chaptersData] = await Promise.all([
         storyService.getStoryDetails(storyId),
         chapterService.getAllChapters(storyId),
       ]);
       setStory(storyData);
       setChapters(chaptersData);
-      // } catch (error) {
-      //   console.error("Error loading data:", error);
-      //   toast.error("Không thể tải thông tin");
-      // } finally {
-      //   setIsLoading(false);
-      // }
     } catch (error: any) {
       // --- DÙNG HELPER ---
       handleApiError(error, "Không thể tải thông tin");
@@ -134,10 +204,26 @@ export default function ManageChaptersPage() {
     }
   };
 
+  /**
+   * HÀM HOÀN THÀNH TRUYỆN - VỚI VALIDATION CHI TIẾT
+   *
+   * MỤC ĐÍCH: Đánh dấu truyện đã hoàn thành
+   * ĐIỀU KIỆN VALIDATION:
+   * 1. Có ít nhất 1 chương đã published
+   * 2. Truyện chưa hoàn thành
+   * 3. Truyện đã được published
+   *
+   * FLOW XỬ LÝ:
+   * 1. Validation chi tiết các điều kiện
+   * 2. Gọi API completeStory
+   * 3. Reload data để cập nhật trạng thái
+   * 4. Điều hướng về overview sau khi thành công
+   */
   const handleCompleteStory = async () => {
     setIsCompleting(true);
     try {
       // Validation chi tiết hơn
+      // Tính số chương đã xuất bản
       const publishedChapters = chapters.filter(
         (ch) => ch.status === "published"
       );
@@ -149,18 +235,19 @@ export default function ManageChaptersPage() {
       });
 
       // Kiểm tra điều kiện chi tiết
+      // Điều kiện 1: Cần ít nhất 1 chương đã xuất bản
       if (publishedChapters.length < 1) {
         toast.error("❌ Cần ít nhất 1 chương đã xuất bản để hoàn thành truyện");
         setIsCompleting(false);
         return;
       }
-
+      // Điều kiện 2: Truyện chưa hoàn thành
       if (story?.status === "completed") {
         toast.error("❌ Truyện này đã được hoàn thành rồi");
         setIsCompleting(false);
         return;
       }
-
+      // Điều kiện 3: Truyện đã được xuất bản
       if (story?.status !== "published") {
         toast.error("❌ Chỉ có thể hoàn thành truyện đã được xuất bản");
         setIsCompleting(false);
@@ -168,6 +255,7 @@ export default function ManageChaptersPage() {
       }
 
       console.log("🚀 Calling completeStory API...");
+      // Gọi API hoàn thành truyện
       await storyService.completeStory(storyId);
 
       toast.success(
@@ -177,28 +265,11 @@ export default function ManageChaptersPage() {
       // Reload data để cập nhật trạng thái
       setTimeout(() => {
         loadData();
+        // Điều hướng về overview sau 1 giây
         setTimeout(() => {
           router.push("/author/overview");
         }, 1000);
       }, 500);
-      // } catch (error: any) {
-      //   console.error("💥 Error in handleCompleteStory:", error);
-
-      //   // Hiển thị thông báo lỗi chi tiết
-      //   const errorMessage =
-      //     error.message || "Có lỗi xảy ra khi hoàn thành truyện";
-
-      //   // Kiểm tra nếu là lỗi thời gian chờ
-      //   if (errorMessage.includes("bạn có thể hoàn thành truyện sau")) {
-      //     toast.error(`⏳ ${errorMessage}`, {
-      //       duration: 8000, // Hiển thị lâu hơn
-      //     });
-      //   } else {
-      //     toast.error(`❌ ${errorMessage}`);
-      //   }
-
-      //   setIsCompleting(false);
-      // }
     } catch (error: any) {
       console.error("Error in handleCompleteStory:", error);
       // --- DÙNG HELPER ---
@@ -206,7 +277,13 @@ export default function ManageChaptersPage() {
       setIsCompleting(false);
     }
   };
-
+  /**
+   * HÀM ĐIỀU HƯỚNG THỐNG NHẤT
+   *
+   * MỤC ĐÍCH: Quản lý tất cả navigation trong trang
+   * LOGIC: Dùng object mapping thay vì nhiều if-else
+   * ƯU ĐIỂM: Dễ maintain, dễ thêm route mới
+   */
   const handleNavigate = (page: string, navParams?: any) => {
     const routes: Record<string, string> = {
       "author-dashboard": "/author/overview",
@@ -224,22 +301,29 @@ export default function ManageChaptersPage() {
     router.push(route);
   };
 
-  // Hàm riêng để xem chương chi tiết
-  // const handleViewChapter = (chapterId: string) => {
-  //   console.log("👁️ Viewing chapter:", { storyId, chapterId });
-  //   router.push(`/author/story/${storyId}/chapter/${chapterId}`);
-  // };
+  /**
+   * HÀM XEM CHI TIẾT CHƯƠNG
+   *
+   * MỤC ĐÍCH: Điều hướng đến trang xem chương (view mode)
+   */
   const handleViewChapter = (chapterId: string) => {
     console.log("👁️ Viewing chapter:", { storyId, chapterId });
     router.push(`/author/story/${storyId}/chapter/${chapterId}`);
   };
 
-  // Hàm riêng để chỉnh sửa chương
+  /**
+   * HÀM CHỈNH SỬA CHƯƠNG
+   *
+   * MỤC ĐÍCH: Điều hướng đến trang edit chương (edit mode)
+   */
   const handleEditChapter = (chapterId: string) => {
     console.log("✏️ Editing chapter:", { storyId, chapterId });
     router.push(`/author/story/${storyId}/chapter/${chapterId}/edit`);
   };
 
+  /**
+   * HIỂN THỊ LOADING SPINNER KHI ĐANG TẢI DỮ LIỆU
+   */
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -248,6 +332,9 @@ export default function ManageChaptersPage() {
     );
   }
 
+  /**
+   * HIỂN THỊ THÔNG BÁO NẾU KHÔNG TÌM THẤY TRUYỆN
+   */
   if (!story) {
     return (
       <div className="text-center py-16">
@@ -259,10 +346,17 @@ export default function ManageChaptersPage() {
     );
   }
 
+  /**
+   * TÍNH TOÁN CÁC BIẾN CHO HIỂN THỊ VÀ VALIDATION
+   *
+   * - isCompleted: Truyện đã hoàn thành chưa
+   * - publishedChapters: Số chương đã xuất bản
+   * - canCompleteStory: Có thể hoàn thành truyện không (validation)
+   */
   const isCompleted = story.status === "completed";
   const publishedChapters = chapters.filter((ch) => ch.status === "published");
   const canCompleteStory = publishedChapters.length >= 1;
-
+  // RENDER GIAO DIỆN CHÍNH
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-8">
       {/* 1. Header Trang */}
@@ -277,7 +371,7 @@ export default function ManageChaptersPage() {
         </div>
       </div>
 
-      {/* 2. Story Info Card (Giao diện mới) */}
+      {/* 2. STORY INFO CARD (Giao diện mới với ribbon) */}
       <Card className="relative overflow-hidden shadow-sm">
         {/* Header Card: Chỉnh pb-0 để đường kẻ dính sát lên */}
         <CardHeader className="pt-2 pb-0">
@@ -343,7 +437,6 @@ export default function ManageChaptersPage() {
           {/* Tăng pt-4 để cân đối hơn */}
           <div className="grid md:grid-cols-3 gap-6">
             {" "}
-            {/* Đổi md:grid-cols-2 thành 3 */}
             {/* Cột 1: Tên truyện */}
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Tên truyện</p>
@@ -400,6 +493,7 @@ export default function ManageChaptersPage() {
 
       {/* Quick Actions */}
       <div className="grid md:grid-cols-2 gap-4">
+        {/* Nút Dàn Ý Truyện */}
         <Button
           variant="outline"
           className="h-auto py-4 flex-col items-start gap-2"
@@ -413,7 +507,7 @@ export default function ManageChaptersPage() {
             Quản lý dàn ý và outline giúp viết truyện mạch lạc
           </span>
         </Button>
-
+        {/* Nút Đăng Chương Mới */}
         <Button
           className="h-auto py-4 flex-col items-start gap-2"
           onClick={() => handleNavigate("chapter-editor", { storyId })}
@@ -428,7 +522,7 @@ export default function ManageChaptersPage() {
         </Button>
       </div>
 
-      {/* Chapters List */}
+      {/* Chapters List - Table hiển thị danh sách chương */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -456,6 +550,7 @@ export default function ManageChaptersPage() {
               </p>
             </div>
           ) : (
+            // Table hiển thị danh sách chương
             <Table>
               <TableHeader>
                 <TableRow>
@@ -507,16 +602,6 @@ export default function ManageChaptersPage() {
                           <Eye className="h-4 w-4 mr-1" />
                           Xem
                         </Button>
-                        {/* {chapter.status === "draft" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditChapter(chapter.chapterId)}
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Sửa
-                          </Button>
-                        )} */}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -603,7 +688,7 @@ export default function ManageChaptersPage() {
               </div>
             )}
 
-          {/* Dialog xác nhận (Giữ nguyên) */}
+          {/* Dialog xác nhận hoàn thành truyện */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button

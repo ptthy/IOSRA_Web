@@ -53,7 +53,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"; // Helper để gộp và xử lý className Tailwind CSS một cách linh hoạt
 import moment from "moment";
 import "moment/locale/vi";
 import {
@@ -122,22 +122,22 @@ export function HistoryPage() {
   };
 
   // Helper: Dịch độ dài truyện
-const translateLength = (length?: string) => {
-  if (!length) return "Chưa xác định";
-  const map: Record<string, string> = {
-    supershot: "Siêu ngắn",
-    super_short: "Siêu ngắn", // Nên thêm case này đề phòng
-    shot: "Ngắn", // Giữ lại nếu backend có trả về sai chính tả
-    short: "Ngắn", // <--- THÊM DÒNG NÀY (hoặc sửa dòng 'shot' thành 'short')
-    long: "Dài",
+  const translateLength = (length?: string) => {
+    if (!length) return "Chưa xác định";
+    const map: Record<string, string> = {
+      supershot: "Siêu ngắn",
+      super_short: "Siêu ngắn", // Nên thêm case này đề phòng
+      shot: "Ngắn", // Giữ lại nếu backend có trả về sai chính tả
+      short: "Ngắn", // <--- THÊM DÒNG NÀY (hoặc sửa dòng 'shot' thành 'short')
+      long: "Dài",
+    };
+
+    // Xử lý trường hợp có underscore (vd: super_shot) hoặc chữ hoa
+    const normalized = length.toLowerCase().replace("_", "");
+
+    // Ưu tiên tìm chính xác key trước, sau đó mới tìm key normalized
+    return map[length.toLowerCase()] || map[normalized] || length;
   };
-  
-  // Xử lý trường hợp có underscore (vd: super_shot) hoặc chữ hoa
-  const normalized = length.toLowerCase().replace("_", "");
-  
-  // Ưu tiên tìm chính xác key trước, sau đó mới tìm key normalized
-  return map[length.toLowerCase()] || map[normalized] || length;
-};
   // Helper: Dịch kết quả AI
   const translateAIResult = (result?: string) => {
     if (!result) return "";

@@ -23,39 +23,49 @@ import { aiChatService } from "@/services/aiChatService";
 import { subscriptionService } from "@/services/subscriptionService";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"; // Helper để gộp và xử lý className Tailwind CSS một cách linh hoạt
 import { usePathname } from "next/navigation";
-// 1. Import hook useAuth
+// Import hook useAuth để lấy thông tin người dùng từ AuthContext
 import { useAuth } from "@/context/AuthContext";
+
 export function ChatBotWidget() {
-  // 2. Lấy thông tin user từ AuthContext
-  const pathname = usePathname(); // Lấy đường dẫn hiện tại
+  // Lấy đường dẫn hiện tại để kiểm tra trang auth/management
+  const pathname = usePathname();
+  // Lấy thông tin user từ AuthContext (chứa roles, id, ...)
   const { user } = useAuth();
+  // Modal context để mở modal nạp tiền/nâng cấp
   const { openTopUpModal } = useModal();
+  // Theme context để toggle dark/light mode
   const { theme, setTheme } = useTheme();
 
-  //  isOpen: false = Hiện bong bóng tròn | true = Hiện cửa sổ chat
-  const [isOpen, setIsOpen] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
-
+  // State quản lý giao diện
+  const [isOpen, setIsOpen] = useState(false); // false = bong bóng tròn, true = cửa sổ chat
+  const [showMenu, setShowMenu] = useState(false); // menu cấu hình (hiện/ẩn)
+  // State quản lý dữ liệu chat
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const [isPremium, setIsPremium] = useState(false);
-  const [checkingPremium, setCheckingPremium] = useState(false);
-
+  const [isTyping, setIsTyping] = useState(false); // hiệu ứng bot đang typing
+  const [isPremium, setIsPremium] = useState(false); // trạng thái premium của user
+  const [checkingPremium, setCheckingPremium] = useState(false); // loading khi check premium
+  // Refs để scroll xuống cuối & xử lý click outside menu
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-
+  /**
+   * Hàm scroll xuống cuối danh sách tin nhắn
+   * Dùng khi có tin nhắn mới, bot typing, hoặc mở cửa sổ chat
+   */
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
-
+  // Scroll xuống cuối mỗi khi messages, isTyping, isOpen thay đổi
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping, isOpen]);
 
-  // Click outside menu
+  /**
+   * Xử lý click outside menu để đóng menu
+   * Dùng event listener mousedown, kiểm tra click có nằm trong menuRef không
+   */
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -66,13 +76,24 @@ export function ChatBotWidget() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Check Premium khi mở chat
+  /**
+   * Khi mở cửa sổ chat (isOpen = true), kiểm tra premium và load lịch sử chat
+   * Chỉ chạy 1 lần khi mở chat nếu chưa có tin nhắn hoặc chưa check premium
+   */
   useEffect(() => {
     if (isOpen) {
       checkPremiumAndInit();
     }
   }, [isOpen]);
-
+  /**
+   * Hàm kiểm tra premium và khởi tạo tin nhắn
+   * Logic:
+   * 1. Nếu đã có tin nhắn và đã là premium -> bỏ qua
+   * 2. Gọi API kiểm tra subscription status
+   * 3. Nếu là premium -> gọi API lấy lịch sử chat
+   * 4. Map dữ liệu API thành định dạng Message
+   * 5. Nếu không có lịch sử -> thêm tin nhắn chào mừng
+   */
   const checkPremiumAndInit = async () => {
     if (messages.length > 0 && isPremium) return;
 
@@ -111,7 +132,15 @@ export function ChatBotWidget() {
       setCheckingPremium(false);
     }
   };
-
+  /**
+   * Hàm xử lý gửi tin nhắn
+   * Logic:
+   * 1. Validate input rỗng hoặc đang typing -> return
+   * 2. Nếu không phải premium -> toast error
+   * 3. Thêm tin nhắn user tạm thời vào state (optimistic update)
+   * 4. Gọi API sendMessage
+   * 5. Map response -> cập nhật state messages (sync với server)
+   */
   const handleSendMessage = async () => {
     if (!inputText.trim() || isTyping) return;
     if (!isPremium) {
@@ -146,22 +175,33 @@ export function ChatBotWidget() {
       setIsTyping(false);
     }
   };
-
+  /**
+   * Xử lý phím Enter để gửi tin nhắn
+   * Shift + Enter -> xuống dòng
+   * Enter -> gửi tin nhắn
+   */
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
   };
-  // --- 3. ĐIỀU KIỆN ẨN CHATBOT (AUTH PAGE + ROLE) ---
+  // --- ĐIỀU KIỆN ẨN CHATBOT (AUTH PAGE + ROLE + MANAGEMENT PAGE) ---
 
-  // A. Check Role (omod, cmod, admin)
+  /**
+   * A. Kiểm tra role của user có trong danh sách ẩn không
+   * hiddenRoles: ["omod", "cmod", "admin"] -> các role quản trị
+   * isHiddenRole: true nếu user có ít nhất 1 role trong hiddenRoles
+   */
   const hiddenRoles = ["omod", "cmod", "admin"];
   const isHiddenRole = user?.roles?.some((role: string) =>
     hiddenRoles.includes(role)
   );
 
-  // B. Check Auth Pages (Login, Register, OTP...)
+  /**
+   * B. Kiểm tra có đang ở trang auth không (login, register, OTP...)
+   * isAuthPage: true nếu pathname nằm trong authPaths
+   */
   const authPaths = [
     "/login",
     "/register",
@@ -171,14 +211,19 @@ export function ChatBotWidget() {
   ];
   const isAuthPage = authPaths.includes(pathname);
 
-  // C. [FIX MỚI] Check các trang quản trị (Admin, Op, Content)
-  // Dùng .some() để xem URL hiện tại có bắt đầu bằng bất kỳ cái nào trong list không
+  /**
+   * C. Kiểm tra có đang ở trang quản trị không (Admin, Op, Content)
+   * Dùng .some() để check pathname có bắt đầu bằng bất kỳ prefix nào trong managementPrefixes
+   */
   const managementPrefixes = ["/admin", "/op", "/content"];
   const isManagementPage = managementPrefixes.some((prefix) =>
     pathname.toLowerCase().startsWith(prefix)
   );
 
-  // D. Tổng hợp điều kiện để Return null
+  /**
+   * D. Tổng hợp điều kiện ẩn chatbot
+   * Nếu user là quản trị HOẶC đang ở trang auth HOẶC đang ở trang quản trị -> return null (ẩn)
+   */
   if (isHiddenRole || isAuthPage || isManagementPage) {
     return null;
   }
@@ -221,7 +266,7 @@ export function ChatBotWidget() {
               </p>
             </div>
           </div>
-
+          {/* Nút toggle theme dark/light */}
           <div className="flex items-center gap-1">
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -243,35 +288,13 @@ export function ChatBotWidget() {
             >
               <Minimize2 className="w-5 h-5" />
             </button>
-
-            {/* <div className="relative" ref={menuRef}>
-              <button
-                onClick={() => setShowMenu(!showMenu)}
-                className="p-2 hover:bg-white/10 rounded-full transition-colors"
-              >
-                <MoreVertical className="w-5 h-5" />
-              </button>
-
-              {showMenu && (
-                <div className="absolute right-0 top-10 bg-popover text-popover-foreground rounded-lg shadow-lg overflow-hidden z-50 min-w-[150px] border border-border">
-                  <button
-                    onClick={() => {
-                      setIsOpen(false);
-                      setShowMenu(false);
-                    }}
-                    className="w-full px-4 py-2 hover:bg-muted text-left text-sm transition-colors"
-                  >
-                    Đóng chat
-                  </button>
-                </div>
-              )}
-            </div> */}
           </div>
         </div>
 
         {/* BODY */}
         <>
           {checkingPremium ? (
+            // Loading khi đang check premium
             <div className="flex-1 flex flex-col items-center justify-center bg-muted/20">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
               <p className="text-sm text-muted-foreground mt-2">
@@ -279,7 +302,7 @@ export function ChatBotWidget() {
               </p>
             </div>
           ) : !isPremium ? (
-            // LOCKED UI
+            // UI khi chưa nâng cấp premium (khóa)
             <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-muted/20 space-y-4">
               <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-2 animate-bounce-subtle">
                 <Lock className="w-10 h-10 text-primary" />
@@ -298,7 +321,7 @@ export function ChatBotWidget() {
               </Button>
             </div>
           ) : (
-            // CHAT UI
+            // UI chat chính (đã mua gói)
             <div className="flex-1 overflow-y-auto px-4 py-4 bg-muted/20 scrollbar-thin scrollbar-thumb-border">
               {messages.map((message) => (
                 <ChatMessage key={message.id} message={message} />

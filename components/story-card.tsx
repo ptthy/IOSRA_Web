@@ -13,9 +13,25 @@ interface StoryCardProps {
   onClick: () => void;
 }
 
+/**
+ * StoryCard Component - Hiển thị thông tin cơ bản của một truyện
+ * Component này có hai trạng thái: mặc định (chỉ hiển thị ảnh bìa và tiêu đề)
+ * và hover (hiển thị đầy đủ thông tin chi tiết)
+ *
+ * Logic xử lý:
+ * 1. Có hiệu ứng hover với transition mượt mà
+ * 2. Xử lý click vào thẻ để mở trang chi tiết truyện
+ * 3. Xử lý click vào tên tác giả để chuyển đến trang profile
+ * 4. Hiển thị badge premium cho truyện trả phí
+ * 5. Hiển thị tag với cơ chế cắt ngắn (chỉ hiện 2 tag đầu)
+ */
 export function StoryCard({ story, onClick }: StoryCardProps) {
   const router = useRouter();
-
+  /**
+   * Xử lý khi click vào tên tác giả
+   * e.stopPropagation() ngăn sự kiện lan truyền lên thẻ cha
+   * Nếu có authorId thì chuyển hướng đến trang profile của tác giả
+   */
   const handleAuthorClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (story.authorId) {
@@ -32,17 +48,19 @@ export function StoryCard({ story, onClick }: StoryCardProps) {
       <div className="relative bg-background rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-500 border border-border/50 w-full h-full group-hover:border-primary/40">
         {/* --- PHẦN 1: TRẠNG THÁI MẶC ĐỊNH (Cover Image) --- */}
         <div className="relative w-full h-full overflow-hidden bg-muted">
+          {/* Ảnh bìa với hiệu ứng scale khi hover */}
           <ImageWithFallback
             src={story.coverUrl}
             alt={story.title}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
           />
 
-          {/* Gradient Overlay & Shine Effect */}
+          {/* Gradient Overlay: Tạo hiệu ứng chuyển màu từ trong suốt đến đen */}
           <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent dark:from-background/90 dark:via-background/30 dark:to-transparent" />
+          {/* Shine Effect: Hiệu ứng ánh sáng trượt khi hover */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
 
-          {/* Premium Badge (Góc phải) */}
+          {/* Premium Badge (Góc phải) - Chỉ hiển thị khi truyện là premium */}
           {story.isPremium && (
             <div className="absolute top-2 right-2 z-20 transform group-hover:scale-110 transition-transform duration-300">
               <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white flex items-center gap-1 shadow-lg border-0 px-2 py-1 text-xs">
@@ -73,7 +91,7 @@ export function StoryCard({ story, onClick }: StoryCardProps) {
           <div className="flex-1 px-5 py-2 flex flex-col justify-between overflow-hidden">
             {/* Author & Description */}
             <div className="flex flex-col items-center space-y-3 min-h-0">
-              {/* Author Name */}
+              {/* Author Name với click handler */}
               <div
                 className="flex items-center gap-2 text-muted-foreground text-sm hover:text-primary transition-colors duration-300 cursor-pointer"
                 onClick={handleAuthorClick}
@@ -84,7 +102,7 @@ export function StoryCard({ story, onClick }: StoryCardProps) {
                 </span>
               </div>
 
-              {/* Description Scrollable */}
+              {/* Description Scrollable với line-clamp để giới hạn số dòng */}
               <div className="w-full relative flex-1 min-h-0 overflow-hidden">
                 <p className="text-muted-foreground text-sm leading-relaxed text-justify line-clamp-6">
                   {story.shortDescription ||
@@ -95,7 +113,7 @@ export function StoryCard({ story, onClick }: StoryCardProps) {
 
             {/* Bottom Stats & Tags */}
             <div className="space-y-3 mt-2 flex-shrink-0">
-              {/* Chapter Count */}
+              {/* Chapter Count với icon BookOpen */}
               <div className="flex items-center justify-center">
                 <div className="flex items-center gap-2 bg-secondary px-3 py-1.5 rounded-full dark:bg-secondary/50">
                   <BookOpen className="h-3 w-3 text-muted-foreground" />
@@ -105,10 +123,11 @@ export function StoryCard({ story, onClick }: StoryCardProps) {
                 </div>
               </div>
 
-              {/* Tags List */}
+              {/* Tags List với cơ chế cắt ngắn */}
               <div className="flex flex-wrap gap-1.5 justify-center h-[26px] overflow-hidden">
                 {/* 1. SỬA THÀNH slice(0, 2): Chỉ lấy 2 tag đầu tiên */}
                 {/* //  {story.tags.slice(0, 2).map((tag) => ( */}
+                {/* Chỉ hiển thị 2 tag đầu tiên để tránh tràn */}
                 {story.tags &&
                   story.tags.slice(0, 2).map((tag) => (
                     <Badge
@@ -122,6 +141,7 @@ export function StoryCard({ story, onClick }: StoryCardProps) {
 
                 {/* 2. SỬA THÀNH length > 2: Nếu có từ 3 tag trở lên thì hiện dấu ... */}
                 {/* {story.tags.length > 2 && ( */}
+                {/* Nếu có nhiều hơn 2 tag, hiển thị dấu "..." */}
                 {story.tags && story.tags.length > 2 && (
                   <Badge
                     variant="secondary"

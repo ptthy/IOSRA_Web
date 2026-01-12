@@ -1,33 +1,62 @@
 //services/apiClient.ts
 
+// ============================================
+// API CLIENT - HTTP CLIENT CHO TOÀN BỘ ỨNG DỤNG
+// MỤC ĐÍCH: Quản lý tất cả API request/response, xử lý token, lỗi tự động
+// CHỨC NĂNG CHÍNH:
+// 1. Tạo axios instance với baseURL, timeout
+// 2. Interceptor request: thêm token vào header
+// 3. Interceptor response: xử lý lỗi 401/403, refresh token tự động
+// 4. Hiển thị thông báo lỗi thân thiện
+// 5. Queue request khi đang refresh token
+// LIÊN THÔNG VỚI:
+// - AuthContext (lấy token từ localStorage)
+// - Backend API (gọi endpoints)
+// - Các service khác (import và sử dụng instance này)
+// ============================================
+
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
-import { toast } from "sonner";
+import { toast } from "sonner"; // Thư viện dùng để hiển thị thông báo (popup) cho người dùng
+
+// Lấy địa chỉ Server Backend từ file cấu hình môi trường
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
+// Tạo instance axios để dùng chung cho cả app
+// Mỗi lần gọi API sẽ dùng instance này thay vì axios trực tiếp
+// ƯU ĐIỂM: Cấu hình một lần, dùng nhiều nơi, dễ maintain
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 30000, // Nếu yêu cầu quá 30 giây mà không phản hồi sẽ tự hủy
   headers: {
-    "Content-Type": "application/json",
+    "Content-Type": "application/json", // Mặc định gửi JSON
   },
-  withCredentials: true, // THÊM DÒNG NÀY để gửi/nhận cookies
+  withCredentials: true, // QUAN TRỌNG: Cho phép gửi và nhận Cookies (dùng cho Session/Auth)
 });
-// --- HELPER-New: LOGIC HIỂN THỊ TOAST TỪ USER ---
+
+// --- HELPER: HIỂN THỊ THÔNG BÁO LỖI TỪ SERVER ---
+/**
+ * Hiển thị thông báo lỗi từ response server
+ * LOGIC XỬ LÝ:
+ * 1. Ưu tiên lấy message từ details (validation errors)
+ * 2. Fallback lấy message chung từ error
+ * 3. Không hiện toast cho lỗi 401 (đã xử lý refresh token)
+ * CẤU TRÚC LỖI CHUẨN TỪ BACKEND: { error: { code, message, details } }
+ */
 const showErrorToast = (err: any) => {
   // Chỉ hiện toast ở client-side
   if (typeof window === "undefined") return;
 
-  // Kiểm tra cấu trúc lỗi { error: { code, message, details } }
+  // Kiểm tra cấu trúc lỗi chuẩn từ backend:{ error: { code, message, details } }
   if (err.response && err.response.data && err.response.data.error) {
     const { message, details } = err.response.data.error;
 
     // 1. Ưu tiên tìm trong 'details' để lấy message cụ thể
     if (details) {
-      const firstKey = Object.keys(details)[0];
+      const firstKey = Object.keys(details)[0]; // Lấy key đầu tiên (ví dụ: "email")
       if (firstKey && details[firstKey].length > 0) {
-        const specificMsg = details[firstKey].join(" ");
-        toast.error(specificMsg);
-        return;
+        const specificMsg = details[firstKey].join(" "); // Nối mảng thành string
+        toast.error(specificMsg); // Hiện popup lỗi
+        return; // Thoát sớm, không chạy code phía dưới
       }
     }
 
@@ -49,82 +78,112 @@ const showErrorToast = (err: any) => {
   }
 };
 
-// Flag để tránh infinite loop khi refresh token
-let isRefreshing = false;
+// --- BIẾN TOÀN CỤC CHO CƠ CHẾ REFRESH TOKEN ---
+/**
+ * CƠ CHẾ QUEUE REQUEST KHI REFRESH TOKEN:
+ * 1. Khi phát hiện token hết hạn (401), bắt đầu refresh token
+ * 2. Các request đến sau được cho vào hàng đợi (failedQueue)
+ * 3. Khi refresh xong, xử lý hàng đợi với token mới
+ * 4. Nếu refresh thất bại, reject tất cả request trong hàng đợi
+ */
+let isRefreshing = false; // Flag tránh refresh nhiều lần cùng lúc
 let failedQueue: Array<{
-  resolve: (value?: any) => void;
-  reject: (error?: any) => void;
+  // Hàng đợi các request bị fail
+  resolve: (value?: any) => void; // Hàm resolve khi retry thành công
+  reject: (error?: any) => void; // Hàm reject khi retry thất bại
 }> = [];
-
+// Hàm xử lý hàng đợi: gọi resolve/reject cho tất cả request đang đợi
 const processQueue = (error: any, token: string | null = null) => {
   failedQueue.forEach((prom) => {
     if (error) {
-      prom.reject(error);
+      prom.reject(error); // Nếu có lỗi, reject tất cả
     } else {
-      prom.resolve(token);
+      prom.resolve(token); // Nếu thành công, resolve với token mới
     }
   });
-  failedQueue = [];
+  failedQueue = []; // Xóa hàng đợi sau khi xử lý
 };
 
-// Hàm chung để refresh token
+// --- HÀM REFRESH TOKEN CHÍNH ---
+/**
+ * Gọi API refresh token để lấy token mới
+ * CƠ CHẾ:
+ * 1. Server kiểm tra refresh token trong cookie
+ * 2. Nếu valid, trả về access token mới
+ * 3. Lưu token mới vào localStorage
+ * LƯU Ý: Refresh token được lưu trong httpOnly cookie, không truy cập được từ JS
+ */
 export const refreshToken = async (): Promise<string> => {
+  // Gọi API refresh token (server sẽ kiểm tra refresh token trong cookie)
   const refreshResponse = await axios.post(
-    `${API_BASE_URL}/api/Auth/refresh`,
-    {},
+    `${API_BASE_URL}/api/Auth/refresh`, // Endpoint refresh
+    {}, // Không cần body, chỉ cần cookie
     {
-      withCredentials: true, //send cookie
+      withCredentials: true, // Gửi cookie chứa refresh token
     }
   );
 
+  // Lấy token mới từ response (có thể ở data.token hoặc data.data.token)
   const newToken =
     refreshResponse.data?.token || refreshResponse.data?.data?.token;
 
   if (!newToken) {
     throw new Error("Không nhận được token mới từ refresh API");
   }
-
+  // Lưu token mới vào localStorage để dùng cho các request tiếp theo
   localStorage.setItem("authToken", newToken);
-  return newToken;
+  return newToken; // Trả về token mới
 };
 
-// Request interceptor
+// ============================================
+// INTERCEPTOR CHO REQUEST (chạy TRƯỚC khi gửi API)
+// MỤC ĐÍCH: Thêm token vào header, xử lý FormData
+// ============================================
 apiClient.interceptors.request.use(
   (config) => {
     // Chỉ chạy ở client-side
     if (typeof window !== "undefined") {
+      // Lấy token từ localStorage (đã lưu khi login)
       const token = localStorage.getItem("authToken");
 
       if (token) {
+        // Thêm token vào header Authorization theo chuẩn Bearer
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
 
     // Đối với FormData, không set Content-Type (axios sẽ tự set)
+    // Xử lý đặc biệt cho FormData (upload file, ảnh)
     if (config.data instanceof FormData) {
-      delete config.headers["Content-Type"];
+      delete config.headers["Content-Type"]; // Axios tự động set Content-Type cho FormData
     } else {
-      config.headers["Content-Type"] = "application/json";
+      config.headers["Content-Type"] = "application/json"; // Mặc định là JSON
     }
 
-    return config;
+    return config; // Trả về config đã chỉnh sửa
   },
   (error) => {
-    return Promise.reject(error);
+    return Promise.reject(error); // Nếu lỗi ở request, reject ngay
   }
 );
 
-// Response interceptor
+// ============================================
+// INTERCEPTOR CHO RESPONSE (chạy SAU khi nhận response)
+// MỤC ĐÍCH: Xử lý lỗi 401/403, refresh token tự động
+// PHẦN QUAN TRỌNG NHẤT: Logic tự động refresh token
+// ============================================
 apiClient.interceptors.response.use(
   (response) => {
-    return response;
+    return response; // Nếu thành công thì cứ để dữ liệu đi tiếp
   },
+  // Lấy mã lỗi từ Server (401, 403, 500...)
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & {
-      _retry?: boolean;
+      _retry?: boolean; // Thêm flag để đánh dấu đã retry chưa
     };
 
-    // Xử lý lỗi 401 - CHỈ khi accessToken hết hạn
+    // ========== XỬ LÝ LỖI 401 (UNAUTHORIZED) ==========
+    // Lỗi 401 thường là token hết hạn hoặc không hợp lệ
     if (
       error.response?.status === 401 &&
       originalRequest &&
@@ -139,7 +198,7 @@ apiClient.interceptors.response.use(
       const currentToken = localStorage.getItem("authToken");
       if (!currentToken) {
         // Không có token -> không phải lỗi hết hạn, reject ngay
-        showErrorToast(error); // <--- THÊM DÒNG NÀY
+        showErrorToast(error);
         return Promise.reject(error);
       }
 
@@ -187,31 +246,33 @@ apiClient.interceptors.response.use(
       if (isRefreshing) {
         // Nếu đang refresh, đợi và retry request sau khi refresh xong
         return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
+          failedQueue.push({ resolve, reject }); // Thêm vào hàng đợi
         })
           .then((token) => {
+            // Khi có token mới, cập nhật header và retry request
             if (originalRequest.headers) {
               originalRequest.headers.Authorization = `Bearer ${token}`;
             }
-            return apiClient(originalRequest);
+            return apiClient(originalRequest); // Gửi lại request ban đầu
           })
           .catch((err) => {
             return Promise.reject(err);
           });
       }
-
+      // Đánh dấu request này đang được retry
       originalRequest._retry = true;
-      isRefreshing = true;
+      isRefreshing = true; // Bật flag đang refresh
 
       try {
+        // Thực hiện refresh token
         const newToken = await refreshToken();
 
-        // Cập nhật header cho request ban đầu
+        // Cập nhật header cho request ban đầu với token mới
         if (originalRequest.headers) {
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
         }
 
-        // Xử lý queue và retry request ban đầu
+        /// Xử lý hàng đợi: gửi token mới cho tất cả request đang đợi
         processQueue(null, newToken);
         isRefreshing = false;
 
@@ -219,10 +280,10 @@ apiClient.interceptors.response.use(
       } catch (refreshError: any) {
         // Refresh token cũng hết hạn hoặc lỗi -> gọi logout
         isRefreshing = false;
-        processQueue(refreshError, null);
+        processQueue(refreshError, null); // Thông báo lỗi cho hàng đợi
 
         try {
-          // Gọi API logout
+          // Gọi API logout để server xóa session
           await axios.post(
             `${API_BASE_URL}/api/Auth/logout`,
             {},
@@ -247,7 +308,9 @@ apiClient.interceptors.response.use(
       }
     }
 
-    // Xử lý lỗi 403 - THỬ REFRESH TOKEN TRƯỚC
+    // ========== XỬ LÝ LỖI 403 (FORBIDDEN) ==========
+    // Lỗi 403: Có token nhưng không có quyền truy cập
+    // KHÁC BIỆT VỚI 401: Có thể do thiếu role, chapter locked,...
     if (
       error.response?.status === 403 &&
       originalRequest &&
@@ -270,6 +333,9 @@ apiClient.interceptors.response.use(
       const errorCode = responseData?.error?.code;
 
       // Các error code đặc biệt không cần refresh (do không phải lỗi token)
+      // ChapterLocked: Chương bị khóa (cần mua)
+      // SubscriptionRequired: Cần gói premium
+      // AccountRestricted: Tài khoản bị cấm
       if (
         errorCode === "ChapterLocked" ||
         errorCode === "SubscriptionRequired" ||
@@ -290,7 +356,7 @@ apiClient.interceptors.response.use(
       }
       // --------------------
 
-      // Tránh refresh nhiều lần đồng thời
+      // Tránh refresh nhiều lần đồng thời (logic tương tự 401)
       if (isRefreshing) {
         // Nếu đang refresh, đợi và retry request sau khi refresh xong
         return new Promise((resolve, reject) => {
@@ -323,7 +389,7 @@ apiClient.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
         }
 
-        // Xử lý queue
+        // Xử lý hàng đợi
         processQueue(null, newToken);
         isRefreshing = false;
 
@@ -379,7 +445,11 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Hàm xử lý 403 sau khi đã thử refresh
+// ============================================
+// HÀM XỬ LÝ 403 SAU KHI ĐÃ THỬ REFRESH
+// MỤC ĐÍCH: Phân loại và xử lý các loại 403 khác nhau
+// QUAN TRỌNG: Không phải 403 nào cũng đá ra login
+// ============================================
 const handle403Error = (error: AxiosError) => {
   const responseData = error.response?.data as any;
   const errorCode = responseData?.error?.code;
@@ -388,23 +458,27 @@ const handle403Error = (error: AxiosError) => {
   // PHÂN BIỆT CÁC LOẠI 403:
 
   // 1. 403 ChapterLocked -> KHÔNG đá ra login, để component xử lý
+  // TÌNH HUỐNG: User cố đọc chương premium mà chưa mua
   if (errorCode === "ChapterLocked") {
     console.log("🎯 Chapter bị khóa - giữ nguyên trên trang reader");
-    return Promise.reject(error);
+    return Promise.reject(error); // Reject để component hiển thị UI mua chương
   }
   // 2. 403 SubscriptionRequired -> KHÔNG đá ra login
+  // TÌNH HUỐNG: User cần mua gói premium để thực hiện hành động
   else if (errorCode === "SubscriptionRequired") {
     console.log("🎯 Cần gói Premium - giữ nguyên trên trang");
     toast.error("Bạn cần gói Premium để thực hiện thao tác này."); // <--- THÊM
     return Promise.reject(error);
   }
   // 3. 403 AccountRestricted (Bị cấm đăng/tương tác) -> KHÔNG đá ra login
+  // TÌNH HUỐNG: User bị admin cấm comment/đăng truyện
   else if (errorCode === "AccountRestricted") {
     console.log("🎯 Tài khoản bị hạn chế - giữ nguyên để hiện thông báo");
     showErrorToast(error); // <--- THÊM (Hiện lý do bị cấm từ backend)
     return Promise.reject(error);
   }
   // 4. 403 do không có quyền author (kiểm tra error message/code HOẶC đang ở trang author)
+  // TÌNH HUỐNG: Reader cố truy cập trang author mà chưa được approve
   else if (
     errorMessage?.includes("author") ||
     errorMessage?.includes("tác giả") ||
@@ -424,7 +498,7 @@ const handle403Error = (error: AxiosError) => {
       // 1. KHÔNG phải trang staff
       // 2. VÀ chưa ở trang author-upgrade
       if (!isStaffPage && !currentPath.includes("author-upgrade")) {
-        window.location.href = "/author-upgrade";
+        window.location.href = "/author-upgrade"; // Redirect đến trang nâng cấp tác giả
       } else if (isStaffPage) {
         // Nếu là trang staff, chỉ hiện lỗi, không redirect
         showErrorToast(error);
@@ -433,6 +507,7 @@ const handle403Error = (error: AxiosError) => {
     return Promise.reject(error);
   }
   // 5. 403 khác (token invalid, etc.) -> đá ra trang home
+  // TÌNH HUỐNG: Token không hợp lệ, hoặc không có quyền truy cập chung
   else {
     showErrorToast(error);
     if (typeof window !== "undefined") {
@@ -455,4 +530,4 @@ const handle403Error = (error: AxiosError) => {
   }
 };
 
-export default apiClient;
+export default apiClient; // Xuất instance để import ở các service khác

@@ -1,5 +1,11 @@
 // services/authService.ts
-import apiClient from "./apiClient";
+
+// ============================================
+// SERVICE QUẢN LÝ TẤT CẢ API LIÊN QUAN ĐẾN AUTHENTICATION
+// Đây là lớp trung gian giữa React components và HTTP client (apiClient)
+// ============================================
+
+import apiClient from "./apiClient"; // Import HTTP client đã config
 
 // --- 1. Định nghĩa các kiểu dữ liệu (Interfaces) cho Request Bodies ---
 
@@ -36,12 +42,12 @@ interface ResetPasswordData {
   confirmNewPassword?: string;
 }
 
-// POST /Auth/google
+// POST /Auth/google Đăng nhập Google (bước 1)
 interface GoogleLoginData {
-  idToken: string;
+  idToken: string; // Token từ Google OAuth
 }
 
-// POST /Auth/google/complete
+// POST /Auth/google/complete - Hoàn tất đăng nhập Google
 interface GoogleCompleteData {
   idToken: string;
   username?: string;
@@ -64,6 +70,8 @@ interface User {
 export const authService = {
   /**
    * API Đăng ký tài khoản mới
+   * @param data: RegisterData
+   * @returns Promise với response từ server
    */
   register: (data: RegisterData) => {
     return apiClient.post("/api/Auth/register", data);
@@ -117,11 +125,20 @@ export const authService = {
    */
   logout: () => {
     // Không cần body, nhưng vẫn là POST request
-    return apiClient.post("/api/Auth/logout");
+    return apiClient.post("/api/Auth/logout"); // Server sẽ xóa session và refresh token
   },
+  /**
+   * API Lấy thông tin profile của user hiện tại
+   * Dùng token trong header để xác thực
+   */
   getMyProfile: () => {
     return apiClient.get("/api/Profile");
   },
+
+  /**
+   * API Refresh token (tạo token mới từ refresh token)
+   * Thường được gọi tự động bởi apiClient interceptor
+   */
   refreshToken: () => {
     return apiClient.post("/api/Auth/refresh");
   },

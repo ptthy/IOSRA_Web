@@ -1,3 +1,5 @@
+//components/rank-badge.tsx
+
 import React from "react";
 import { Star } from "lucide-react";
 

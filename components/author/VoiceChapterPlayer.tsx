@@ -42,11 +42,17 @@ import { toast } from "sonner";
 import { VoiceTopupModal } from "@/components/payment/VoiceTopupModal";
 import { Badge } from "@/components/ui/badge";
 import { PricingRule } from "@/services/voiceChapterService";
-// --- CẤU HÌNH DOMAIN AUDIO R2 ---
+/**
+ * CẤU HÌNH DOMAIN AUDIO R2:
+ * Base URL cho Cloudflare R2 Storage, nơi lưu trữ file audio đã tạo
+ * Logic xử lý đường dẫn:
+ * - API trả về relative path → cần ghép với BASE_URL
+ * - Nếu đã là full URL → giữ nguyên
+ */
 const AUDIO_BASE_URL = "https://pub-15618311c0ec468282718f80c66bcc13.r2.dev/";
 
 interface VoiceChapterPlayerProps {
-  chapterId: string;
+  chapterId: string; // ID chương truyện cần xử lý audio
 }
 
 export default function VoiceChapterPlayer({
@@ -54,6 +60,14 @@ export default function VoiceChapterPlayer({
 }: VoiceChapterPlayerProps) {
   // --- Data States ---
   const router = useRouter();
+  /**
+   * STATE QUẢN LÝ DỮ LIỆU:
+   * - createdVoices: Danh sách voice đã tạo cho chapter này (đang có trong DB)
+   * - availableVoices: Danh sách tất cả voice có sẵn từ hệ thống (danh mục giọng)
+   * - charCount: Số ký tự của chương (dùng để tính phí theo công thức)
+   * - walletBalance: Số dư Dias trong tài khoản author (lấy từ revenue service)
+   * - pricingRules: Bảng giá theo số ký tự (dùng để tính chi phí dynamic)
+   */
   const [createdVoices, setCreatedVoices] = useState<VoiceAudio[]>([]);
   const [availableVoices, setAvailableVoices] = useState<VoiceItem[]>([]);
   const [charCount, setCharCount] = useState<number>(0);
@@ -61,6 +75,14 @@ export default function VoiceChapterPlayer({
   const [pricingRules, setPricingRules] = useState<PricingRule[]>([]); // <--- State mới
 
   // --- UI States ---
+  /**
+   * STATE GIAO DIỆN VÀ TƯƠNG TÁC:
+   * - isLoading: Trạng thái loading khi fetch data lần đầu (mount component)
+   * - isProcessing: Trạng thái đang xử lý tạo voice (khi user click "Tạo Audio")
+   * - selectedVoiceIds: Mảng ID các voice đang được chọn để tạo (checkbox)
+   * - isVoiceTopupOpen: Trạng thái mở modal nạp tiền khi số dư không đủ
+   * - isAddingVoice: Chế độ hiện tại (true: mua thêm, false: nghe) - toggle mode
+   */
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedVoiceIds, setSelectedVoiceIds] = useState<string[]>([]);
@@ -70,6 +92,14 @@ export default function VoiceChapterPlayer({
   const [isAddingVoice, setIsAddingVoice] = useState(false);
 
   // --- Player States ---
+  /**
+   * STATE AUDIO PLAYER:
+   * - currentVoiceId: ID voice đang được phát (để switch giữa các giọng)
+   * - isPlaying: Trạng thái đang phát/dừng (boolean control)
+   * - currentTime: Thời gian hiện tại của audio (tính bằng seconds)
+   * - duration: Tổng thời lượng audio (lấy từ metadata)
+   * - playbackSpeed: Tốc độ phát (0.75x, 1.0x, ...) dùng playbackRate của audio element
+   */
   const [currentVoiceId, setCurrentVoiceId] = useState<string>("");
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -77,14 +107,31 @@ export default function VoiceChapterPlayer({
   const [playbackSpeed, setPlaybackSpeed] = useState("1.0");
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
+  /**
+   * STATE HẠNG TÁC GIẢ VÀ PHÂN QUYỀN:
+   * - authorRank: Hạng hiện tại của tác giả (Tân Thủ, Đồng, Vàng...)
+   * - isRankRestricted: Boolean kiểm tra có bị giới hạn quyền không
+   * Logic: Tân Thủ không được tạo audio, phải lên hạng Đồng
+   */
   const [authorRank, setAuthorRank] = useState<string>("");
   const [isRankRestricted, setIsRankRestricted] = useState(false);
 
   // --- THÊM: Ref cho Polling ---
+  /**
+   * REF POLLING: Dùng để tự động cập nhật trạng thái voice đang xử lý
+   * pollingIntervalRef: Lưu ID của interval để clear khi không cần
+   * Lý do dùng ref: Giữ giá trị interval qua các lần render, không bị reset
+   */
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // --- THÊM: Logic Polling (Tự động cập nhật) ---
+  /**
+   * EFFECT POLLING: Tự động kiểm tra và cập nhật trạng thái voice đang "processing"
+   * Logic chạy khi createdVoices thay đổi:
+   * 1. Nếu có voice nào đang processing/pending → bắt đầu polling mỗi 4s
+   * 2. Nếu tất cả voice đã ready/failed → dừng polling
+   * 3. Cleanup khi component unmount để tránh memory leak
+   */
   useEffect(() => {
     // Nếu có voice nào đang "processing" thì bắt đầu polling
     const hasProcessing = createdVoices.some(
@@ -102,7 +149,14 @@ export default function VoiceChapterPlayer({
   useEffect(() => {
     return () => stopPolling();
   }, []);
-
+  /**
+   * HÀM BẮT ĐẦU POLLING: Gọi API getVoiceChapter mỗi 4s để cập nhật trạng thái
+   * Flow:
+   * 1. Kiểm tra nếu đã có interval → return (tránh duplicate)
+   * 2. Set interval gọi API mỗi 4 giây
+   * 3. Khi API trả về → cập nhật danh sách voices mới
+   * 4. Kiểm tra nếu không còn voice nào processing → dừng polling
+   */
   const startPolling = () => {
     if (pollingIntervalRef.current) return;
 
@@ -130,6 +184,10 @@ export default function VoiceChapterPlayer({
     }, 4000); // 4 giây gọi 1 lần
   };
 
+  /**
+   * HÀM DỪNG POLLING: Clear interval và reset ref về null
+   * Quan trọng: Phải clear để tránh interval chạy mãi sau khi component unmount
+   */
   const stopPolling = () => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
@@ -137,6 +195,16 @@ export default function VoiceChapterPlayer({
     }
   };
   // --- Helper: Ghép Link Audio Full ---
+  /**
+   * HÀM GHÉP URL AUDIO ĐẦY ĐỦ:
+   * @param path - Đường dẫn audio từ API (có thể là relative hoặc absolute)
+   * @returns URL đầy đủ đến file audio
+   *
+   * Logic xử lý:
+   * 1. Nếu path đã là full URL (bắt đầu bằng "http") → giữ nguyên
+   * 2. Nếu là relative path → ghép với BASE_URL
+   * 3. Loại bỏ "/" đầu nếu có để tránh double slash
+   */
   const getFullAudioUrl = (path: string | undefined | null) => {
     if (!path) return "";
     if (path.startsWith("http")) return path;
@@ -145,19 +213,33 @@ export default function VoiceChapterPlayer({
   };
 
   // --- 1. Load Data ---
+  /**
+   * EFFECT LOAD DATA KHI CHAPTERID THAY ĐỔI:
+   * Fetch tất cả dữ liệu cần thiết khi component mount hoặc chapterId thay đổi
+   * Sử dụng Promise.all để load song song 6 API → tối ưu performance
+   */
   useEffect(() => {
     if (chapterId) {
       loadData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapterId]);
-
+  /**
+   * EFFECT CẬP NHẬT WALLET KHI MODAL NẠP TIỀN ĐÓNG:
+   * Refresh số dư sau khi người dùng nạp tiền xong
+   * Dependency: isVoiceTopupOpen (khi modal đóng → fetch lại số dư)
+   */
   useEffect(() => {
     if (!isVoiceTopupOpen) {
       fetchWallet();
     }
   }, [isVoiceTopupOpen]);
-
+  /**
+   * HÀM LẤY SỐ DƯ WALLET:
+   * Gọi API summary từ authorRevenueService (thay vì profileService cũ)
+   * Lý do: Tách biệt concern - revenue service quản lý doanh thu tác giả
+   * Trả về: revenueBalance (số dư Dias có thể dùng để tạo audio)
+   */
   const fetchWallet = async () => {
     try {
       // const res = await profileService.getWallet();
@@ -172,7 +254,20 @@ export default function VoiceChapterPlayer({
       console.error("Lỗi lấy ví:", error);
     }
   };
-
+  /**
+   * HÀM LOAD TẤT CẢ DỮ LIỆU:
+   * Sử dụng Promise.all để load song song các API:
+   * 1. Wallet balance (từ revenue service)
+   * 2. Chapter voice data (voices đã tạo)
+   * 3. Danh sách voice có sẵn (catalog)
+   * 4. Số ký tự chương (để tính giá)
+   * 5. Bảng giá (pricing rules)
+   * 6. Profile để lấy hạng tác giả (author rank)
+   *
+   * Logic điều hướng mode:
+   * - Nếu đã có voice → vào mode Player (isAddingVoice = false)
+   * - Nếu chưa có voice → vào mode Add Voice (isAddingVoice = true)
+   */
   const loadData = async () => {
     setIsLoading(true);
     try {
@@ -197,22 +292,21 @@ export default function VoiceChapterPlayer({
       }
       // Set Wallet
       if (walletRes.data) {
-        //  setWalletBalance(walletRes.data.voiceCharBalance || 0);
-        // SỬA: Map vào revenueBalance
         setWalletBalance(walletRes.data.revenueBalance || 0);
       }
-
+      // Logic xử lý chế độ hiển thị
       // Set Voices & Chapter info
       setAvailableVoices(voiceList);
       setCharCount(count);
 
       if (chapterData.voices && chapterData.voices.length > 0) {
+        // Đã có voice -> vào mode Player
         setCreatedVoices(chapterData.voices);
         setCurrentVoiceId(chapterData.voices[0].voiceId);
         setIsAddingVoice(false); // Mặc định vào mode Player nếu đã có voice
       } else {
-        // Nếu chưa có voice nào, tự động chọn tất cả (hoặc 1 cái tùy logic cũ)
-        // setSelectedVoiceIds(voiceList.map((v) => v.voiceId));
+        // Chưa có voice -> vào mode Add Voice
+
         setSelectedVoiceIds([]); // BỎ MẶC ĐỊNH CHỌN HẾT
         setIsAddingVoice(true); // Vào mode Add Voice
       }
@@ -225,6 +319,10 @@ export default function VoiceChapterPlayer({
   };
 
   // --- 2. Logic Player Controls ---
+  /**
+   * EVENT HANDLERS CHO AUDIO ELEMENT:
+   * Các hàm callback cho các sự kiện audio HTML5
+   */
   const handleTimeUpdate = () => {
     if (audioRef.current) {
       setCurrentTime(audioRef.current.currentTime);
@@ -241,7 +339,11 @@ export default function VoiceChapterPlayer({
     setIsPlaying(false);
     setCurrentTime(0);
   };
-
+  /**
+   * HÀM TOGGLE PLAY/PAUSE:
+   * Điều khiển play/pause audio element
+   * Sử dụng HTMLAudioElement API: play() và pause()
+   */
   const togglePlay = () => {
     if (audioRef.current) {
       if (isPlaying) {
@@ -252,33 +354,57 @@ export default function VoiceChapterPlayer({
       setIsPlaying(!isPlaying);
     }
   };
-
+  /**
+   * HÀM NHANH TUA (SKIP):
+   * @param seconds - Số giây cần tua (+: tới, -: lùi)
+   * Thay đổi currentTime của audio element
+   */
   const skipTime = (seconds: number) => {
     if (audioRef.current) {
       audioRef.current.currentTime += seconds;
     }
   };
-
+  /**
+   * HÀM SEEK (KÉO THANH TIẾN ĐỘ):
+   * @param value - Mảng chứa giá trị thời gian mới (Slider trả về array)
+   * Cập nhật currentTime và UI đồng bộ
+   */
   const handleSeek = (value: number[]) => {
     if (audioRef.current) {
       audioRef.current.currentTime = value[0];
       setCurrentTime(value[0]);
     }
   };
-
+  /**
+   * HÀM THAY ĐỔI TỐC ĐỘ PHÁT:
+   * @param speed - Tốc độ mới (string) như "1.25"
+   * Sử dụng playbackRate property của audio element
+   */
   const handleSpeedChange = (speed: string) => {
     setPlaybackSpeed(speed);
     if (audioRef.current) {
       audioRef.current.playbackRate = parseFloat(speed);
     }
   };
-
+  /**
+   * HÀM THAY ĐỔI VOICE ĐANG PHÁT:
+   * @param voiceId - ID của voice muốn chuyển sang
+   * Reset player state khi chuyển giọng
+   */
   const handleVoiceChange = (voiceId: string) => {
     setCurrentVoiceId(voiceId);
     setIsPlaying(false);
   };
 
   // --- 3. Logic Tạo Voice & Tính Toán ---
+  /**
+   * HÀM TOGGLE CHỌN VOICE:
+   * @param voiceId - ID voice cần toggle chọn/bỏ chọn
+   * Logic:
+   * - Nếu đã chọn → filter bỏ đi
+   * - Nếu chưa chọn → thêm vào mảng
+   * Sử dụng functional update để tránh stale closure
+   */
   const handleToggleSelectVoice = (voiceId: string) => {
     setSelectedVoiceIds((prev) =>
       prev.includes(voiceId)
@@ -286,7 +412,15 @@ export default function VoiceChapterPlayer({
         : [...prev, voiceId]
     );
   };
-  // Tìm rule phù hợp với số ký tự hiện tại
+
+  /**
+   * TÍNH TOÁN CHI PHÍ (REAL-TIME):
+   * 1. Tìm rule phù hợp với số ký tự hiện tại
+   * 2. Tính cost per voice dựa trên rule
+   * 3. Tính tổng cost = cost per voice * số voice đã chọn
+   *
+   * Công thức: Tổng chi phí = Giá mỗi voice × Số lượng voice chọn
+   */
   const currentRule = pricingRules.find(
     (r) =>
       charCount >= r.minCharCount &&
@@ -301,6 +435,19 @@ export default function VoiceChapterPlayer({
   // const totalCost = charCount * selectedVoiceIds.length;
   const isEnoughBalance = walletBalance >= totalCost;
 
+  /**
+   * HÀM TẠO VOICE (ORDER VOICE):
+   * Flow xử lý:
+   * 1. Validate input (phải chọn ít nhất 1 voice)
+   * 2. Kiểm tra số dư (nếu không đủ → mở modal nạp tiền)
+   * 3. Gọi API orderVoice với chapterId và selectedVoiceIds
+   * 4. Xử lý kết quả:
+   *    - Hiển thị thông báo thành công với số Dias đã trừ
+   *    - Cập nhật số dư mới từ response
+   *    - Cập nhật danh sách voices mới tạo
+   *    - Chuyển về mode Player
+   *    - Reset selection cho lần sau
+   */
   const handleCreateVoices = async () => {
     if (selectedVoiceIds.length === 0) {
       toast.error("Vui lòng chọn ít nhất 1 giọng đọc");
@@ -315,52 +462,14 @@ export default function VoiceChapterPlayer({
 
     setIsProcessing(true);
     try {
-      //const result = await voiceChapterService.orderVoice(
+      // Gọi API orderVoice (dùng any tạm thời vì TS chưa cập nhật type)
       // Vì TS chưa cập nhật type nên ta dùng "as any" hoặc truy cập trực tiếp để tránh lỗi IDE tạm thời
       const result: any = await voiceChapterService.orderVoice(
         chapterId,
         selectedVoiceIds
       );
-      //     // SỬA: Thêm || 0 để phòng trường hợp backend trả về null/undefined
-      //     const charged = result.charactersCharged || 0;
-      //     toast.success(
-      //       `Tạo thành công! Đã trừ ${result.charactersCharged.toLocaleString()} ký tự.`
-      //     );
-
-      //     if (result.walletBalance !== undefined) {
-      //       setWalletBalance(result.walletBalance);
-      //     } else {
-      //       fetchWallet();
-      //     }
-
-      //     // Cập nhật lại danh sách voices (kết hợp cái cũ và mới nếu API trả về full,
-      //     // nhưng thường API trả về full list voices của chapter đó, nên set thẳng)
-      //     setCreatedVoices(result.voices);
-
-      //     // Chọn voice mới nhất vừa tạo làm mặc định phát
-      //     if (result.voices.length > 0) {
-      //       // Tìm voice đầu tiên trong danh sách vừa chọn mua để play
-      //       const newVoice = result.voices.find((v) =>
-      //         selectedVoiceIds.includes(v.voiceId)
-      //       );
-      //       if (newVoice) setCurrentVoiceId(newVoice.voiceId);
-      //       else setCurrentVoiceId(result.voices[0].voiceId);
-      //     }
-
-      //     // Quay về màn hình Player
-      //     setIsAddingVoice(false);
-      //     // Reset selection cho lần sau
-      //     setSelectedVoiceIds([]);
-      //   } catch (error: any) {
-      //     console.error("Lỗi tạo voice:", error);
-      //     toast.error(
-      //       error.response?.data?.message ||
-      //         "Không thể tạo giọng đọc. Vui lòng thử lại."
-      //     );
-      //   } finally {
-      //     setIsProcessing(false);
-      //   }
-      // };
+      // Lấy cost từ "totalGenerationCostDias" (API trả về)
+      // 1. Hiển thị thông báo thành công với số Dias đã trừ
       // 1. Lấy cost từ "totalGenerationCostDias" thay vì "charactersCharged"
       const charged =
         result.totalGenerationCostDias || result.charactersCharged || 0;
@@ -377,7 +486,7 @@ export default function VoiceChapterPlayer({
         </div>
       );
 
-      // 2. Lấy số dư mới từ "authorRevenueBalanceAfter" thay vì "walletBalance"
+      // 2. Lấy số dư mới từ "authorRevenueBalanceAfter" thay vì "walletBalance"  (ưu tiên authorRevenueBalanceAfter)
       if (result.authorRevenueBalanceAfter !== undefined) {
         setWalletBalance(result.authorRevenueBalanceAfter);
       } else if (result.walletBalance !== undefined) {
@@ -414,6 +523,13 @@ export default function VoiceChapterPlayer({
       setIsProcessing(false);
     }
   };
+
+  /**
+   * HELPER FORMAT THỜI GIAN:
+   * @param seconds - Số giây
+   * @returns Chuỗi định dạng mm:ss
+   * Logic: Chia seconds thành minutes và seconds, format 2 chữ số
+   */
   const formatTime = (seconds: number) => {
     if (!seconds || isNaN(seconds)) return "0:00";
     const mins = Math.floor(seconds / 60);
@@ -421,12 +537,22 @@ export default function VoiceChapterPlayer({
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
-  // Helper: Check if voice is already purchased
+  /**
+   * HELPER KIỂM TRA VOICE ĐÃ MUA:
+   * @param voiceId - ID voice cần kiểm tra
+   * @returns Boolean - voice đã được mua chưa
+   * So sánh với createdVoices để biết voice nào đã có trong DB
+   */
   const isVoicePurchased = (voiceId: string) => {
     return createdVoices.some((v) => v.voiceId === voiceId);
   };
 
   // --- RENDER ---
+  /**
+   * LOADING STATE:
+   * Hiển thị spinner khi đang fetch data lần đầu
+   * Tránh render UI khi chưa có dữ liệu
+   */
   if (isLoading) {
     return (
       <Card className="w-full">
@@ -486,7 +612,7 @@ export default function VoiceChapterPlayer({
                   : "Nghe lại audio đã tạo"}
               </CardDescription>
             </div>
-
+            {/* Nút "Mua thêm giọng" */}
             <Button
               variant="outline"
               size="sm"
@@ -503,6 +629,7 @@ export default function VoiceChapterPlayer({
         </CardHeader>
 
         <CardContent className="pt-6">
+          {/* Audio element (chỉ render src khi đã ready) */}
           <audio
             ref={audioRef}
             src={fullAudioUrl} // React tự hiểu undefined là không render src
@@ -533,7 +660,7 @@ export default function VoiceChapterPlayer({
               <AlertCircle className="h-10 w-10 text-red-500 mb-2" />
               <h3 className="font-semibold text-red-700">Tạo thất bại</h3>
 
-              {/* SỬA: Hiển thị đúng errorMessage lấy từ JSON  gửi */}
+              {/*  Hiển thị đúng errorMessage lấy từ JSON  gửi */}
               <p className="text-sm text-red-600/80 mt-1 mb-4 px-4 text-center font-medium">
                 {currentVoiceData?.errorMessage ||
                   "Lỗi không xác định từ hệ thống AI."}
@@ -545,18 +672,19 @@ export default function VoiceChapterPlayer({
             </div>
           )}
 
-          {/* TRƯỜNG HỢP 3: THÀNH CÔNG -> Hiện Player cũ của bạn */}
+          {/* TRƯỜNG HỢP 3: THÀNH CÔNG -> Hiện Player */}
           {isReady && (
             <div className="flex flex-col gap-4 animate-in fade-in">
               {/* Control Bar (Nút Play, Slider...) */}
               <div className="flex items-center gap-4 select-none">
+                {/* Nút tua lùi 10s */}
                 <button
                   onClick={() => skipTime(-10)}
                   className="text-slate-500 hover:text-blue-600 font-bold text-xs w-8"
                 >
                   -10s
                 </button>
-
+                {/* Nút Play/Pause chính */}
                 <button
                   onClick={togglePlay}
                   className="flex items-center justify-center h-12 w-12 rounded-full bg-[#1e3a5f] hover:bg-[#2a4d7a] text-white shadow-lg transition-all hover:scale-105 active:scale-95"
@@ -567,17 +695,18 @@ export default function VoiceChapterPlayer({
                     <Play className="h-5 w-5 fill-current ml-1" />
                   )}
                 </button>
-
+                {/* Nút tua tới 10s */}
                 <button
                   onClick={() => skipTime(10)}
                   className="text-slate-500 hover:text-blue-600 font-bold text-xs w-8"
                 >
                   +10s
                 </button>
-
+                {/* Thời gian hiện tại */}
                 <span className="text-xs text-slate-500 font-mono w-10 text-right">
                   {formatTime(currentTime)}
                 </span>
+                {/* Slider seek */}
                 <div className="flex-1 mx-2">
                   <Slider
                     value={[currentTime]}
@@ -587,6 +716,7 @@ export default function VoiceChapterPlayer({
                     className="cursor-pointer"
                   />
                 </div>
+                {/* Tổng thời lượng */}
                 <span className="text-xs text-slate-500 font-mono w-10">
                   {formatTime(duration)}
                 </span>
@@ -597,6 +727,7 @@ export default function VoiceChapterPlayer({
           {/* Bottom Bar (Select Voice & Speed) - Luôn hiển thị */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-4 mt-4 border-[#00416a]/20 dark:border-[#f0ead6]/20">
             <div className="flex items-center gap-3 w-full sm:w-auto">
+              {/* Select tốc độ phát */}
               <Select
                 value={playbackSpeed}
                 onValueChange={handleSpeedChange}
@@ -613,7 +744,7 @@ export default function VoiceChapterPlayer({
                   <SelectItem value="2.0">2.0x</SelectItem>
                 </SelectContent>
               </Select>
-
+              {/* Select chuyển đổi giọng */}
               <Select value={currentVoiceId} onValueChange={handleVoiceChange}>
                 <SelectTrigger className="h-9 w-auto min-w-[200px] text-xs font-medium bg-[#f0ead6] text-[#00416a] border-[#00416a]/20 dark:bg-[#00416a] dark:text-[#f0ead6] dark:border-[#f0ead6]/20">
                   <SelectValue placeholder="Đổi giọng đọc" />
@@ -642,7 +773,11 @@ export default function VoiceChapterPlayer({
   }
 
   // === CASE 2: FORM TẠO / MUA THÊM VOICE ===
-  // Tính toán những voice chưa mua để hiển thị logic phù hợp
+  /**
+   * TÍNH SỐ VOICE CHƯA MUA:
+   * Dùng để hiển thị thông báo khi đã mua hết voice
+   * Filter availableVoices với điều kiện chưa có trong createdVoices
+   */
   const unpurchasedCount = availableVoices.filter(
     (v) => !isVoicePurchased(v.voiceId)
   ).length;
@@ -682,7 +817,7 @@ export default function VoiceChapterPlayer({
         </CardHeader>
         <CardContent>
           {isRankRestricted ? (
-            // HIỂN THỊ THÔNG BÁO KHÓA HẠNG
+            // 1. HIỂN THỊ THÔNG BÁO KHÓA HẠNG
             <div className="py-12 flex flex-col items-center justify-center text-center bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-200">
               <Gem className="h-12 w-12 text-amber-500 mb-4" />
               <h3 className="text-lg font-bold text-amber-900 dark:text-amber-100">
@@ -702,7 +837,8 @@ export default function VoiceChapterPlayer({
                 Tìm hiểu về Cấp bậc Tác giả
               </Button>
             </div>
-          ) : unpurchasedCount === 0 ? (
+          ) : /* 2. ĐÃ MUA HẾT VOICE */
+          unpurchasedCount === 0 ? (
             <div className="text-center py-8 bg-slate-50 dark:bg-slate-900 rounded-lg">
               <Check className="h-10 w-10 text-green-500 mx-auto mb-2" />
               <h3 className="font-semibold text-slate-900 dark:text-slate-100">
@@ -716,6 +852,7 @@ export default function VoiceChapterPlayer({
               </Button>
             </div>
           ) : (
+            /* 3. FORM CHỌN VOICE VÀ THANH TOÁN */
             <div className="flex flex-col md:flex-row gap-6 mb-6">
               {/* --- CỘT 1: THÔNG TIN CHI PHÍ --- */}
               <div className="flex-1 bg-slate-50 dark:bg-slate-900 rounded-lg border p-5 h-fit">
@@ -743,14 +880,12 @@ export default function VoiceChapterPlayer({
                   </div>
 
                   <div className="h-[1px] bg-slate-200 dark:bg-slate-700 my-2"></div>
-
+                  {/* Tổng chi phí */}
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-slate-700 dark:text-slate-300">
                       Tổng chi phí:
                     </span>
-                    {/* <span className="font-bold text-blue-600 text-lg">
-                      {totalCost.toLocaleString()} chars
-                    </span> */}
+
                     <span className="font-bold text-blue-600 text-lg flex items-center gap-1">
                       {totalCost.toLocaleString()}
                       <span className="relative inline-flex items-center">
@@ -761,7 +896,7 @@ export default function VoiceChapterPlayer({
                       </span>
                     </span>
                   </div>
-
+                  {/* Số dư và cảnh báo */}
                   <div
                     className={`mt-4 p-3 rounded-md border flex flex-col gap-2 ${
                       isEnoughBalance
@@ -773,9 +908,7 @@ export default function VoiceChapterPlayer({
                       <span className="text-xs font-semibold uppercase opacity-70">
                         Số dư hiện tại
                       </span>
-                      {/* <span className="font-bold">
-                        {walletBalance.toLocaleString()} chars
-                      </span> */}
+
                       <span className="font-bold flex items-center gap-1">
                         {walletBalance.toLocaleString()}
                         <span className="relative inline-flex items-center">
@@ -786,7 +919,7 @@ export default function VoiceChapterPlayer({
                         </span>
                       </span>
                     </div>
-
+                    {/* Nút nạp thêm nếu không đủ số dư */}
                     {!isEnoughBalance && (
                       <Button
                         size="sm"
@@ -867,16 +1000,16 @@ export default function VoiceChapterPlayer({
               </div>
             </div>
           )}
-
+          {/* Nút hành động */}
           {unpurchasedCount > 0 && (
             <div className="flex justify-end pt-2 border-t mt-4 gap-3">
-              {/* Nút hủy ở dưới cùng mobile cho tiện (optional) */}
+              {/* Nút hủy (chỉ hiện khi đã có voice) */}
               {createdVoices.length > 0 && (
                 <Button variant="ghost" onClick={() => setIsAddingVoice(false)}>
                   Hủy
                 </Button>
               )}
-
+              {/* Nút tạo audio chính */}
               <Button
                 onClick={handleCreateVoices}
                 disabled={isProcessing || selectedVoiceIds.length === 0}

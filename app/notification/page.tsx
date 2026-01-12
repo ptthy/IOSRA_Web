@@ -35,8 +35,48 @@ import {
   notificationService,
   NotificationItem as INotifItem,
 } from "@/services/notificationService";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"; // Helper để gộp và xử lý className Tailwind CSS một cách linh hoạt
 
+/**
+ * Trang danh sách thông báo của người dùng
+ *
+ * MỤC ĐÍCH:
+ * - Hiển thị tất cả thông báo của người dùng theo thời gian
+ * - Phân trang (20 items/trang)
+ * - Real-time update qua event listener
+ * - Xử lý click vào thông báo để điều hướng đến trang liên quan
+ *
+ * CÁC LOẠI THÔNG BÁO HỖ TRỢ:
+ * - new_chapter: Chương mới của truyện đang theo dõi
+ * - new_story: Truyện mới từ tác giả yêu thích
+ * - subscription_reminder: Nhắc nhở gói cước sắp hết hạn
+ * - new_follower: Người dùng mới theo dõi
+ * - chapter_comment: Có bình luận mới trên chương truyện
+ * - story_rating: Có đánh giá mới trên truyện
+ * - op_request: Yêu cầu rút tiền (author)
+ * - chapter_purchase: Chương truyện được mua
+ * - author_rank_upgrade: Nâng cấp rank tác giả
+ * - voice_purchase: Giọng đọc AI được mua
+ *
+ * LIÊN THÔNG VỚI:
+ * - @/services/notificationService: Lấy danh sách thông báo
+ * - Event listener "notification-updated": Real-time update
+ * - Các trang khác: Điều hướng khi click thông báo
+ */
+
+/**
+ * Component hiển thị một dòng thông báo
+ *
+ * PROPS:
+ * - item: Thông tin thông báo từ API
+ * - onClick: Hàm xử lý khi click vào thông báo
+ *
+ * TÍNH NĂNG:
+ * - Icon khác nhau cho mỗi loại thông báo
+ * - Highlight thông báo chưa đọc (nền xanh nhạt)
+ * - Hiển thị thời gian định dạng "HH:mm - dd/MM/yyyy"
+ * - Dot màu xanh cho thông báo chưa đọc
+ */
 // --- COMPONENT HIỂN THỊ ROW (Nội bộ cho trang này) ---
 const NotificationRow = ({
   item,
@@ -45,6 +85,16 @@ const NotificationRow = ({
   item: INotifItem;
   onClick: (item: INotifItem) => void;
 }) => {
+  /**
+   * Hàm trả về icon tương ứng với loại thông báo
+   *
+   * LOGIC:
+   * - Mỗi loại thông báo có icon và màu sắc riêng
+   * - Giúp người dùng nhận diện nhanh loại thông báo
+   *
+   * @param type - Loại thông báo từ API
+   * @returns JSX.Element icon với màu sắc phù hợp
+   */
   const getIcon = (type: string) => {
     switch (type) {
       case "new_chapter":
@@ -70,7 +120,7 @@ const NotificationRow = ({
         return <Info className="h-5 w-5 text-gray-500" />;
     }
   };
-
+  // Format thời gian: "HH:mm - dd/MM/yyyy"
   const timeDisplay = format(new Date(item.createdAt), "HH:mm - dd/MM/yyyy");
 
   return (
@@ -78,9 +128,11 @@ const NotificationRow = ({
       onClick={() => onClick(item)}
       className={cn(
         "flex gap-4 p-4 border-b last:border-0 hover:bg-muted/50 transition-colors cursor-pointer items-start",
+        // Thông báo chưa đọc có nền xanh nhạt
         !item.isRead ? "bg-blue-50/60 dark:bg-blue-900/10" : "bg-card"
       )}
     >
+      {/* Icon thông báo */}
       <div className="mt-1 shrink-0 bg-background p-2 rounded-full border shadow-sm">
         {getIcon(item.type)}
       </div>
@@ -89,20 +141,23 @@ const NotificationRow = ({
           <span
             className={cn(
               "text-sm font-semibold",
+              // Tiêu đề thông báo chưa đọc đậm hơn
               !item.isRead ? "text-foreground" : "text-muted-foreground"
             )}
           >
             {item.title}
           </span>
+          {/* Thời gian */}
           <span className="text-xs text-muted-foreground/60 whitespace-nowrap shrink-0">
             {timeDisplay}
           </span>
         </div>
-
+        {/* Nội dung chi tiết (giới hạn 2 dòng) */}
         <span className="text-sm text-muted-foreground line-clamp-2">
           {item.message}
         </span>
       </div>
+      {/* Dot màu xanh cho thông báo chưa đọc */}
       {!item.isRead && (
         <div className="self-center shrink-0 ml-2">
           <div className="h-3 w-3 rounded-full bg-blue-500 shadow-sm animate-pulse" />
@@ -111,20 +166,27 @@ const NotificationRow = ({
     </div>
   );
 };
-
+// Component chính của trang thông báo
 export default function NotificationPage() {
   const router = useRouter();
 
-  // State
+  // State quản lý dữ liệu và UI
   const [notifications, setNotifications] = useState<INotifItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Pagination State
+  // State phân trang
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20); // Cố định 20 items/trang
   const [total, setTotal] = useState(0);
 
-  // --- HÀM XỬ LÝ LỖI (Nằm ngay trong file) ---
+  /**
+   * Hàm xử lý lỗi API thống nhất
+   *
+   * LOGIC TƯƠNG TỰ NHƯ CÁC TRANG KHÁC:
+   * 1. Ưu tiên lỗi validation (details)
+   * 2. Lỗi message chung
+   * 3. Fallback lỗi mạng
+   */
   const handleApiError = (error: any, defaultMessage: string) => {
     if (error.response && error.response.data && error.response.data.error) {
       const { message, details } = error.response.data.error;
@@ -148,7 +210,21 @@ export default function NotificationPage() {
   };
   // ------------------------------------------
 
-  // 1. Logic fetch data (Giữ nguyên)
+  /**
+   * Hàm fetch danh sách thông báo từ API
+   *
+   * API GỌI: GET /api/notifications?page=1&limit=20
+   *
+   * RESPONSE DỰ KIẾN:
+   * {
+   *   data: {
+   *     items: INotifItem[],
+   *     total: 100,
+   *     page: 1,
+   *     limit: 20
+   *   }
+   * }
+   */
   const fetchNotifications = async () => {
     setLoading(true);
     try {
@@ -165,7 +241,17 @@ export default function NotificationPage() {
     }
   };
 
-  // 2. --- THÊM HÀM NÀY: Xử lý nút Làm mới ---
+  /**
+   * Hàm xử lý nút "Làm mới"
+   *
+   * LOGIC THÔNG MINH:
+   * - Nếu đang ở trang 1 -> gọi fetch trực tiếp
+   * - Nếu đang ở trang khác (2,3...) -> reset về trang 1
+   * - Việc reset page sẽ kích hoạt useEffect và tự fetch
+   *
+   * LÝ DO: Tránh trường hợp người dùng đang xem trang 5,
+   * khi refresh sẽ bị giật về trang 1 mất vị trí đang xem
+   */
   const handleRefresh = () => {
     if (page === 1) {
       // Nếu đang ở trang 1 rồi thì gọi tải lại luôn
@@ -177,10 +263,22 @@ export default function NotificationPage() {
     }
   };
 
-  // useEffect bắt sự kiện thay đổi trang (Giữ nguyên)
+  /**
+   * useEffect chính - Fetch data khi page thay đổi
+   *
+   * CÓ 2 CHỨC NĂNG:
+   * 1. Fetch danh sách thông báo khi page thay đổi
+   * 2. Lắng nghe event "notification-updated" để real-time update
+   *
+   * REAL-TIME UPDATE LOGIC:
+   * - Backend/webhook gửi event khi có thông báo mới
+   * - Frontend lắng nghe event và refresh nếu đang ở trang 1
+   * - Nếu đang ở trang khác -> không refresh (tránh làm gián đoạn UX)
+   */
   useEffect(() => {
+    // 1. Fetch data ban đầu hoặc khi page thay đổi
     fetchNotifications();
-    // --- THÊM ĐOẠN NÀY ---
+    // 2. Xử lý real-time update
     const handleRealtimeUpdate = () => {
       // Chỉ tự động load lại nếu đang ở trang 1
       // (Để tránh người dùng đang xem trang 5 tự nhiên bị giật về trang 1 hoặc bị trôi nội dung)
@@ -189,19 +287,29 @@ export default function NotificationPage() {
         fetchNotifications();
       }
     };
-
+    // Lắng nghe event từ nơi khác trong app (ví dụ: WebSocket, Polling)
     window.addEventListener("notification-updated", handleRealtimeUpdate);
-
+    // Cleanup: Xóa event listener khi component unmount
     return () => {
       window.removeEventListener("notification-updated", handleRealtimeUpdate);
     };
     // ---------------------
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, [page]); // Chỉ chạy lại khi page thay đổi
 
+  /**
+   * Hàm xử lý khi click vào một thông báo
+   *
+   * LOGIC ĐIỀU HƯỚNG:
+   * - Dựa vào type của thông báo và payload
+   * - Điều hướng đến trang phù hợp
+   * - Thông báo sẽ được đánh dấu đã đọc ở backend (qua API riêng)
+   *
+   * @param item - Thông báo được click
+   */
   const handleItemClick = (item: INotifItem) => {
     const { type, payload } = item;
-
+    // Switch case điều hướng theo loại thông báo
     switch (type) {
       case "voice_purchase":
       case "op_request": // Yêu cầu rút tiền
@@ -244,6 +352,7 @@ export default function NotificationPage() {
         break;
     }
   };
+  // Tính tổng số trang
   const totalPages = Math.ceil(total / pageSize);
 
   return (
@@ -260,12 +369,12 @@ export default function NotificationPage() {
                 Cập nhật tin tức mới nhất từ hệ thống và truyện bạn theo dõi.
               </p>
             </div>
-
+            {/* Nút làm mới */}
             <Button
               variant="ghost"
               size="sm"
               className="text-muted-foreground hover:text-blue-600"
-              onClick={handleRefresh}
+              onClick={handleRefresh} // Sử dụng handleRefresh thông minh
             >
               {/* ^^^ Sửa onClick={fetchNotifications} thành onClick={handleRefresh} */}
               {/* Thêm hiệu ứng xoay icon khi đang loading cho xịn */}
@@ -292,6 +401,7 @@ export default function NotificationPage() {
                 ))}
               </div>
             ) : (
+              // Trạng thái không có thông báo
               <div className="flex flex-col items-center justify-center py-20 text-muted-foreground bg-muted/10">
                 <Bell className="h-12 w-12 mb-4 opacity-20" />
                 <p>Bạn chưa có thông báo nào.</p>
@@ -300,10 +410,11 @@ export default function NotificationPage() {
           </CardContent>
         </Card>
 
-        {/* --- PHÂN TRANG --- */}
+        {/* Phân trang (chỉ hiện khi có dữ liệu) */}
         {!loading && total > 0 && (
           <Pagination>
             <PaginationContent>
+              {/* Nút Previous */}
               <PaginationItem>
                 <PaginationPrevious
                   href="#"
@@ -318,7 +429,7 @@ export default function NotificationPage() {
                   }
                 />
               </PaginationItem>
-
+              {/* Hiển thị trang hiện tại / tổng số trang */}
               <PaginationItem>
                 <span className="px-4 text-sm font-medium text-muted-foreground">
                   Trang{" "}
@@ -326,7 +437,7 @@ export default function NotificationPage() {
                   {totalPages || 1}
                 </span>
               </PaginationItem>
-
+              {/* Nút Next */}
               <PaginationItem>
                 <PaginationNext
                   href="#"

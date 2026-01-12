@@ -1,4 +1,25 @@
 //app/author/story/[id]/outline/page.tsx
+
+/**
+ * MỤC ĐÍCH:
+ * - Cung cấp công cụ soạn thảo dàn ý chi tiết cho tác giả
+ * - Giúp tác giả lên kế hoạch và cấu trúc truyện trước khi viết
+ *
+ * CHỨC NĂNG CHÍNH:
+ * 1. Hiển thị thông tin truyện và dàn ý gốc (khi nộp)
+ * 2. Editor dàn ý với sections có thể thu gọn/mở rộng
+ * 3. CRUD sections: thêm, sửa, xóa sections
+ * 4. Hai chế độ xem: editor (chỉnh sửa) và preview (xem trước)
+ * 5. Lưu trữ dàn ý cục bộ trong localStorage
+ *
+ * ĐẶC ĐIỂM:
+ * - Tạo template dàn ý mẫu với 3 sections cơ bản
+ * - Collapsible sections với animation
+ * - Tự động lưu vào localStorage
+ * - Hiển thị dàn ý gốc từ hệ thống (khi tạo truyện)
+ * - Thống kê thông tin truyện (ngày tạo, điểm AI, v.v.)
+ */
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -36,7 +57,22 @@ import { toast } from "sonner";
 import { storyService } from "@/services/storyService";
 import type { Story } from "@/services/apiTypes";
 
-// Định nghĩa types cho outline editor
+/**
+ * INTERFACE ĐỊNH NGHĨA CẤU TRÚC DÀN Ý
+ *
+ * Mỗi section gồm:
+ * - sectionId: unique identifier
+ * - title: tiêu đề section
+ * - content: nội dung chi tiết
+ * - order: thứ tự hiển thị
+ * - createdAt/updatedAt: timestamp
+ *
+ * Outline chứa:
+ * - outlineId: ID của outline
+ * - storyId: liên kết với truyện nào
+ * - sections: mảng các section
+ * - timestamps: created/updated
+ */
 interface OutlineSection {
   sectionId: string;
   title: string;
@@ -53,9 +89,21 @@ interface Outline {
   createdAt: string;
   updatedAt: string;
 }
-
+// Key để lưu outline vào localStorage
 const OUTLINE_STORAGE_KEY = "story_outlines";
-
+/**
+ * HÀM CHUYỂN ĐỔI lengthPlan TỪ CODE SANG LABEL TIẾNG VIỆT
+ *
+ * LOGIC:
+ * - Map các giá trị lengthPlan từ API sang label hiển thị
+ * - Dùng switch case để xử lý từng loại
+ * - Fallback: "Chưa xác định" nếu không có hoặc không hợp lệ
+ *
+ * TẠI SAO CẦN HÀM NÀY:
+ * - API trả về code (super_short, short, novel)
+ * - UI cần hiển thị label tiếng Việt có nghĩa
+ * - Đảm bảo consistency trong toàn ứng dụng
+ */
 const getLengthPlanLabel = (lengthPlan: string | undefined): string => {
   switch (lengthPlan) {
     case "super_short":
@@ -73,17 +121,32 @@ export default function OutlineEditorPage() {
   const params = useParams();
   const router = useRouter();
   const storyId = params.id as string;
-
+  // STATE QUẢN LÝ DỮ LIỆU VÀ TRẠNG THÁI
   const [story, setStory] = useState<Story | null>(null);
   const [outline, setOutline] = useState<Outline | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set()
-  );
-  const [editingSection, setEditingSection] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ title: "", content: "" });
-  const [isSaving, setIsSaving] = useState(false);
-  const [viewMode, setViewMode] = useState<"editor" | "preview">("editor");
+  ); // Set chứa ID của các section đang mở
+  const [editingSection, setEditingSection] = useState<string | null>(null); // ID của section đang edit, hoặc "new" khi tạo mới
+  const [editForm, setEditForm] = useState({ title: "", content: "" }); // Form data cho edit
+  const [isSaving, setIsSaving] = useState(false); // Trạng thái đang lưu
+  const [viewMode, setViewMode] = useState<"editor" | "preview">("editor"); // Chế độ xem: editor hoặc preview
+
+  /**
+   * HELPER FUNCTION XỬ LÝ LỖI API - GIỐNG CÁC FILE KHÁC
+   *
+   * LOGIC XỬ LÝ:
+   * 1. Kiểm tra lỗi validation từ backend (details)
+   * 2. Nếu có validation errors -> hiển thị lỗi đầu tiên
+   * 3. Nếu có message từ backend -> hiển thị message đó
+   * 4. Fallback: dùng message mặc định hoặc từ response
+   *
+   * TẠI SAO CẦN CONSISTENCY:
+   * - Người dùng nhận được thông báo lỗi nhất quán
+   * - Dễ debug và bảo trì code
+   * - Xử lý được nhiều loại response error khác nhau
+   */
   const handleApiError = (error: any, defaultMessage: string) => {
     // 1. Check lỗi Validation/Logic từ Backend
     if (error.response && error.response.data && error.response.data.error) {
@@ -112,6 +175,20 @@ export default function OutlineEditorPage() {
     toast.error(fallbackMsg);
   };
   // -------------------
+  /**
+   * LOAD STORY VÀ OUTLINE KHI COMPONENT MOUNT
+   *
+   * FLOW XỬ LÝ:
+   * 1. Gọi API lấy thông tin truyện (storyService.getStoryDetails)
+   * 2. Load outline từ localStorage (nếu có)
+   * 3. Nếu chưa có outline -> tạo outline mẫu
+   * 4. Mở tất cả sections khi load xong (UX: cho người dùng thấy toàn bộ)
+   *
+   * TẠI SAO DÙNG LOCALSTORAGE:
+   * - Outline là công cụ cá nhân của tác giả, chưa cần lưu server
+   * - Tiết kiệm API calls: chỉ cần load từ local
+   * - Cho phép tác giả làm việc offline
+   */
   useEffect(() => {
     loadStoryAndOutline();
   }, [storyId]);
@@ -119,33 +196,29 @@ export default function OutlineEditorPage() {
   const loadStoryAndOutline = async () => {
     setIsLoading(true);
     try {
-      // Load story từ API
+      // 1. Load story từ API
       const storyData = await storyService.getStoryDetails(storyId);
       setStory(storyData);
-
-      // Load outline từ localStorage
+      // 2. Load outline từ localStorage
       const storedOutlines = localStorage.getItem(OUTLINE_STORAGE_KEY);
       if (storedOutlines) {
         const outlines: Record<string, Outline> = JSON.parse(storedOutlines);
         const storyOutline = outlines[storyId];
 
         if (storyOutline) {
+          // Nếu có outline đã lưu, set state và mở tất cả sections
           setOutline(storyOutline);
           setExpandedSections(
             new Set(storyOutline.sections.map((s) => s.sectionId))
           );
         } else {
+          // Nếu chưa có outline cho story này, tạo mới
           createNewOutline();
         }
       } else {
+        // Nếu chưa có outline nào trong localStorage, tạo mới
         createNewOutline();
       }
-      // } catch (error) {
-      //   console.error("Error loading:", error);
-      //   toast.error("Không thể tải dữ liệu");
-      // } finally {
-      //   setIsLoading(false);
-      // }
     } catch (error: any) {
       console.error("Error loading:", error);
       // --- DÙNG HELPER ---
@@ -154,7 +227,19 @@ export default function OutlineEditorPage() {
       setIsLoading(false);
     }
   };
-
+  /**
+   * TẠO OUTLINE MẪU VỚI 3 SECTIONS CƠ BẢN
+   *
+   * CẤU TRÚC MẪU:
+   * 1. Chủ đề & Góc độ: Setting cơ bản của truyện
+   * 2. Bối cảnh câu chuyện: Thời gian, không gian
+   * 3. Xây dựng nhân vật: Mô tả nhân vật chính
+   *
+   * TẠI SAO CẦN TEMPLATE:
+   * - Hướng dẫn người dùng mới bắt đầu
+   * - Cung cấp structure cơ bản, người dùng có thể chỉnh sửa
+   * - Đảm bảo outline có đủ thông tin quan trọng
+   */
   const createNewOutline = () => {
     const newOutline: Outline = {
       outlineId: `outline_${storyId}`,
@@ -193,7 +278,26 @@ export default function OutlineEditorPage() {
     setExpandedSections(new Set(newOutline.sections.map((s) => s.sectionId)));
     saveOutlineToStorage(newOutline);
   };
-
+  /**
+   * LƯU OUTLINE VÀO LOCALSTORAGE
+   *
+   * CẤU TRÚC DỮ LIỆU:
+   * {
+   *   "storyId1": {outline1},
+   *   "storyId2": {outline2},
+   *   ...
+   * }
+   *
+   * LOGIC XỬ LÝ:
+   * 1. Lấy toàn bộ outlines hiện có từ localStorage
+   * 2. Merge outline mới vào object
+   * 3. Lưu lại toàn bộ object
+   *
+   * TẠI SAO DÙNG RECORD STRUCTURE:
+   * - Dễ query: outlines[storyId]
+   * - Hiệu suất: chỉ cần parse/serialize 1 lần
+   * - Quản lý được nhiều outlines cho nhiều truyện
+   */
   const saveOutlineToStorage = (outlineData: Outline) => {
     const storedOutlines = localStorage.getItem(OUTLINE_STORAGE_KEY);
     const outlines: Record<string, Outline> = storedOutlines
@@ -202,19 +306,47 @@ export default function OutlineEditorPage() {
     outlines[storyId] = outlineData;
     localStorage.setItem(OUTLINE_STORAGE_KEY, JSON.stringify(outlines));
   };
-
+  /**
+   * TOGGLE MỞ/ĐÓNG SECTION (COLLAPSIBLE)
+   *
+   * LOGIC XỬ LÝ:
+   * 1. Dùng Set để lưu trữ ID của các section đang mở
+   * 2. Kiểm tra nếu sectionId đã có trong Set -> xóa (đóng)
+   * 3. Nếu chưa có -> thêm vào (mở)
+   * 4. Luôn tạo Set mới để trigger React re-render
+   *
+   * TẠI SAO DÙNG SET:
+   * - Đảm bảo không có duplicate
+   * - O(1) cho thao tác add/delete/check
+   * - Dễ dàng convert sang Array nếu cần
+   */
   const toggleSection = (sectionId: string) => {
     setExpandedSections((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(sectionId)) {
-        newSet.delete(sectionId);
+        newSet.delete(sectionId); // Đóng nếu đang mở
       } else {
-        newSet.add(sectionId);
+        newSet.add(sectionId); // Mở nếu đang đóng
       }
       return newSet;
     });
   };
 
+  /**
+   * THÊM SECTION MỚI VÀO OUTLINE
+   *
+   * FLOW XỬ LÝ:
+   * 1. Validate: tiêu đề không được rỗng
+   * 2. Tạo section mới với ID unique từ timestamp
+   * 3. Thêm vào mảng sections (cuối mảng)
+   * 4. Cập nhật state và localStorage
+   * 5. Reset form và thoát edit mode
+   *
+   * TẠI SAO DÙNG TIMESTAMP CHO ID:
+   * - Đảm bảo unique trong client-side
+   * - Không cần phải generate UUID phức tạp
+   * - Có thể sắp xếp theo thời gian tạo nếu cần
+   */
   const handleAddSection = () => {
     if (!editForm.title.trim()) {
       toast.error("Vui lòng nhập tiêu đề phần");
@@ -224,14 +356,14 @@ export default function OutlineEditorPage() {
     setIsSaving(true);
     try {
       const newSection: OutlineSection = {
-        sectionId: `section_${Date.now()}`,
+        sectionId: `section_${Date.now()}`, // Tạo ID unique từ timestamp
         title: editForm.title,
         content: editForm.content,
         order: outline?.sections.length || 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-
+      // Tạo outline mới hoặc update outline hiện tại
       const updatedOutline = outline
         ? {
             ...outline,
@@ -248,14 +380,9 @@ export default function OutlineEditorPage() {
 
       setOutline(updatedOutline);
       saveOutlineToStorage(updatedOutline);
-      setEditForm({ title: "", content: "" });
-      setEditingSection(null);
+      setEditForm({ title: "", content: "" }); // Reset form
+      setEditingSection(null); // Thoát mode edit
       toast.success("Đã thêm phần mới");
-      // } catch (error) {
-      //   toast.error("Không thể thêm phần mới");
-      // } finally {
-      //   setIsSaving(false);
-      // }
     } catch (error: any) {
       // --- DÙNG HELPER ---
       handleApiError(error, "Không thể thêm phần mới.");
@@ -263,7 +390,21 @@ export default function OutlineEditorPage() {
       setIsSaving(false);
     }
   };
-
+  /**
+   * CẬP NHẬT SECTION HIỆN CÓ
+   *
+   * FLOW XỬ LÝ:
+   * 1. Validate: tiêu đề không được rỗng
+   * 2. Map qua mảng sections, tìm section cần update
+   * 3. Cập nhật title, content và updatedAt
+   * 4. Cập nhật state và localStorage
+   * 5. Reset form và thoát edit mode
+   *
+   * TẠI SAO DÙNG MAP THAY VÌ TÌM INDEX:
+   * - Map tạo array mới, đảm bảo immutability
+   * - Dễ đọc và maintain hơn việc tìm index rồi thay đổi
+   * - Phù hợp với React philosophy
+   */
   const handleUpdateSection = (sectionId: string) => {
     if (!editForm.title.trim()) {
       toast.error("Vui lòng nhập tiêu đề phần");
@@ -300,11 +441,6 @@ export default function OutlineEditorPage() {
       setEditForm({ title: "", content: "" });
       setEditingSection(null);
       toast.success("Đã cập nhật");
-      // } catch (error) {
-      //   toast.error("Không thể cập nhật");
-      // } finally {
-      //   setIsSaving(false);
-      // }
     } catch (error: any) {
       // --- DÙNG HELPER ---
       handleApiError(error, "Không thể cập nhật nội dung.");
@@ -313,6 +449,19 @@ export default function OutlineEditorPage() {
     }
   };
 
+  /**
+   * XÓA SECTION VỚI CONFIRMATION DIALOG
+   *
+   * FLOW XỬ LÝ:
+   * 1. Hiển thị confirm dialog (built-in browser confirm)
+   * 2. Nếu user confirm -> filter ra sections không chứa section cần xóa
+   * 3. Cập nhật state và localStorage
+   *
+   * TẠI SAO CẦN CONFIRMATION:
+   * - Ngăn người dùng xóa nhầm
+   * - UX tốt hơn: cho phép cancel trước khi xóa
+   * - Quan trọng với dữ liệu người dùng tự tạo
+   */
   const handleDeleteSection = (sectionId: string) => {
     if (!confirm("Bạn có chắc muốn xóa phần này?")) return;
 
@@ -334,32 +483,63 @@ export default function OutlineEditorPage() {
         saveOutlineToStorage(updatedOutline);
       }
       toast.success("Đã xóa phần");
-      // } catch (error) {
-      //   toast.error("Không thể xóa");
-      // }
     } catch (error: any) {
       // --- DÙNG HELPER ---
       handleApiError(error, "Không thể xóa phần này.");
     }
   };
-
+  /**
+   * BẮT ĐẦU EDIT MODE CHO MỘT SECTION
+   *
+   * LOGIC XỬ LÝ:
+   * 1. Set editingSection = section.sectionId
+   * 2. Copy dữ liệu hiện tại của section vào editForm
+   *
+   * TẠI SAO COPY DỮ LIỆU VÀO STATE RIÊNG:
+   * - Cho phép user chỉnh sửa mà không ảnh hưởng đến dữ liệu gốc
+   * - Có thể cancel mà không mất dữ liệu
+   * - Dễ validate trước khi lưu
+   */
   const startEdit = (section: OutlineSection) => {
     setEditingSection(section.sectionId);
     setEditForm({ title: section.title, content: section.content });
   };
-
+  /**
+   * HỦY EDIT MODE
+   *
+   * LOGIC XỬ LÝ:
+   * 1. Set editingSection = null
+   * 2. Reset editForm về rỗng
+   *
+   * TẠI SAO CẦN HỦY EDIT:
+   * - Cho phép user cancel thao tác chỉnh sửa
+   * - Reset UI về trạng thái ban đầu
+   * - Ngăn state bị "mắc kẹt" trong edit mode
+   */
   const cancelEdit = () => {
     setEditingSection(null);
     setEditForm({ title: "", content: "" });
   };
-
+  /**
+   * KẾT HỢP TẤT CẢ SECTIONS THÀNH MỘT VĂN BẢN MARKDOWN
+   *
+   * LOGIC XỬ LÝ:
+   * 1. Map qua từng section
+   * 2. Format: ## Tiêu đề\n\nNội dung
+   * 3. Join với \n\n (2 newlines) giữa các section
+   *
+   * TẠI SAO DÙNG MARKDOWN FORMAT:
+   * - Dễ đọc trong preview mode
+   * - Có thể convert sang HTML nếu cần
+   * - Chuẩn phổ biến cho văn bản có cấu trúc
+   */
   const getCombinedOutline = () => {
     if (!outline) return "";
     return outline.sections
       .map((section) => `## ${section.title}\n\n${section.content}`)
       .join("\n\n");
   };
-
+  // Hiển thị loading spinner khi đang tải dữ liệu
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -367,7 +547,7 @@ export default function OutlineEditorPage() {
       </div>
     );
   }
-
+  // Hiển thị thông báo nếu không tìm thấy truyện
   if (!story) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
@@ -381,7 +561,7 @@ export default function OutlineEditorPage() {
       </div>
     );
   }
-
+  // Render UI chính
   return (
     <div className="space-y-6 pb-8 max-w-7xl mx-auto">
       {/* Back Button */}
@@ -431,7 +611,7 @@ export default function OutlineEditorPage() {
                   )}
                 </div>
               </div>
-
+              {/* Tags */}
               {story.tags && story.tags.length > 0 && (
                 <div>
                   <p className="text-xs text-muted-foreground mb-1 font-bold">
@@ -451,6 +631,7 @@ export default function OutlineEditorPage() {
                 </div>
               )}
 
+              {/* Original Outline từ hệ thống */}
               {story.outline && (
                 <Card className="border-l-4 border-l-blue-500">
                   <CardHeader className="pb-3">
@@ -475,10 +656,10 @@ export default function OutlineEditorPage() {
         </CardContent>
       </Card>
 
-      {/* EDITOR MODE */}
+      {/* EDITOR MODE - Giao diện chỉnh sửa */}
       {viewMode === "editor" && (
         <>
-          {/* Sections List */}
+          {/* Danh sách sections */}
           <div className="space-y-4">
             {outline?.sections.map((section, index) => (
               <Card
@@ -492,6 +673,7 @@ export default function OutlineEditorPage() {
                   <CardHeader className="pb-4">
                     <div className="flex items-start gap-3">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {/* Drag handle (visual only) */}
                         <GripVertical className="h-4 w-4 text-muted-foreground cursor-move flex-shrink-0" />
                         <CollapsibleTrigger asChild>
                           <Button
@@ -499,6 +681,8 @@ export default function OutlineEditorPage() {
                             size="sm"
                             className="p-0 h-auto hover:bg-transparent flex-shrink-0"
                           >
+                            {" "}
+                            {/* Icon mở/đóng */}
                             {expandedSections.has(section.sectionId) ? (
                               <ChevronDown className="h-4 w-4" />
                             ) : (
@@ -506,7 +690,7 @@ export default function OutlineEditorPage() {
                             )}
                           </Button>
                         </CollapsibleTrigger>
-
+                        {/* Hiển thị tiêu đề hoặc input edit */}
                         {editingSection === section.sectionId ? (
                           <Input
                             value={editForm.title}
@@ -525,9 +709,10 @@ export default function OutlineEditorPage() {
                           </h3>
                         )}
                       </div>
-
+                      {/* Action buttons: Edit/Save hoặc Delete */}
                       <div className="flex items-center gap-1 flex-shrink-0">
                         {editingSection === section.sectionId ? (
+                          // Edit mode: Save và Cancel buttons
                           <>
                             <Button
                               size="sm"
@@ -552,6 +737,7 @@ export default function OutlineEditorPage() {
                             </Button>
                           </>
                         ) : (
+                          // View mode: Edit và Delete buttons
                           <>
                             <Button
                               size="sm"
@@ -578,6 +764,7 @@ export default function OutlineEditorPage() {
 
                   <CollapsibleContent>
                     <CardContent className="pt-0">
+                      {/* Hiển thị nội dung hoặc textarea edit */}
                       {editingSection === section.sectionId ? (
                         <Textarea
                           value={editForm.content}
@@ -606,7 +793,7 @@ export default function OutlineEditorPage() {
             ))}
           </div>
 
-          {/* Add New Section */}
+          {/* Form thêm section mới */}
           {editingSection === "new" ? (
             <Card className="border-dashed border-2 border-primary/30">
               <CardHeader className="space-y-3">
@@ -649,6 +836,7 @@ export default function OutlineEditorPage() {
               </CardContent>
             </Card>
           ) : (
+            // Button để bắt đầu tạo section mới
             <Button
               variant="outline"
               className="w-full border-dashed border-2 h-12"
@@ -661,7 +849,7 @@ export default function OutlineEditorPage() {
         </>
       )}
 
-      {/* PREVIEW MODE */}
+      {/* PREVIEW MODE - Xem trước dàn ý */}
       {viewMode === "preview" && (
         <Card>
           <CardHeader>

@@ -23,77 +23,110 @@ import { jwtDecode } from "jwt-decode";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
-// Thêm helper function ở đầu file (sau imports)
+/**
+ * Trang đăng nhập chính của ứng dụng
+ *
+ * MỤC ĐÍCH:
+ * - Cung cấp 2 phương thức đăng nhập: Email/Password và Google OAuth
+ * - Xử lý authentication và redirect dựa trên role người dùng
+ * - Xử lý trường hợp tài khoản Google chưa đăng ký (chuyển đến trang hoàn tất)
+ *
+ * QUY TRÌNH ĐĂNG NHẬP GOOGLE:
+ * 1. Người dùng click "Đăng nhập với Google"
+ * 2. Mở popup Firebase Authentication
+ * 3. Lấy idToken từ Firebase
+ * 4. Gửi idToken đến backend (/api/auth/google)
+ * 5. Backend kiểm tra:
+ *    - Nếu tài khoản đã tồn tại -> trả về token và user data
+ *    - Nếu chưa tồn tại -> trả về 409/404 -> chuyển đến trang hoàn tất
+ *
+ * LIÊN THÔNG VỚI:
+ * - @/context/AuthContext: Lưu thông tin đăng nhập và token
+ * - @/lib/firebase: Xác thực Google qua Firebase
+ * - @/services/authService: Gọi API login và loginWithGoogle
+ * - /app/google-complete/page.tsx: Khi tài khoản Google chưa đăng ký
+ */
+
+/**
+ * Helper function: Xác định role chính từ danh sách roles
+ *
+ * LOGIC ƯU TIÊN:
+ * admin > omod > cmod > author > reader
+ *
+ * MỤC ĐÍCH:
+ * - Người dùng có thể có nhiều role (ví dụ: vừa là author vừa là cmod)
+ * - Hệ thống cần xác định role "quyền lực nhất" để redirect đúng trang
+ *
+ * @param roles - Mảng các role của người dùng
+ * @returns Role chính để điều hướng
+ */
 const getPrimaryRole = (roles: string[]): string => {
+  // Ưu tiên các role theo thứ tự: admin > omod > cmod > author > reader
+  // Kiểm tra mảng rỗng hoặc undefined
   if (!roles || roles.length === 0) return "reader";
+  // Logic ưu tiên theo thứ tự
   if (roles.includes("admin")) return "admin";
   if (roles.includes("omod")) return "omod";
   if (roles.includes("cmod")) return "cmod";
   if (roles.includes("author")) return "author";
+  // Fallback về role đầu tiên hoặc "reader"
   return roles[0] || "reader";
 };
 
+// Component chính của trang đăng nhập
 export default function LoginRoute() {
+  // Lấy hàm login và setAuthData từ AuthContext
   const { login, setAuthData } = useAuth();
   const router = useRouter();
 
-  // Đổi tên state từ email -> identifier để rõ nghĩa hơn
-  const [identifier, setIdentifier] = useState("");
+  // State quản lý các trường nhập liệu
+  const [identifier, setIdentifier] = useState(""); // Nhận cả email hoặc username
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Đảm bảo khi component mount, các trường này trống (phòng hờ trình duyệt cố tình điền)
+  /**
+   * useEffect reset form khi component mount
+   *
+   * MỤC ĐÍCH:
+   * - Phòng trường hợp trình duyệt tự động điền thông tin cũ
+   * - Đảm bảo form luôn bắt đầu từ trạng thái trống
+   */
   useEffect(() => {
     setIdentifier("");
     setPassword("");
   }, []);
 
-  // Hàm login
+  /**
+   * Hàm xử lý đăng nhập với email/password
+   *
+   * QUY TRÌNH:
+   * 1. Ngăn reload trang với e.preventDefault()
+   * 2. Gọi hàm login từ AuthContext (xử lý authentication)
+   * 3. AuthContext sẽ tự động:
+   *    - Gọi API login
+   *    - Lưu token vào localStorage
+   *    - Cập nhật context
+   *    - Redirect dựa trên role
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
+      // Gọi hàm login từ AuthContext
+      // AuthContext sẽ xử lý toàn bộ flow đăng nhập
       await login({ identifier: identifier, password });
-      // Thành công -> AuthContext tự redirect
+      // Nếu thành công, AuthContext sẽ tự động redirect dựa trên role
     } catch (err: any) {
       setIsLoading(false);
-
-      //   if (err.response && err.response.data && err.response.data.error) {
-      //     const { code, message, details } = err.response.data.error;
-
-      //     // 1. Ưu tiên xử lý Validation (details) -> Lấy lỗi đầu tiên tìm thấy
-      //     if (details) {
-      //       const firstKey = Object.keys(details)[0];
-      //       if (firstKey && details[firstKey].length > 0) {
-      //         toast.error(details[firstKey].join(" ")); // VD: "Email không đúng định dạng"
-      //         return;
-      //       }
-      //     }
-
-      //     // . Fallback: Hiển thị message từ Backend nếu không rơi vào các case trên
-      //     if (message) {
-      //       toast.error(message);
-      //       return;
-      //     }
-      //   }
-
-      //   // Case 4: Lỗi không xác định (mạng, server down...)
-      //   const fallbackMsg =
-      //     err.response?.data?.message ||
-      //     "Đăng nhập thất bại. Vui lòng thử lại sau.";
-      //   toast.error(fallbackMsg);
-      //   console.error("Login Error:", err);
-      // }
-      // Lấy message trực tiếp từ cấu trúc server trả về
-      // Ưu tiên: error.message -> message -> Fallback mặc định
+      // Xử lý lỗi chi tiết từ server
       const serverMsg =
         err.response?.data?.error?.message ||
         err.response?.data?.message ||
         "Đăng nhập thất bại. Vui lòng thử lại.";
 
-      // Nếu có lỗi validation chi tiết (details) thì hiện cái đó, không thì hiện message chung
+      // Ưu tiên hiển thị lỗi validation chi tiết (details)
       const details = err.response?.data?.error?.details;
       if (details) {
         const firstKey = Object.keys(details)[0];
@@ -105,14 +138,34 @@ export default function LoginRoute() {
       console.error("Login Error:", err);
     }
   };
+
+  /**
+   * Hàm xử lý đăng nhập với Google OAuth
+   *
+   * QUY TRÌNH CHI TIẾT:
+   * 1. Tạo GoogleAuthProvider và mở popup đăng nhập
+   * 2. Lấy Firebase idToken từ kết quả
+   * 3. Gửi idToken đến backend API /api/auth/google
+   * 4. Backend xử lý:
+   *    a. Xác thực idToken với Google
+   *    b. Kiểm tra user đã tồn tại trong DB chưa
+   *    c. Nếu tồn tại -> trả về user data và token
+   *    d. Nếu chưa tồn tại -> trả về 409/404
+   * 5. Frontend xử lý response:
+   *    a. Nếu thành công -> lưu thông tin vào AuthContext
+   *    b. Nếu lỗi 409/404 -> redirect đến trang hoàn tất đăng ký
+   */
   const signInWithGoogle = async () => {
     setIsLoading(true);
     const provider = new GoogleAuthProvider();
     try {
+      // 1. Mở popup đăng nhập Firebase
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      const idToken = await user.getIdToken();
 
+      // 2. Lấy idToken từ Firebase (dùng để xác thực với backend)
+      const idToken = await user.getIdToken();
+      // 3. Gửi idToken đến backend để xác thực
       const response = await authService.loginWithGoogle({ idToken });
       const {
         username,
@@ -123,56 +176,36 @@ export default function LoginRoute() {
         avatar,
       } = response.data;
       console.log(response.data);
+
+      // 4. Kiểm tra dữ liệu trả về
       if (backendToken && username && email) {
+        // Decode JWT token để lấy thông tin
         const decodedPayload: any = jwtDecode(backendToken);
 
-        // Xử lý roles tương tự như trong AuthContext
+        // Xử lý roles: đảm bảo là mảng và chuyển thành chữ thường
         const userRoles = (Array.isArray(roles) ? roles : [roles]).map(
           (r: string) => r.toLowerCase().trim()
         );
-        const primaryRole = getPrimaryRole(userRoles);
+        const primaryRole = getPrimaryRole(userRoles); // Xác định role chính
 
+        // Tạo object user để lưu vào context
         const userToSet = {
-          id: decodedPayload.sub,
+          id: decodedPayload.sub, // ID từ token JWT
           username: username,
           email: email,
-          role: primaryRole, // SỬA: Dùng getPrimaryRole thay vì roles[0]
-          roles: userRoles, // THÊM: Lưu cả array roles
+          role: primaryRole, // Role chính để điều hướng
+          roles: userRoles, // Toàn bộ roles để kiểm tra quyền
           displayName: displayName || username,
           avatar: avatar,
         };
+        // 5. Lưu thông tin đăng nhập vào AuthContext
+        // Hàm này sẽ tự động lưu vào localStorage và cập nhật state
         setAuthData(userToSet, backendToken);
       } else {
         toast.error("Đăng nhập Google thất bại: Dữ liệu thiếu.");
         setIsLoading(false);
       }
     } catch (err: any) {
-      //   if (err.response?.status === 404) {
-      //     try {
-      //       const currentUser = auth.currentUser;
-      //       if (currentUser) {
-      //         const idToken = await currentUser.getIdToken();
-      //         const googleEmail = currentUser.email;
-      //         if (idToken && googleEmail) {
-      //           toast.info("Tài khoản Google mới, vui lòng hoàn tất đăng ký.");
-      //           router.push(
-      //             `/google-complete?idToken=${idToken}&email=${googleEmail}`
-      //           );
-      //         }
-      //       }
-      //     } catch (innerError) {
-      //       setIsLoading(false);
-      //     }
-      //   } else if (err.code === "auth/popup-closed-by-user") {
-      //     toast.info("Bạn đã đóng cửa sổ đăng nhập Google.");
-      //     setIsLoading(false);
-      //   } else {
-      //     const errMsg =
-      //       err.response?.data?.message || err.message || "Đăng nhập thất bại.";
-      //     toast.error(errMsg);
-      //     setIsLoading(false);
-      //   }
-      // }
       setIsLoading(false);
 
       // 1. Lấy message lỗi từ server (Bất kể lỗi gì: 404, 409, 500...)
@@ -198,7 +231,7 @@ export default function LoginRoute() {
       }
     }
   };
-
+  // Ảnh fallback khi ảnh chính bị lỗi
   const ERROR_IMG_SRC =
     "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==";
 
@@ -208,6 +241,7 @@ export default function LoginRoute() {
       <div className="hidden lg:flex lg:w-1/2 bg-primary relative overflow-hidden">
         <div className="absolute inset-0">
           {imageError ? (
+            // Hiển thị ảnh fallback khi ảnh chính bị lỗi
             <div className="w-full h-full flex items-center justify-center bg-gray-100 opacity-20">
               <img
                 src={ERROR_IMG_SRC}
@@ -216,11 +250,12 @@ export default function LoginRoute() {
               />
             </div>
           ) : (
+            // Ảnh background chính
             <img
               src="https://images.unsplash.com/photo-1543244916-b3da1ba6252c"
               alt="Reading experience"
               className="w-full h-full object-cover opacity-20"
-              onError={() => setImageError(true)}
+              onError={() => setImageError(true)} // Xử lý lỗi tải ảnh
             />
           )}
         </div>
@@ -278,6 +313,7 @@ export default function LoginRoute() {
               className="space-y-4"
               autoComplete="off"
             >
+              {/* Identifier Field (nhận cả email hoặc username) */}
               <div className="space-y-2">
                 <Label htmlFor="identifier">Email hoặc Username của bạn</Label>
                 <Input
@@ -310,6 +346,7 @@ export default function LoginRoute() {
                     autoComplete="new-password" // Trick để trình duyệt nghĩ đây là mk mới, không điền mk cũ
                     className="h-11 pr-10"
                   />
+                  {/* Nút toggle hiển thị mật khẩu */}
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
@@ -325,7 +362,7 @@ export default function LoginRoute() {
                   </button>
                 </div>
               </div>
-
+              {/* Submit Button */}
               <Button
                 type="submit"
                 disabled={isLoading}
@@ -338,7 +375,7 @@ export default function LoginRoute() {
                 )}
               </Button>
             </form>
-
+            {/* Separator - Dòng ngăn cách giữa form đăng nhập và Google */}
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <Separator />
@@ -349,7 +386,7 @@ export default function LoginRoute() {
                 </span>
               </div>
             </div>
-
+            {/* Google Sign-in Button */}
             <Button
               type="button"
               variant="outline"
@@ -360,6 +397,7 @@ export default function LoginRoute() {
               onClick={signInWithGoogle}
               disabled={isLoading}
             >
+              {/* Google Icon SVG */}
               <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
                 <path
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -380,7 +418,7 @@ export default function LoginRoute() {
               </svg>
               Đăng nhập với Google
             </Button>
-
+            {/* Links đến các trang khác */}
             <div className="text-center text-sm text-muted-foreground space-y-2">
               <p>
                 Chưa có tài khoản?{" "}

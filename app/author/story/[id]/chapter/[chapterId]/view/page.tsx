@@ -1,4 +1,31 @@
 // app/author/story/[id]/chapter/[chapterId]/view/page.tsx
+/**
+ * TRANG XEM CHƯƠNG TRUYỆN (CHẾ ĐỘ READONLY - VIEW ONLY)
+ *
+ * MỤC ĐÍCH:
+ * - Hiển thị chi tiết chương truyện ở chế độ chỉ xem, không chỉnh sửa được
+ * - Tập trung vào việc trình bày thông tin đầy đủ cho tác giả review
+ *
+ * CHỨC NĂNG CHÍNH:
+ * 1. Hiển thị đầy đủ thông tin chương (tiêu đề, số chương, trạng thái, số từ/ký tự, ngày tạo/xuất bản)
+ * 2. Tự động phát hiện và hiển thị định dạng nội dung (HTML, Markdown, Plain text)
+ * 3. Hiển thị kết quả đánh giá AI với component AiModerationReport
+ * 4. Tích hợp tính năng Voice AI (chỉ cho tác giả từ rank Bronze trở lên)
+ * 5. Cho phép tải xuống nội dung chương dưới dạng file .txt
+ * 6. Hiển thị thông tin kiểm duyệt từ Content Moderator
+ *
+ * ĐẶC ĐIỂM KHÁC BIỆT VỚI TRANG EDIT:
+ * - Không có chức năng chỉnh sửa
+ * - Có thêm tính năng Voice AI player
+ * - Có thể tải xuống nội dung
+ * - Hiển thị ribbon trạng thái trực quan
+ *
+ * ĐỐI TƯỢNG SỬ DỤNG: Tác giả (Author) muốn xem lại chương đã xuất bản hoặc đang chờ duyệt
+ * LIÊN KẾT VỚI FILE KHÁC:
+ * - Sử dụng `chapterService`, `profileService`, `voiceChapterService`
+ * - Sử dụng component `VoiceChapterPlayer` và `AiModerationReport`
+ * - Kế thừa UI components từ shadcn/ui
+ */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -38,10 +65,18 @@ import VoiceChapterPlayer from "@/components/author/VoiceChapterPlayer";
 import { profileService } from "@/services/profileService";
 import { voiceChapterService } from "@/services/voiceChapterService";
 import { AiModerationReport } from "@/components/AiModerationReport";
-// Base URL cho R2 bucket
+// Base URL cho R2 bucket (Cloudflare R2 storage) - nơi lưu file content
 const R2_BASE_URL = "https://pub-15618311c0ec468282718f80c66bcc13.r2.dev";
 
-// Hàm trích xuất phần tiếng Việt từ AI Feedback
+/**
+ * HÀM TRÍCH XUẤT PHẦN TIẾNG VIỆT TỪ AI FEEDBACK
+ *
+ * MỤC ĐÍCH: AI feedback có thể chứa nhiều ngôn ngữ, cần lấy phần tiếng Việt
+ * LOGIC: Tìm marker "Tiếng Việt:" và lấy phần sau đó
+ * INPUT: feedback string (có thể null)
+ * OUTPUT: string phần tiếng Việt hoặc null nếu không tìm thấy
+ * VÍ DỤ: "English: Good. Tiếng Việt: Tốt." → "Tốt."
+ */
 const extractVietnameseFeedback = (feedback: string | null): string | null => {
   if (!feedback) return null;
 
@@ -50,10 +85,16 @@ const extractVietnameseFeedback = (feedback: string | null): string | null => {
     return feedback.substring(vietnameseIndex + "Tiếng Việt:".length).trim();
   }
 
-  return feedback;
+  return feedback; // Nếu không có marker, trả về toàn bộ
 };
 
-// Custom components để style markdown
+/**
+ * CUSTOM COMPONENTS CHO REACT-MARKDOWN
+ *
+ * MỤC ĐÍCH: Style các thẻ markdown thành giao diện đẹp hơn
+ * LOGIC: Mỗi component nhận props và trả về JSX với className tương ứng
+ * SỬ DỤNG: Truyền vào ReactMarkdown thông qua prop "components"
+ */
 const markdownComponents = {
   h1: ({ node, ...props }: any) => (
     <h1
@@ -120,28 +161,51 @@ const markdownComponents = {
   ),
 };
 
-// Hàm phát hiện xem nội dung có phải là Markdown không
+/**
+ * HÀM PHÁT HIỆN NỘI DUNG CÓ PHẢI LÀ MARKDOWN KHÔNG
+ *
+ * MỤC ĐÍCH: Xác định định dạng nội dung để render phù hợp
+ * LOGIC: Kiểm tra các pattern đặc trưng của Markdown bằng regex
+ * PATTERNS KIỂM TRA:
+ * - **bold**, *italic*, ~~strikethrough~~
+ * - Headers (#, ##, ###)
+ * - Lists (-, 1., 2.)
+ * - Blockquotes (>)
+ * - Links [text](url)
+ *
+ * INPUT: content string
+ * OUTPUT: boolean (true nếu là markdown)
+ */
 const isMarkdownContent = (content: string): boolean => {
   if (!content) return false;
 
   const markdownPatterns = [
-    /\*\*.+?\*\*/,
-    /\*.+?\*/,
-    /~~.+?~~/,
-    /^#+\s+.+/m,
-    /^-\s+.+/m,
-    /^\d+\.\s+.+/m,
-    /^>\s+.+/m,
-    /\[.+\]\(.+\)/,
+    /\*\*.+?\*\*/, // **bold**
+    /\*.+?\*/, // *italic*
+    /~~.+?~~/, // ~~strikethrough~~
+    /^#+\s+.+/m, // headers (#, ##, ###)
+    /^-\s+.+/m, // unordered lists
+    /^\d+\.\s+.+/m, // ordered lists
+    /^>\s+.+/m, // blockquotes
+    /\[.+\]\(.+\)/, // links
   ];
-
+  // Nếu có bất kỳ pattern nào match → là markdown
   return markdownPatterns.some((pattern) => pattern.test(content));
 };
 
-// Hàm phát hiện xem nội dung có phải là HTML từ Rich Text Editor không
+/**
+ * HÀM PHÁT HIỆN NỘI DUNG CÓ PHẢI LÀ HTML TỪ RICH TEXT EDITOR
+ *
+ * MỤC ĐÍCH: Phân biệt HTML từ editor với plain text/markdown
+ * LOGIC: Kiểm tra sự tồn tại của các thẻ HTML cơ bản
+ * PATTERNS: Các thẻ HTML phổ biến từ Rich Text Editor (div, p, br, strong, etc.)
+ *
+ * INPUT: content string
+ * OUTPUT: boolean (true nếu là HTML)
+ */
 const isHTMLContent = (content: string): boolean => {
   if (!content) return false;
-
+  // Các thẻ HTML phổ biến từ Rich Text Editor
   const htmlPatterns = [
     /<div[^>]*>/i,
     /<p[^>]*>/i,
@@ -167,11 +231,20 @@ const isHTMLContent = (content: string): boolean => {
 
   const hasHTMLTag = htmlPatterns.some((pattern) => pattern.test(content));
   const hasClosingTag = /<\/[a-z][a-z0-9]*>/i.test(content);
-
+  // Nếu có thẻ HTML hoặc thẻ đóng → là HTML
   return hasHTMLTag || hasClosingTag;
 };
 
-// Hàm hiển thị nội dung HTML từ Rich Text Editor
+/**
+ * HÀM HIỂN THỊ NỘI DUNG HTML TỪ RICH TEXT EDITOR
+ *
+ * MỤC ĐÍCH: Render HTML content an toàn với dangerouslySetInnerHTML
+ * LOGIC: Sử dụng dangerouslySetInnerHTML nhưng đã được xác nhận an toàn từ backend
+ * CẢNH BÁO: Chỉ dùng với nội dung đã được sanitize từ backend
+ *
+ * INPUT: HTML content string
+ * OUTPUT: JSX element với HTML rendered
+ */
 const renderHTMLContent = (content: string) => {
   return (
     <div
@@ -180,34 +253,51 @@ const renderHTMLContent = (content: string) => {
         __html: content,
       }}
       style={{
-        whiteSpace: "pre-wrap",
-        wordWrap: "break-word",
+        whiteSpace: "pre-wrap", // Giữ ngắt dòng
+        wordWrap: "break-word", // Giữ ngắt dòng
       }}
     />
   );
 };
 
-// Hàm hiển thị nội dung với định dạng phù hợp
+/**
+ * HÀM HIỂN THỊ NỘI DUNG VỚI ĐỊNH DẠNG PHÙ HỢP
+ *
+ * MỤC ĐÍCH: Tự động detect và render nội dung theo đúng format
+ * LOGIC PHÂN LOẠI ƯU TIÊN:
+ * 1. HTML → từ rich text editor (ưu tiên cao nhất)
+ * 2. Markdown → có các pattern đặc trưng
+ * 3. Plain text → cuối cùng nếu không phải 2 loại trên
+ *
+ * INPUT: content string
+ * OUTPUT: JSX element được render phù hợp
+ */
 const renderContent = (content: string) => {
+  // Ưu tiên 1: Kiểm tra HTML (từ rich text editor)
   if (isHTMLContent(content)) {
     return renderHTMLContent(content);
+    // Ưu tiên 2: Kiểm tra Markdown
   } else if (isMarkdownContent(content)) {
     return (
       <div className="max-w-none">
         <ReactMarkdown components={markdownComponents}>{content}</ReactMarkdown>
       </div>
     );
+    // Cuối cùng: Plain text
   } else {
+    // Chia thành các đoạn văn (paragraphs) dựa trên \n\n
     const paragraphs = content.split("\n\n").filter((p) => p.trim().length > 0);
 
     return (
       <div className="text-gray-700 dark:text-gray-300 leading-relaxed">
         {paragraphs.map((paragraph, index) => (
           <p key={index} className="mb-4">
+            {/* Xử lý ngắt dòng trong đoạn văn (\n → <br/>) */}
             {paragraph.split("\n").map((line, lineIndex, lines) => (
               <span key={lineIndex}>
                 {line}
-                {lineIndex < lines.length - 1 && <br />}
+                {lineIndex < lines.length - 1 && <br />}{" "}
+                {/* Thêm <br> nếu không phải dòng cuối */}
               </span>
             ))}
           </p>
@@ -216,20 +306,37 @@ const renderContent = (content: string) => {
     );
   }
 };
-
+/**
+ * COMPONENT CHÍNH: AuthorChapterViewPage
+ *
+ * MỤC ĐÍCH: Trang xem chương ở chế độ readonly
+ * KHÁC BIỆT VỚI TRANG EDIT:
+ * - Không có chức năng edit
+ * - Có thể mua voice AI
+ * - Có ribbon trạng thái đẹp
+ */
 export default function AuthorChapterViewPage() {
+  // Lấy params từ URL
   const params = useParams();
   const router = useRouter();
   const storyId = params.id as string;
   const chapterId = params.chapterId as string;
-  const [authorRank, setAuthorRank] = useState<string>("Casual");
-  const [rankLoading, setRankLoading] = useState(true);
-  const [chapter, setChapter] = useState<ChapterDetails | null>(null);
-  const [chapterContent, setChapterContent] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // STATE QUẢN LÝ
+  const [authorRank, setAuthorRank] = useState<string>("Casual"); // Rank của tác giả
+  const [rankLoading, setRankLoading] = useState(true); // Đang tải rank
+  const [chapter, setChapter] = useState<ChapterDetails | null>(null); // Dữ liệu chapter
+  const [chapterContent, setChapterContent] = useState<string | null>(null); // Nội dung chapter
+  const [isLoading, setIsLoading] = useState(true); // Đang tải chính
 
-  const [isLoadingContent, setIsLoadingContent] = useState(false);
-  const [voicePrice, setVoicePrice] = useState<number | null>(null);
+  const [isLoadingContent, setIsLoadingContent] = useState(false); // Đang tải content
+  const [voicePrice, setVoicePrice] = useState<number | null>(null); // Giá voice AI
+
+  /**
+   * HÀM XỬ LÝ LỖI API THỐNG NHẤT (giống file edit)
+   *
+   * MỤC ĐÍCH: Xử lý lỗi từ API response theo cấu trúc thống nhất
+   * FLOW: Tương tự hàm trong file edit
+   */
   const handleApiError = (error: any, defaultMessage: string) => {
     // 1. Check lỗi Validation/Logic từ Backend
     if (error.response && error.response.data && error.response.data.error) {
@@ -258,46 +365,66 @@ export default function AuthorChapterViewPage() {
     toast.error(fallbackMsg);
   };
   // -------------------
-
+  /**
+   * useEffect 1: LẤY RANK CỦA TÁC GIẢ
+   *
+   * MỤC ĐÍCH: Xác định quyền sử dụng tính năng Audio AI
+   * LOGIC: Chỉ tác giả từ rank Bronze trở lên mới được dùng Voice AI
+   * DEPENDENCIES: [] → chỉ chạy 1 lần khi component mount
+   */
   useEffect(() => {
     profileService.getAuthorRank().then((rank) => {
       setAuthorRank(rank);
       setRankLoading(false);
     });
   }, []);
+  /**
+   * useEffect 2: TẢI THÔNG TIN CHƯƠNG KHI storyId HOẶC chapterId THAY ĐỔI
+   *
+   * MỤC ĐÍCH: Load dữ liệu chapter khi vào trang hoặc chuyển chapter
+   * DEPENDENCIES: [storyId, chapterId] → chạy lại khi ID thay đổi
+   */
   useEffect(() => {
     loadChapter();
   }, [storyId, chapterId]);
 
+  /**
+   * HÀM TẢI THÔNG TIN CHƯƠNG CHÍNH
+   *
+   * MỤC ĐÍCH: Load tất cả dữ liệu liên quan đến chapter
+   * LOGIC ƯU TIÊN TẢI NỘI DUNG:
+   * 1. Lấy thông tin chương từ API (metadata)
+   * 2. Lấy giá voice AI nếu có
+   * 3. Tải nội dung: ưu tiên từ database, fallback từ contentPath
+   */
   const loadChapter = async () => {
     setIsLoading(true);
     try {
-      // --- (Lấy thông tin chương) ---
+      // --- (1) Lấy thông tin chương ---
       const chapterData = await chapterService.getChapterDetails(
         storyId,
         chapterId
       );
       setChapter(chapterData);
+
       // Đoạn này chèn vào giữa lúc lấy thông tin chương và lúc xử lý nội dung
+      // --- (2) Lấy thông tin voice AI ---
       const voiceData = await voiceChapterService
         .getVoiceChapter(chapterId)
-        .catch(() => null);
+        .catch(() => null); // Bắt lỗi nếu không có voice
       setVoicePrice(voiceData?.voices?.[0]?.priceDias ?? null);
 
-      // ƯU TIÊN SỬ DỤNG NỘI DUNG TỪ DATABASE TRƯỚC
+      // --- (3) Tải nội dung với logic ưu tiên ---
+      // ƯU TIÊN 1: Nội dung từ database
       if (chapterData.content) {
         setChapterContent(chapterData.content);
+        // ƯU TIÊN 2: Nội dung từ file (contentPath)
       } else if (chapterData.contentPath) {
         await loadChapterContent(chapterData.contentPath);
+        // Không có nội dung
       } else {
         setChapterContent("");
       }
-      // } catch (error: any) {
-      //   console.error("Error loading chapter:", error);
-      //   toast.error(error.message || "Không thể tải thông tin chương");
-      // } finally {
-      //   setIsLoading(false);
-      // }
     } catch (error: any) {
       // --- DÙNG HELPER ---
       handleApiError(error, "Không thể tải thông tin chương");
@@ -306,16 +433,29 @@ export default function AuthorChapterViewPage() {
     }
   };
 
+  /**
+   * HÀM TẢI NỘI DUNG CHƯƠNG TỪ FILE (contentPath)
+   *
+   * MỤC ĐÍCH: Load content từ external storage (R2 bucket) thông qua API proxy
+   * LOGIC:
+   * 1. Gọi API proxy `/api/chapter-content` với path parameter
+   * 2. Xử lý HTTP errors (404, 500, etc.)
+   * 3. Fallback về content trong DB nếu file không tìm thấy
+   *
+   * INPUT: contentPath (string) - đường dẫn file trong storage
+   */
   const loadChapterContent = async (contentPath: string) => {
     setIsLoadingContent(true);
     try {
+      // Gọi API proxy để lấy nội dung từ file (tránh CORS)
       const apiUrl = `/api/chapter-content?path=${encodeURIComponent(
         contentPath
       )}`;
 
       const response = await fetch(apiUrl);
-
+      // Xử lý HTTP errors
       if (!response.ok) {
+        // Nếu 404 và có nội dung trong DB → dùng nội dung DB
         if (response.status === 404) {
           if (chapter?.content) {
             setChapterContent(chapter.content);
@@ -329,20 +469,21 @@ export default function AuthorChapterViewPage() {
       }
 
       const data = await response.json();
-
+      // Xử lý lỗi từ API response
       if (data.error) {
         throw new Error(data.error);
       }
-
+      // Cập nhật nội dung
       setChapterContent(data.content);
     } catch (error: any) {
       console.error("Error loading chapter content:", error);
-
+      // Xử lý các loại lỗi
       if (
         error.message.includes("404") ||
         error.message.includes("not found") ||
         error.message.includes("Không tìm thấy")
       ) {
+        // Fallback về nội dung trong database
         if (chapter?.content) {
           setChapterContent(chapter.content);
           toast.warning("Sử dụng nội dung từ database");
@@ -359,28 +500,49 @@ export default function AuthorChapterViewPage() {
     }
   };
 
+  /**
+   * HÀM TẢI NỘI DUNG CHƯƠNG VỀ MÁY
+   *
+   * MỤC ĐÍCH: Export nội dung chương thành file .txt để download
+   * LOGIC:
+   * 1. Tạo Blob từ nội dung với type "text/plain"
+   * 2. Tạo URL object từ Blob
+   * 3. Tạo thẻ <a> ẩn để trigger download
+   * 4. Cleanup sau khi download
+   */
   const handleDownloadContent = () => {
     if (!chapterContent || !chapter) return;
 
+    // Tạo blob từ nội dung với MIME type text/plain
     const blob = new Blob([chapterContent], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
+
+    // Tạo thẻ a ẩn để trigger download
     const a = document.createElement("a");
     a.href = url;
     a.download = `${chapter.title}.txt` || `chapter-${chapter.chapterNo}.txt`;
     document.body.appendChild(a);
-    a.click();
+    a.click(); // Trigger download
+
+    // Dọn dẹp DOM và revoke URL
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
-
+  /**
+   * HÀM ĐIỀU HƯỚNG QUAY LẠI DANH SÁCH CHƯƠNG
+   */
   const handleBackToChapters = () => {
     router.push(`/author/story/${storyId}/chapters`);
   };
-
+  /**
+   * HÀM ĐIỀU HƯỚNG QUAY LẠI TRANG TRUYỆN
+   */
   const handleBackToStory = () => {
     router.push(`/author/story/${storyId}`);
   };
-
+  /**
+   * HIỂN THỊ LOADING SPINNER KHI ĐANG TẢI DỮ LIỆU CHÍNH
+   */
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -389,6 +551,9 @@ export default function AuthorChapterViewPage() {
     );
   }
 
+  /**
+   * HIỂN THỊ THÔNG BÁO NẾU KHÔNG TÌM THẤY CHƯƠNG
+   */
   if (!chapter) {
     return (
       <div className="text-center py-16">
@@ -399,13 +564,19 @@ export default function AuthorChapterViewPage() {
       </div>
     );
   }
-
-  // Trích xuất phần tiếng Việt từ AI Feedback
+  /**
+   * TRÍCH XUẤT PHẦN TIẾNG VIỆT TỪ AI FEEDBACK
+   */
   const vietnameseFeedback = chapter
     ? extractVietnameseFeedback(chapter.aiFeedback ?? null)
     : null;
 
-  // Xác định loại nội dung để hiển thị thông báo
+  /**
+   * HÀM XÁC ĐỊNH LOẠI NỘI DUNG ĐỂ HIỂN THỊ THÔNG BÁO
+   *
+   * MỤC ĐÍCH: Hiển thị cho user biết content đang được render ở chế độ nào
+   * OUTPUT: String mô tả định dạng content
+   */
   const getContentType = () => {
     if (!chapterContent) return "";
     if (isMarkdownContent(chapterContent))
@@ -414,10 +585,10 @@ export default function AuthorChapterViewPage() {
       return "Đang hiển thị ở chế độ Rich Text";
     return "Đang hiển thị ở chế độ văn bản thuần";
   };
-
+  // RENDER GIAO DIỆN CHÍNH
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-8">
-      {/* Header */}
+      {/* HEADER với nút quay lại */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" onClick={handleBackToStory}>
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -431,7 +602,7 @@ export default function AuthorChapterViewPage() {
           </p>
         </div>
       </div>
-      {/* Chapter Info */}
+      {/* CARD THÔNG TIN CHƯƠNG với ribbon trạng thái */}
       <Card className="relative overflow-hidden">
         <CardHeader className="pt-0 pb-2">
           <div className="flex items-start justify-between">
@@ -483,13 +654,14 @@ export default function AuthorChapterViewPage() {
 
             {/* === PHẦN RUY BĂNG (RIBBON) === */}
             {(() => {
+              // Cấu hình mặc định: Bản nháp
               let statusConfig = {
                 label: "Bản nháp",
                 bgColor: "bg-slate-500",
                 shadowColor: "text-slate-700",
                 Icon: FileText,
               };
-
+              // Thay đổi cấu hình theo trạng thái
               if (chapter?.status === "published") {
                 statusConfig = {
                   label: "Đã xuất bản",
@@ -521,6 +693,7 @@ export default function AuthorChapterViewPage() {
                       text-white font-bold text-xs shadow-lg transition-all
                       ${statusConfig.bgColor}
                     `}
+                    // CSS clip-path tạo hình ruy băng (đuôi cá)
                     style={{
                       clipPath:
                         "polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%)",
@@ -540,7 +713,7 @@ export default function AuthorChapterViewPage() {
 
         {/* Đường kẻ phân cách */}
         <div className="w-full h-[1px] -mt-6 bg-[#00416a] dark:bg-[#f0ead6]" />
-
+        {/* Nội dung chi tiết chương - 3 cột */}
         <CardContent className="grid md:grid-cols-3 gap-x-4 gap-y-6">
           {/* === CỘT 1 === */}
           <div className="space-y-6">
@@ -615,7 +788,7 @@ export default function AuthorChapterViewPage() {
                 )}
               </div>
             </div>
-            {/* Trạng thái AI (Thêm vào cho giống mẫu) */}
+            {/* Trạng thái AI  */}
             {chapter?.aiResult && (
               <div>
                 <p className="text-sm text-slate-400 mb-1">Trạng thái AI</p>

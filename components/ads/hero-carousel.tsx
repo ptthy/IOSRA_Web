@@ -8,6 +8,10 @@ type Props = {
   className?: string;
 };
 
+/**
+ * Dữ liệu các slide cho carousel
+ * Mỗi slide có: id, tiêu đề, phụ đề, mô tả, gradient background và icon
+ */
 const slides = [
   {
     id: 1,
@@ -36,37 +40,60 @@ const slides = [
 ];
 
 export function HeroCarousel() {
+  /**
+   * State quản lý slide hiện tại (bắt đầu từ 0)
+   * isHovered để kiểm tra người dùng có đang hover không (dừng auto slide)
+   */
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
-
+  /**
+   * Effect xử lý auto slide:
+   * - Chỉ chạy khi KHÔNG hover (isHovered = false)
+   * - Tự động chuyển slide mỗi 5 giây
+   * - Sử dụng toán tử % để quay vòng (0 → 1 → 2 → 0...)
+   */
   useEffect(() => {
     if (!isHovered) {
       const timer = setInterval(() => {
         setCurrentSlide((prev) => (prev + 1) % slides.length);
       }, 5000); // Chuyển slide mỗi 5 giây
-
+      // Cleanup: xóa timer khi component unmount hoặc dependency thay đổi
       return () => clearInterval(timer);
     }
   }, [isHovered]);
-
+  /**
+   * Hàm chuyển đến slide cụ thể theo index
+   */
   const goToSlide = (index: number) => {
     setCurrentSlide(index);
   };
-
+  /**
+   * Hàm chuyển đến slide trước đó
+   * Sử dụng (prev - 1 + slides.length) % slides.length để xử lý quay vòng
+   * Khi ở slide 0, nhấn Previous sẽ chuyển đến slide cuối cùng
+   */
   const goToPrevious = () => {
     setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
   };
-
+  /**
+   * Hàm chuyển đến slide tiếp theo
+   * Sử dụng (prev + 1) % slides.length để xử lý quay vòng
+   * Khi ở slide cuối, nhấn Next sẽ chuyển về slide đầu
+   */
   const goToNext = () => {
     setCurrentSlide((prev) => (prev + 1) % slides.length);
   };
-
+  // Lấy thông tin slide hiện tại và icon tương ứng
   const slide = slides[currentSlide];
   const Icon = slide.icon;
 
   return (
     <div
       className="relative w-full overflow-hidden rounded-2xl shadow-xl"
+      /**
+       * Khi hover vào carousel, set isHovered = true → dừng auto slide
+       * Khi rời khỏi, set isHovered = false → tiếp tục auto slide
+       */
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -74,7 +101,7 @@ export function HeroCarousel() {
       <div
         className={`relative bg-gradient-to-br ${slide.gradient} p-8 md:p-12 transition-all duration-500`}
       >
-        {/* Decorative background elements */}
+        {/* Decorative background elements - hiệu ứng blur cho đẹp */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-3xl" />
 
@@ -111,7 +138,7 @@ export function HeroCarousel() {
         <ChevronRight className="h-5 w-5 text-white group-hover:scale-110 transition-transform" />
       </button>
 
-      {/* Dots Indicator */}
+      {/* Dots Indicator - hiển thị vị trí các slide */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
         {slides.map((_, index) => (
           <button
@@ -119,8 +146,8 @@ export function HeroCarousel() {
             onClick={() => goToSlide(index)}
             className={`transition-all ${
               index === currentSlide
-                ? "w-8 h-2 bg-white"
-                : "w-2 h-2 bg-white/50 hover:bg-white/70"
+                ? "w-8 h-2 bg-white" // Dot của slide hiện tại: dài hơn, màu đậm
+                : "w-2 h-2 bg-white/50 hover:bg-white/70" // Dot thường: nhỏ hơn, mờ hơn
             } rounded-full`}
           />
         ))}

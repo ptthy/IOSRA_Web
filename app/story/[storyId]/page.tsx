@@ -55,7 +55,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { StatusRibbon } from "@/components/StatusRibbon";
-// Component ImageWithFallback
+/**
+ * COMPONENT IMAGE WITH FALLBACK
+ *
+ * MỤC ĐÍCH: Hiển thị ảnh với cơ chế fallback khi lỗi
+ * LOGIC XỬ LÝ:
+ * 1. Theo dõi state imageError để biết ảnh có load được không
+ * 2. Nếu lỗi -> hiển thị ảnh placeholder (base64 SVG)
+ * 3. Nếu không lỗi -> hiển thị ảnh gốc
+ * 4. Bắt sự kiện onError để cập nhật trạng thái lỗi
+ *
+ * THAM SỐ:
+ * - src: URL ảnh gốc
+ * - alt: Text thay thế khi ảnh lỗi
+ * - className: CSS class tùy chỉnh
+ */
 function ImageWithFallback({
   src,
   alt,
@@ -95,11 +109,47 @@ function ImageWithFallback({
 }
 
 type SortOption = "newest" | "oldest";
-
+/**
+ * COMPONENT CHÍNH: TRANG CHI TIẾT TRUYỆN
+ *
+ * MỤC ĐÍCH: Hiển thị đầy đủ thông tin về một truyện cụ thể
+ * CHỨC NĂNG CHÍNH:
+ * 1. Hiển thị thông tin truyện (ảnh bìa, tiêu đề, tác giả, mô tả)
+ * 2. Quản lý danh sách chương với sắp xếp (mới/cũ)
+ * 3. Xử lý rating/đánh giá truyện
+ * 4. Quản lý hệ thống bình luận (thêm, xóa, sửa, reply, like/dislike)
+ * 5. Xử lý report (báo cáo truyện, chương, bình luận)
+ * 6. Theo dõi trạng thái yêu thích
+ *
+ * FLOW DỮ LIỆU:
+ * 1. Lấy storyId từ URL params
+ * 2. Fetch dữ liệu truyện, chương, rating, comment (song song)
+ * 3. Render giao diện với tabs (Chapters/Ratings/Comments)
+ * 4. Xử lý tương tác người dùng (đọc truyện, bình luận, report)
+ */
 export default function StoryDetailPage() {
   const router = useRouter();
   const params = useParams();
   const storyId = params.storyId as string;
+  /**
+   * HÀM XỬ LÝ LỖI API THỐNG NHẤT
+   *
+   * LOGIC XỬ LÝ LỖI THEO THỨ TỰ ƯU TIÊN:
+   * 1. Kiểm tra lỗi validation từ backend (có details)
+   *    -> Lấy lỗi đầu tiên từ object details
+   * 2. Kiểm tra message từ backend
+   * 3. Fallback: Lấy message từ response hoặc dùng defaultMessage
+   *
+   * VÍ DỤ RESPONSE LỖI TỪ BACKEND:
+   * {
+   *   error: {
+   *     message: "Invalid input",
+   *     details: {
+   *       content: ["Nội dung không được để trống"]
+   *     }
+   *   }
+   * }
+   */
   const handleApiError = (err: any, defaultMessage: string) => {
     if (err.response && err.response.data && err.response.data.error) {
       const { message, details } = err.response.data.error;
@@ -121,7 +171,7 @@ export default function StoryDetailPage() {
     toast.error(err.response?.data?.message || defaultMessage);
   };
   const { user } = useAuth();
-
+  // STATE QUẢN LÝ DỮ LIỆU VÀ TRẠNG THÁI
   const [story, setStory] = useState<Story | null>(null);
   const [chapters, setChapters] = useState<ChapterSummary[]>([]);
   const [comments, setComments] = useState<ChapterComment[]>([]);
@@ -141,12 +191,18 @@ export default function StoryDetailPage() {
     id: string;
     title: string;
   } | null>(null);
-  //  THÊM: State để kiểm tra chế độ tối
+  //  State để kiểm tra chế độ tối
   const [isDarkTheme, setIsDarkTheme] = useState(false);
-
+  /**
+   * EFFECT KIỂM TRA CHẾ ĐỘ TỐI
+   *
+   * LOGIC:
+   * 1. Kiểm tra class 'dark' trên thẻ html
+   * 2. Hoặc kiểm tra system preference (prefers-color-scheme: dark)
+   * 3. Lắng nghe thay đổi class của html để cập nhật real-time
+   * 4. Sử dụng MutationObserver để theo dõi thay đổi
+   */
   useEffect(() => {
-    // Logic đơn giản để check theme (bạn có thể thay bằng hook theme của bạn)
-    // Kiểm tra class 'dark' trên html hoặc system preference
     const checkTheme = () => {
       const isDark =
         document.documentElement.classList.contains("dark") ||
@@ -162,11 +218,25 @@ export default function StoryDetailPage() {
     });
     return () => observer.disconnect();
   }, []);
-  // --- BỔ SUNG: Luôn cuộn lên đầu khi vừa vào trang hoặc đổi storyId ---
+  /**
+   * EFFECT CUỘN LÊN ĐẦU KHI VÀO TRANG
+   *
+   * MỤC ĐÍCH: Đảm bảo khi người dùng vào trang hoặc chuyển truyện
+   *           luôn bắt đầu từ đầu trang
+   *
+   * CHẠY KHI: storyId thay đổi (người dùng xem truyện khác)
+   */
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [storyId]);
-  //   Hàm xử lý khi bấm nút Report ở CommentItem
+  /**
+   * HÀM XỬ LÝ REPORT COMMENT
+   *
+   * FLOW:
+   * 1. Nhận comment object từ CommentItem
+   * 2. Set reportTarget với type="comment"
+   * 3. Mở modal report
+   */
   const handleReportComment = (comment: ChapterComment) => {
     setReportTarget({
       type: "comment",
@@ -176,7 +246,19 @@ export default function StoryDetailPage() {
     setShowReportModal(true);
   };
 
-  // --- Helper Recursive Functions ---
+  // --- HELPER RECURSIVE FUNCTIONS CHO COMMENTS ---
+
+  /**
+   * HÀM ĐỆ QUY CẬP NHẬT COMMENT
+   *
+   * MỤC ĐÍCH: Tìm và cập nhật nội dung comment trong cây comments
+   *
+   * THUẬT TOÁN:
+   * 1. Duyệt qua từng comment trong list
+   * 2. Nếu tìm thấy commentId trùng -> cập nhật content
+   * 3. Nếu comment có replies -> gọi đệ quy để tìm trong replies
+   * 4. Trả về list mới với comment đã cập nhật
+   */
   const updateCommentRecursive = (
     list: ChapterComment[],
     id: string,
@@ -193,7 +275,14 @@ export default function StoryDetailPage() {
       return c;
     });
   };
-
+  /**
+   * HÀM ĐỆ QUY XÓA COMMENT
+   *
+   * THUẬT TOÁN:
+   * 1. Filter bỏ comment có id trùng khớp
+   * 2. Với các comment còn lại, kiểm tra nếu có replies
+   * 3. Gọi đệ quy để xóa comment trong replies
+   */
   const deleteCommentRecursive = (
     list: ChapterComment[],
     id: string
@@ -207,6 +296,18 @@ export default function StoryDetailPage() {
       });
   };
 
+  /**
+   * HÀM ĐỆ QUY THÊM REPLY VÀO COMMENT
+   *
+   * MỤC ĐÍCH: Thêm reply mới vào đúng vị trí parent comment
+   *
+   * LOGIC:
+   * 1. Duyệt qua list comments
+   * 2. Tìm parentId trùng -> thêm newReply vào đầu mảng replies
+   * 3. Nếu không tìm thấy -> tiếp tục tìm trong replies (đệ quy)
+   *
+   * LƯU Ý: Thêm vào đầu mảng để hiển thị reply mới nhất lên trước
+   */
   const addReplyToState = (
     comments: ChapterComment[],
     parentId: string,
@@ -228,7 +329,15 @@ export default function StoryDetailPage() {
       return c;
     });
   };
-
+  /**
+   * HÀM TÌM COMMENT THEO ID (ĐỆ QUY)
+   *
+   * THUẬT TOÁN TÌM KIẾM THEO CHIỀU SÂU (DFS):
+   * 1. Duyệt qua từng comment
+   * 2. Nếu commentId trùng -> return comment
+   * 3. Nếu có replies -> gọi đệ quy để tìm trong replies
+   * 4. Return null nếu không tìm thấy
+   */
   const findCommentById = (
     comments: ChapterComment[],
     id: string
@@ -242,7 +351,20 @@ export default function StoryDetailPage() {
     }
     return null;
   };
-  // Load Data
+  /**
+   * EFFECT LOAD DỮ LIỆU CHÍNH (TRUYỆN, CHƯƠNG, RATING)
+   *
+   * FLOW:
+   * 1. Set loading = true
+   * 2. Gọi 3 API song song (Promise.all):
+   *    - Lấy thông tin truyện
+   *    - Lấy danh sách chương
+   *    - Lấy rating truyện
+   * 3. Thử lấy tổng số comment (optional)
+   * 4. Set state và loading = false
+   *
+   * CHẠY KHI: storyId thay đổi
+   */
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -260,7 +382,7 @@ export default function StoryDetailPage() {
         setStory(storyData);
         setChapters(chaptersData.items);
         setStoryRating(ratingData);
-
+        // Lấy tổng số comments (optional, có thể bỏ qua nếu lỗi)
         try {
           const commentsResponse =
             await chapterCommentService.getCommentsByStory(storyId, {
@@ -279,11 +401,28 @@ export default function StoryDetailPage() {
     };
     if (storyId) loadData();
   }, [storyId]);
-
+  /**
+   * EFFECT LOAD COMMENTS KHI CHUYỂN TAB
+   *
+   * CHẠY KHI:
+   * - storyId thay đổi
+   * - activeTab = "comments"
+   * - selectedChapter thay đổi
+   */
   useEffect(() => {
     if (storyId && activeTab === "comments") loadComments();
   }, [storyId, activeTab, selectedChapter]);
-
+  /**
+   * HÀM LOAD COMMENTS PHÂN TRANG
+   *
+   * LOGIC PHÂN TRANG:
+   * 1. Nếu page = 1 -> reset comments (load mới)
+   * 2. Nếu page > 1 -> append thêm comments vào cuối
+   * 3. Kiểm tra hasMoreComments: nếu API trả về đủ pageSize (20) -> còn dữ liệu
+   *
+   * FILTER THEO CHAPTER:
+   * - Nếu selectedChapter !== "all" -> thêm chapterId vào query
+   */
   const loadComments = async (page: number = 1) => {
     if (!storyId) return;
     setCommentsLoading(true);
@@ -313,7 +452,22 @@ export default function StoryDetailPage() {
     }
   };
 
-  //  FIX QUAN TRỌNG: Handle Add Comment có hỗ trợ ParentId (Reply)
+  /**
+   * FIX QUAN TRỌNG: XỬ LÝ THÊM COMMENT VÀ REPLY
+   *
+   * 2 TRƯỜNG HỢP:
+   * 1. REPLY COMMENT (có parentCommentId):
+   *    - Tìm parent comment trong state
+   *    - Gọi API tạo reply với parentCommentId
+   *    - Cập nhật state bằng addReplyToState (đệ quy)
+   *
+   * 2. ROOT COMMENT (không có parent):
+   *    - Xác định chapterId mục tiêu:
+   *        + Nếu đã chọn chapter cụ thể -> dùng chapter đó
+   *        + Nếu "all" -> dùng chapter đầu tiên của truyện
+   *    - Gọi API tạo comment root
+   *    - Thêm vào đầu mảng comments
+   */
   const handleAddComment = async (
     content: string,
     parentCommentId?: string
@@ -365,7 +519,15 @@ export default function StoryDetailPage() {
       throw error;
     }
   };
-
+  /**
+   * HÀM CẬP NHẬT COMMENT
+   *
+   * FLOW:
+   * 1. Tìm comment trong state
+   * 2. Gọi API update
+   * 3. Cập nhật state với updateCommentRecursive
+   * 4. Throw error nếu lỗi để CommentSection xử lý UI
+   */
   const handleUpdateComment = async (commentId: string, content: string) => {
     try {
       const comment = findCommentById(comments, commentId);
@@ -385,7 +547,15 @@ export default function StoryDetailPage() {
       throw error;
     }
   };
-
+  /**
+   * HÀM XÓA COMMENT
+   *
+   * FLOW:
+   * 1. Tìm comment trong state
+   * 2. Gọi API delete
+   * 3. Cập nhật state với deleteCommentRecursive
+   * 4. Giảm totalComments
+   */
   const handleDeleteComment = async (commentId: string) => {
     try {
       const comment = findCommentById(comments, commentId);
@@ -401,8 +571,19 @@ export default function StoryDetailPage() {
     }
   };
 
-  // Reaction Logic (Giữ nguyên logic recursive của bạn)
-  const updateReactionRecursive = (
+  /**
+   * HÀM ĐỆ QUY CẬP NHẬT REACTION (LIKE/DISLIKE)
+   *
+   * LOGIC TOGGLE REACTION:
+   * 1. Like hiện tại:
+   *    - Đang like -> bỏ like (giảm likeCount)
+   *    - Đang dislike -> chuyển sang like (tăng likeCount, giảm dislikeCount)
+   *    - Chưa có reaction -> tăng likeCount
+   *
+   * 2. Dislike hiện tại: tương tự
+   *
+   * 3. Remove reaction: giảm count tương ứng
+   */ const updateReactionRecursive = (
     list: ChapterComment[],
     commentId: string,
     reactionType: "like" | "dislike" | null
@@ -449,7 +630,7 @@ export default function StoryDetailPage() {
       return comment;
     });
   };
-
+  // Các hàm xử lý reaction (like, dislike, remove)
   const handleLikeComment = async (commentId: string) => {
     try {
       const comment = findCommentById(comments, commentId);
@@ -507,12 +688,24 @@ export default function StoryDetailPage() {
     setSelectedChapter(id);
     setCommentsPage(1);
   };
-
+  /**
+   * HÀM LẤY CHAPTER ĐẦU TIÊN
+   *
+   * LOGIC: Sắp xếp theo chapterNo tăng dần, lấy phần tử đầu tiên
+   */
   const getFirstChapter = () => {
     if (chapters.length === 0) return null;
     return [...chapters].sort((a, b) => a.chapterNo - b.chapterNo)[0];
   };
-
+  /**
+   * SẮP XẾP CHAPTERS VỚI useMemo
+   *
+   * TỐI ƯU HIỆU NĂNG: Chỉ tính toán lại khi chapters hoặc sortOption thay đổi
+   *
+   * LOGIC SẮP XẾP:
+   * - newest: Theo publishedAt giảm dần (mới nhất lên đầu)
+   * - oldest: Theo publishedAt tăng dần (cũ nhất lên đầu)
+   */
   const sortedChapters = useMemo(() => {
     const copy = [...chapters];
     return sortOption === "newest"
@@ -527,7 +720,9 @@ export default function StoryDetailPage() {
             new Date(b.publishedAt).getTime()
         );
   }, [chapters, sortOption]);
-
+  /**
+   * HÀM CẬP NHẬT RATING SAU KHI NGƯỜI DÙNG ĐÁNH GIÁ
+   */
   const handleRatingUpdate = async () => {
     try {
       setStoryRating(await storyRatingApi.getStoryRating(storyId));
@@ -535,7 +730,9 @@ export default function StoryDetailPage() {
       console.error(e);
     }
   };
-
+  /**
+   * HÀM ĐIỀU HƯỚNG ĐẾN TRANG ĐỌC TRUYỆN
+   */
   const handleNavigate = (page: string, sId?: string, cId?: string) => {
     if (page === "/reader" && sId && cId) router.push(`/reader/${sId}/${cId}`);
     else if (page === "/") router.push("/");
@@ -545,6 +742,9 @@ export default function StoryDetailPage() {
     const first = getFirstChapter();
     if (first) handleNavigate("/reader", storyId, first.chapterId);
   };
+  /**
+   * HÀM XỬ LÝ REPORT
+   */
   const handleReportStory = () => {
     if (!story) return;
     setReportTarget({
@@ -585,14 +785,12 @@ export default function StoryDetailPage() {
   return (
     <div className="min-h-screen">
       <div className="max-w-6xl mx-auto space-y-6 pb-16 pt-6 px-4">
+        {/* CARD CHÍNH HIỂN THỊ THÔNG TIN TRUYỆN */}
         <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-card via-card to-muted/20">
           <CardContent className="p-0 relative">
-            <StatusRibbon status={story.status} />{" "}
-            {/* QUAN TRỌNG: Thêm 'relative' ở đây */}
-            {/*  KHỐI NÚT BÁO CÁO (Nằm ngay đầu CardContent) 👇 */}
+            <StatusRibbon status={story.status} /> {/* KHỐI NÚT BÁO CÁO */}
             <div className="absolute top-4 right-4 z-20">
               {" "}
-              {/* Tăng z-index lên 20 */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -621,7 +819,8 @@ export default function StoryDetailPage() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            {/* 👆 KẾT THÚC KHỐI NÚT BÁO CÁO 👆 */}
+            {/*  KẾT THÚC KHỐI NÚT BÁO CÁO  */}
+            {/* LAYOUT 2 CỘT: ẢNH BÌA + THÔNG TIN */}
             <div className="flex flex-col md:flex-row gap-8 p-6 md:p-8">
               <div className="flex-shrink-0">
                 <div className="relative w-full md:w-64 group">
@@ -634,7 +833,9 @@ export default function StoryDetailPage() {
                   </div>
                 </div>
               </div>
+              {/* CỘT PHẢI: THÔNG TIN CHI TIẾT */}
               <div className="flex-1 space-y-5">
+                {/* TIÊU ĐỀ VÀ TÁC GIẢ */}
                 <div>
                   <h1 className="text-xl md:text-3xl font-bold mb-3">
                     {story.title}
@@ -652,7 +853,7 @@ export default function StoryDetailPage() {
                     </span>
                   </div>
                 </div>
-
+                {/* TAGS VÀ PREMIUM BADGE */}
                 <div className="flex flex-wrap gap-2">
                   {story.tags?.map((tag: any) => (
                     <Badge
@@ -672,6 +873,7 @@ export default function StoryDetailPage() {
                   <div className="flex flex-wrap md:flex-nowrap items-center gap-y-4 gap-x-4 md:gap-x-8 py-4 border-y border-border/50">
                     {/* Ngôn ngữ */}
                     <div className="flex items-center gap-2.5 min-w-fit">
+                      {/* Stats content... */}
                       <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
                         <span className="text-[11px] font-bold text-primary uppercase">
                           {story.languageCode?.split("-")[0] || "VN"}
@@ -763,11 +965,13 @@ export default function StoryDetailPage() {
                   </div>
                   {/* ... more stats ... */}
                 </div>
+                {/* MÔ TẢ */}
                 <div>
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {story.description}
                   </p>
                 </div>
+                {/* NÚT HÀNH ĐỘNG */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-2">
                   <Button
                     size="lg"
@@ -788,7 +992,7 @@ export default function StoryDetailPage() {
             </div>
           </CardContent>
         </Card>
-
+        {/* TABS: CHAPTERS/RATINGS/COMMENTS */}
         <Card className="shadow-lg">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <CardHeader className="border-b">
@@ -827,6 +1031,7 @@ export default function StoryDetailPage() {
             </CardHeader>
 
             <CardContent className="p-0">
+              {/* TAB 1: DANH SÁCH CHƯƠNG */}
               <TabsContent value="chapters" className="m-0 p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="font-semibold text-lg">Danh sách chương</h3>
@@ -876,9 +1081,7 @@ export default function StoryDetailPage() {
                             </span>
                           </div>
                         </div>
-                        {/* {chapter.isLocked && (
-                          <Lock className="h-4 w-4 text-orange-500" />
-                        )} */}
+                        {/* HIỂN THỊ TRẠNG THÁI CHAPTER */}
                         {/* Chỉ hiện icon khóa nếu bị khóa VÀ CHƯA SỞ HỮU */}
                         {chapter.isLocked && !chapter.isOwned && (
                           <Lock className="h-4 w-4 text-orange-500" />
@@ -918,7 +1121,7 @@ export default function StoryDetailPage() {
                   </div>
                 )}
               </TabsContent>
-
+              {/* TAB 2: ĐÁNH GIÁ */}
               <TabsContent value="ratings" className="m-0 p-6">
                 {storyRating ? (
                   <>
@@ -929,7 +1132,7 @@ export default function StoryDetailPage() {
                   <p>Đang tải...</p>
                 )}
               </TabsContent>
-
+              {/* TAB 3: BÌNH LUẬN */}
               <TabsContent value="comments" className="m-0 p-6">
                 <CommentSection
                   comments={comments}
@@ -967,6 +1170,7 @@ export default function StoryDetailPage() {
           </Tabs>
         </Card>
       </div>
+      {/* MODALS */}
       <ReportModal
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}

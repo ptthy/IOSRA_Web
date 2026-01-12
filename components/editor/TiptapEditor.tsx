@@ -1,4 +1,41 @@
+//components/editor/TiptapEditor.tsx
+
 "use client";
+
+/**
+ * MỤC ĐÍCH: Component React chính cho rich text editor sử dụng Tiptap
+ * CHỨC NĂNG CỐT LÕI:
+ * 1. Khởi tạo và quản lý Tiptap editor instance với đầy đủ extensions
+ * 2. Cung cấp toolbar với các công cụ định dạng văn bản (bold, italic, headings, lists, etc.)
+ * 3. Tích hợp character counting với giới hạn tùy chỉnh
+ * 4. Hỗ trợ placeholder, typography improvements và link insertion
+ * 5. Quản lý state đồng bộ giữa editor và parent component
+ * 6. Hỗ trợ disabled mode và undo/redo operations
+ *
+ * KIẾN TRÚC COMPONENT:
+ * - Editor Core: useEditor hook với các extensions (StarterKit, Placeholder, CharacterCount, etc.)
+ * - Toolbar: Các button điều khiển định dạng được nhóm theo chức năng
+ * - Editor Content: Khu vực hiển thị và chỉnh sửa nội dung
+ * - Footer: Hiển thị thông tin đếm ký tự và số từ
+ *
+ * DATA FLOW:
+ * - Nhận content từ props (HTML string)
+ * - Cập nhật content qua callback onChange khi có thay đổi
+ * - Đồng bộ content từ props vào editor khi cần thiết
+ * - Quản lý editable state dựa trên disabled prop
+ *
+ * EXTENSIONS TÍCH HỢP:
+ * 1. StarterKit - Bộ extension cơ bản
+ * 2. Placeholder - Hiển thị gợi ý khi editor trống
+ * 3. CharacterCount - Đếm ký tự/từ và giới hạn
+ * 4. Typography - Cải thiện typography (smart quotes, etc.)
+ * 5. Link - Hỗ trợ chèn và quản lý liên kết
+ */
+
+/**
+ * Component TiptapEditor - Rich text editor sử dụng Tiptap
+ * Cho phép người dùng nhập và định dạng văn bản với nhiều tính năng
+ */
 
 import "./tiptap-editor.css";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -24,14 +61,22 @@ import {
 } from "lucide-react";
 import { useEffect } from "react";
 
+/**
+ * Props interface cho TiptapEditor component
+ * Định nghĩa các thuộc tính mà component nhận từ parent
+ */
 interface TiptapEditorProps {
-  content: string;
-  onChange: (html: string) => void;
-  placeholder?: string;
-  maxLength?: number;
-  disabled?: boolean;
+  content: string; // Nội dung HTML hiện tại
+  onChange: (html: string) => void; // Callback khi nội dung thay đổi
+  placeholder?: string; // Văn bản placeholder (mặc định: "Nhập nội dung...")
+  maxLength?: number; // Giới hạn số ký tự (mặc định: 10000)
+  disabled?: boolean; // Trạng thái vô hiệu hóa editor
 }
 
+/**
+ * Component chính TiptapEditor
+ * Quản lý editor state, toolbar và các chức năng định dạng
+ */
 export default function TiptapEditor({
   content,
   onChange,
@@ -39,15 +84,22 @@ export default function TiptapEditor({
   maxLength = 10000,
   disabled = false,
 }: TiptapEditorProps) {
+  /**
+   * Khởi tạo editor instance với Tiptap
+   * Cấu hình extensions, content và event handlers
+   */
   const editor = useEditor({
-    immediatelyRender: false,
+    immediatelyRender: false, // Không render ngay lập tức
+
+    // Các extensions (plugin) của Tiptap
     extensions: [
+      // StarterKit: bộ extension cơ bản
       StarterKit.configure({
         heading: {
-          levels: [1, 2, 3],
+          levels: [1, 2, 3], // Chỉ hỗ trợ heading 1, 2, 3
         },
         bulletList: {
-          keepMarks: true,
+          keepMarks: true, // Giữ các định dạng khi tạo danh sách
           keepAttributes: false,
         },
         orderedList: {
@@ -55,26 +107,37 @@ export default function TiptapEditor({
           keepAttributes: false,
         },
       }),
+
+      // Extension placeholder: hiển thị văn bản gợi ý
       Placeholder.configure({
         placeholder,
       }),
+      // Extension đếm ký tự: giới hạn và theo dõi số ký tự
       CharacterCount.configure({
         limit: maxLength,
       }),
+      // Extension typography: cải thiện typography (dấu ngoặc thông minh, etc.)
       Typography,
+      // Extension link: hỗ trợ chèn liên kết
       Link.configure({
-        openOnClick: false,
+        openOnClick: false, // Không mở link khi click
         HTMLAttributes: {
           class: "text-blue-600 underline cursor-pointer",
         },
       }),
     ],
-    content,
-    editable: !disabled,
+    content, // Nội dung khởi tạo
+    editable: !disabled, // Trạng thái có thể chỉnh sửa hay không
+
+    /**
+     * Event handler khi nội dung thay đổi
+     * Lấy HTML từ editor và gọi callback onChange
+     */
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
       onChange(html);
     },
+    // Props cho editor
     editorProps: {
       attributes: {
         class:
@@ -83,24 +146,35 @@ export default function TiptapEditor({
     },
   });
 
-  // Cập nhật content khi prop thay đổi từ bên ngoài
+  /**
+   * Effect: Cập nhật content khi prop thay đổi từ bên ngoài
+   * So sánh content mới với content hiện tại trong editor
+   * Chỉ cập nhật khi khác nhau để tránh vòng lặp vô hạn
+   */
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
       editor.commands.setContent(content);
     }
   }, [content, editor]);
 
-  // Cập nhật editable state
+  /**
+   * Effect: Cập nhật trạng thái editable khi disabled prop thay đổi
+   * Cho phép bật/tắt chế độ chỉnh sửa động
+   */
   useEffect(() => {
     if (editor) {
       editor.setEditable(!disabled);
     }
   }, [disabled, editor]);
-
+  // Hiển thị null nếu editor chưa khởi tạo xong
   if (!editor) {
     return null;
   }
-
+  /**
+   * Hàm thêm liên kết
+   * Hiển thị prompt để người dùng nhập URL
+   * Sử dụng chain() để thực hiện nhiều command liên tiếp
+   */
   const addLink = () => {
     const url = window.prompt("Nhập URL:");
     if (url) {
@@ -110,10 +184,11 @@ export default function TiptapEditor({
 
   return (
     <div className="border-2 border-primary/30 rounded-md overflow-hidden focus-within:border-primary">
-      {/* Toolbar */}
+      {/* Toolbar - Thanh công cụ định dạng */}
       <div className="border-b bg-muted/20 p-2">
         <div className="flex flex-wrap gap-1">
-          {/* Text formatting */}
+          {/* ========== ĐỊNH DẠNG VĂN BẢN ========== */}
+          {/* Nút In đậm */}
           <Button
             type="button"
             variant={editor.isActive("bold") ? "default" : "outline"}
@@ -125,7 +200,7 @@ export default function TiptapEditor({
           >
             <Bold className="h-4 w-4" />
           </Button>
-
+          {/* Nút In nghiêng */}
           <Button
             type="button"
             variant={editor.isActive("italic") ? "default" : "outline"}
@@ -137,7 +212,7 @@ export default function TiptapEditor({
           >
             <Italic className="h-4 w-4" />
           </Button>
-
+          {/* Nút Gạch ngang */}
           <Button
             type="button"
             variant={editor.isActive("strike") ? "default" : "outline"}
@@ -149,10 +224,11 @@ export default function TiptapEditor({
           >
             <Strikethrough className="h-4 w-4" />
           </Button>
-
+          {/* Phân cách */}
           <div className="w-px h-8 bg-border mx-1" />
-
+          {/* ========== HEADING ========== */}
           {/* Headings */}
+          {/* Nút Heading 1 */}
           <Button
             type="button"
             variant={
@@ -169,6 +245,7 @@ export default function TiptapEditor({
             <Heading1 className="h-4 w-4" />
           </Button>
 
+          {/* Nút Heading 2 */}
           <Button
             type="button"
             variant={
@@ -184,7 +261,7 @@ export default function TiptapEditor({
           >
             <Heading2 className="h-4 w-4" />
           </Button>
-
+          {/* Nút Heading 3 */}
           <Button
             type="button"
             variant={
@@ -200,10 +277,12 @@ export default function TiptapEditor({
           >
             <Heading3 className="h-4 w-4" />
           </Button>
-
+          {/* Phân cách */}
           <div className="w-px h-8 bg-border mx-1" />
 
+          {/* ========== DANH SÁCH & TRÍCH DẪN ========== */}
           {/* Lists */}
+          {/* Nút danh sách không thứ tự */}
           <Button
             type="button"
             variant={editor.isActive("bulletList") ? "default" : "outline"}
@@ -215,7 +294,7 @@ export default function TiptapEditor({
           >
             <List className="h-4 w-4" />
           </Button>
-
+          {/* Nút danh sách có thứ tự */}
           <Button
             type="button"
             variant={editor.isActive("orderedList") ? "default" : "outline"}
@@ -227,7 +306,7 @@ export default function TiptapEditor({
           >
             <ListOrdered className="h-4 w-4" />
           </Button>
-
+          {/* Nút trích dẫn */}
           <Button
             type="button"
             variant={editor.isActive("blockquote") ? "default" : "outline"}
@@ -239,7 +318,7 @@ export default function TiptapEditor({
           >
             <Quote className="h-4 w-4" />
           </Button>
-
+          {/* Phân cách */}
           <div className="w-px h-8 bg-border mx-1" />
 
           {/* Link */}
@@ -256,7 +335,7 @@ export default function TiptapEditor({
           </Button> */}
 
           <div className="w-px h-8 bg-border mx-1" />
-
+          {/* ========== UNDO/REDO ========== */}
           {/* Undo/Redo */}
           <Button
             type="button"
@@ -290,10 +369,10 @@ export default function TiptapEditor({
         </div>
       </div>
 
-      {/* Editor content */}
+      {/* Khu vực nội dung editor */}
       <EditorContent editor={editor} className="min-h-[400px]" />
 
-      {/* Character count */}
+      {/* Thông tin đếm ký tự và số từ */}
       <div className="border-t bg-muted/10 px-4 py-2 flex justify-between items-center text-xs text-muted-foreground">
         <span>
           Số từ: {editor.storage.characterCount.words()} | Ký tự:{" "}

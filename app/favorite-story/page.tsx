@@ -18,15 +18,29 @@ import {
   FavoriteStoryItem,
 } from "@/services/favoriteStoryService";
 import { toast } from "sonner";
-
+/**
+ * FILE MÔ TẢ: Trang quản lý truyện yêu thích của người dùng
+ *
+ * CHỨC NĂNG:
+ * 1. Hiển thị danh sách truyện đã thêm vào tủ truyện
+ * 2. Bật/tắt thông báo chương mới cho từng truyện
+ * 3. Xóa truyện khỏi danh sách yêu thích
+ * 4. Phân trang danh sách truyện
+ * 5. Click vào truyện để đi đến trang chi tiết
+ *
+ * LIÊN KẾT VỚI:
+ * - favoriteStoryService: API lấy danh sách, toggle notification, xóa truyện
+ * - FavoriteStoryCard: Component hiển thị card cho từng truyện
+ * - Next Router: Điều hướng đến trang chi tiết truyện
+ */
 export default function FavoritePage() {
   const router = useRouter();
   const [data, setData] = useState<FavoriteStoryItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
-  const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [total, setTotal] = useState(0); // Tổng số truyện (cho phân trang)
+  const [page, setPage] = useState(1); // Trang hiện tại
+  const [pageSize] = useState(20); // Số truyện mỗi trang (fixed)
+  const [loading, setLoading] = useState(true); // Loading khi fetch data
+  const [updatingId, setUpdatingId] = useState<string | null>(null); // ID truyện đang update (toggle notification)
   // --- HELPER: Xử lý lỗi API ---
   const handleApiError = (error: any, defaultMessage: string) => {
     // 1. Check lỗi Validation/Logic từ Backend
@@ -55,13 +69,29 @@ export default function FavoritePage() {
     const fallbackMsg = error.response?.data?.message || defaultMessage;
     toast.error(fallbackMsg);
   };
+
+  /**
+   * useEffect: Load danh sách truyện yêu thích khi page thay đổi
+   * Dependency: [page] → mỗi lần đổi trang sẽ reload data
+   *
+   * Tại sao chỉ có page? Vì pageSize fixed, không cần refetch khi thay đổi
+   */
   useEffect(() => {
     loadFavorites();
   }, [page]);
-
+  /**
+   * HÀM LOAD DANH SÁCH TRUYỆN YÊU THÍCH
+   * Flow:
+   * 1. Set loading = true
+   * 2. Gọi API với page và pageSize
+   * 3. Lưu data và total vào state
+   * 4. Xử lý lỗi nếu có
+   * 5. Set loading = false
+   */
   const loadFavorites = async () => {
     setLoading(true);
     try {
+      // Gọi API lấy danh sách truyện yêu thích
       const response = await favoriteStoryService.getFavorites(page, pageSize);
       setData(response.items);
       setTotal(response.total);
@@ -73,12 +103,30 @@ export default function FavoritePage() {
       setLoading(false);
     }
   };
-
+  /**
+   * HÀM XỬ LÝ CLICK VÀO TRUYỆN
+   * Mục đích: Điều hướng đến trang chi tiết truyện
+   * Input: storyId (string)
+   * Output: Router push đến /story/{storyId}
+   */
   const handleStoryClick = (storyId: string) => {
     router.push(`/story/${storyId}`);
   };
 
-  // Xử lý Bật/Tắt chuông
+  /**
+   * HÀM BẬT/TẮT THÔNG BÁO CHƯƠNG MỚI
+   * Flow:
+   * 1. Set updatingId = storyId (để hiển thị loading trên card đó)
+   * 2. Tính toán newState = !currentState (đảo ngược trạng thái)
+   * 3. Gọi API toggleNotification với storyId và newState
+   * 4. Nếu thành công: update local state, hiển thị toast
+   * 5. Nếu lỗi: hiển thị thông báo lỗi
+   * 6. Reset updatingId = null
+   *
+   * Tại sao không dùng response từ API?
+   * Vì API chỉ trả về success/fail, không trả về data mới
+   * Nên cần tính toán trước và update local
+   */
   const handleToggleNotification = async (
     storyId: string,
     currentState: boolean
@@ -87,9 +135,10 @@ export default function FavoritePage() {
     try {
       // Gọi API đảo ngược trạng thái hiện tại (!currentState)
       const newState = !currentState;
+      // Gọi API cập nhật
       await favoriteStoryService.toggleNotification(storyId, newState);
 
-      // Cập nhật lại UI Local
+      // Cập nhật UI local: tìm story và update notiNewChapter
       setData((prev) =>
         prev.map((item) =>
           item.storyId === storyId
@@ -97,15 +146,10 @@ export default function FavoritePage() {
             : item
         )
       );
-
+      // Hiển thị toast thông báo
       toast.success(
         newState ? "Đã bật thông báo chương mới" : "Đã tắt thông báo"
       );
-      // } catch (error) {
-      //   toast.error("Lỗi cập nhật trạng thái thông báo");
-      // } finally {
-      //   setUpdatingId(null);
-      // }
     } catch (error: any) {
       // --- DÙNG HELPER ---
       handleApiError(error, "Lỗi cập nhật trạng thái thông báo.");
@@ -114,23 +158,30 @@ export default function FavoritePage() {
     }
   };
 
-  // Xử lý xóa khỏi thư viện
+  /**
+   * HÀM XÓA TRUYỆN KHỎI DANH SÁCH YÊU THÍCH
+   * Flow:
+   * 1. Confirm với user (tránh xóa nhầm)
+   * 2. Gọi API removeFavorite(storyId)
+   * 3. Nếu thành công: reload lại danh sách
+   * 4. Nếu lỗi: hiển thị thông báo
+   *
+   * Tại sao reload toàn bộ thay vì xóa local?
+   * Vì cần cập nhật lại total count và phân trang
+   */
   const handleRemoveFavorite = async (storyId: string) => {
     if (!confirm("Bạn có chắc muốn bỏ theo dõi truyện này?")) return;
 
     try {
       await favoriteStoryService.removeFavorite(storyId);
       toast.success("Đã xóa khỏi tủ truyện");
-      loadFavorites(); // Reload lại list
-      // } catch (error) {
-      //   toast.error("Lỗi khi xóa truyện");
-      // }
+      loadFavorites(); // Reload lại toàn bộ list
     } catch (error: any) {
       // --- DÙNG HELPER ---
       handleApiError(error, "Lỗi khi xóa truyện khỏi danh sách.");
     }
   };
-
+  // Tính tổng số trang (dùng cho phân trang)
   const totalPages = Math.ceil(total / pageSize);
 
   return (

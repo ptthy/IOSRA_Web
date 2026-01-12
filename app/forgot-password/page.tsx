@@ -16,18 +16,43 @@ import {
 import { authService } from "@/services/authService";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-
+/**
+ * FILE MÔ TẢ: Trang quên mật khẩu - gửi OTP reset password
+ *
+ * CHỨC NĂNG:
+ * 1. Nhập email đã đăng ký
+ * 2. Gửi OTP reset password đến email
+ * 3. Redirect đến trang reset-password với email trong query params
+ *
+ * QUY TRÌNH:
+ * User nhập email → API gửi OTP → Redirect đến /reset-password?email={email}
+ *
+ * LIÊN KẾT VỚI:
+ * - authService.forgotPassword(): API gửi OTP
+ * - /reset-password page: Trang nhập OTP và mật khẩu mới
+ */
+// Component chính của trang quên mật khẩu
 export default function ForgotPasswordPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  const [imageError, setImageError] = useState(false);
+  // State quản lý các trường nhập liệu và trạng thái
+  const [email, setEmail] = useState(""); // Email nhập vào
+  const [isLoading, setIsLoading] = useState(false); // Loading khi gửi OTP
+  const [error, setError] = useState(""); // Lỗi hiển thị dưới form
 
+  const [imageError, setImageError] = useState(false); // Lỗi tải ảnh background
+  // Ảnh fallback khi ảnh chính bị lỗi (SVG base64)
   const ERROR_IMG_SRC =
     "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==";
-  // --- HELPER: Xử lý lỗi API ---
+  /**
+   * HÀM XỬ LÝ LỖI API THỐNG NHẤT (CÓ SỬA ĐỔI)
+   * Khác biệt: Set cả error state (cho khung đỏ) và toast
+   *
+   * LOGIC:
+   * 1. Parse lỗi validation từ details → nối thành 1 câu
+   * 2. Set error state (hiển thị khung đỏ)
+   * 3. Show toast thông báo
+   */
   const handleApiError = (error: any, defaultMessage: string) => {
     // 1. Check lỗi Validation/Logic từ Backend
     if (error.response && error.response.data && error.response.data.error) {
@@ -37,7 +62,6 @@ export default function ForgotPasswordPage() {
       if (details) {
         const firstKey = Object.keys(details)[0];
         if (firstKey && details[firstKey].length > 0) {
-          // --- SỬA CHỖ NÀY ---
           // Dùng .join(' ') để nối tất cả thông báo lỗi lại thành một câu nguyên văn
           // Thay vì lấy [0] chỉ được 1 dòng.
           const msg = details[firstKey].join(" ");
@@ -48,7 +72,7 @@ export default function ForgotPasswordPage() {
         }
       }
 
-      // Message từ Backend
+      //  Hiển thị message chung từ Backend (nếu không có details)
       if (message) {
         toast.error(message);
         setError(message);
@@ -56,37 +80,43 @@ export default function ForgotPasswordPage() {
       }
     }
 
-    // 2. Fallback
+    // 2. Fallback: Hiển thị lỗi mạng hoặc lỗi không xác định
     const fallbackMsg = error.response?.data?.message || defaultMessage;
     toast.error(fallbackMsg);
     setError(fallbackMsg);
   };
+  /**
+   * HÀM XỬ LÝ SUBMIT FORM
+   * Flow:
+   * 1. Ngăn default form submission
+   * 2. Clear error cũ
+   * 3. Set loading = true
+   * 4. Gọi API forgotPassword(email)
+   * 5. Nếu thành công: redirect đến reset-password với email param
+   * 6. Nếu lỗi: hiển thị thông báo
+   * 7. Reset loading = false
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    setIsLoading(true);
+    setError(""); // Xóa lỗi cũ
+    setIsLoading(true); // Bắt đầu loading
 
     try {
+      // Gọi API quên mật khẩu để gửi OTP
+
       await authService.forgotPassword({ email });
 
       toast.success(
         "Đã gửi mã OTP thành công. Vui lòng kiểm tra email của bạn."
       );
-
+      // Redirect đến trang reset-password với email trong query params
+      // Format: /reset-password?email=user@example.com
       router.push(`/reset-password?email=${email}`);
-      // } catch (err: any) {
-      //   const errMsg =
-      //     err.response?.data?.message ||
-      //     "Gửi yêu cầu thất bại. Vui lòng thử lại.";
-      //   setError(errMsg);
-      //   toast.error(errMsg);
-      //   setIsLoading(false);
-      // }
     } catch (error: any) {
-      // ---  ---
+      // Xử lý lỗi chi tiết từ API
       handleApiError(error, "Gửi yêu cầu thất bại. Vui lòng thử lại.");
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Kết thúc loading
     }
   };
 
@@ -111,7 +141,7 @@ export default function ForgotPasswordPage() {
             src="https://images.unsplash.com/photo-1563986768609-322da13575f3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080"
             alt="Email verification"
             className="w-full h-full object-cover opacity-20"
-            onError={() => setImageError(true)}
+            onError={() => setImageError(true)} // Xử lý lỗi tải ảnh
           />
         )}
 

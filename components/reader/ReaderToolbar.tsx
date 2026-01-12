@@ -1,3 +1,65 @@
+// components/reader/ReaderToolbar.tsx
+/*
+ * MỤC ĐÍCH CHÍNH:
+ * Thanh công cụ điều khiển toàn diện cho trải nghiệm đọc truyện, tích hợp đa chức năng:
+ *
+ * CHỨC NĂNG CORE:
+ * 1. ĐIỀU HƯỚNG CHƯƠNG:
+ *    - Dropdown danh sách chương với trạng thái (đã mua/khóa/free)
+ *    - Nút Back về trang trước
+ *    - Hiển thị thông tin chương hiện tại
+ *
+ * 2. HỆ THỐNG AUDIO ĐA LỚP:
+ *    a) GIỌNG ĐỌC (Voice Narration):
+ *       - Play/Pause/Tua (seek) audio giọng đọc
+ *       - Điều chỉnh âm lượng, tốc độ (0.5x-2.0x)
+ *       - Progress bar hiển thị thời gian
+ *       - Chọn giọng đọc từ nhiều options
+ *
+ *    b) NHẠC NỀN (Background Music):
+ *       - Premium feature chỉ cho subscribers
+ *       - Multiple tracks theo mood/chapter
+ *       - Điều khiển volume riêng biệt
+ *       - Loop tự động
+ *
+ * 3. BUSINESS MODEL & MONETIZATION:
+ *    a) VOICE PURCHASE FLOW:
+ *       - Hiển thị giọng đọc có giá (gem/dias)
+ *       - Xác nhận mua dialog
+ *       - Xử lý thanh toán + error handling
+ *       - Auto-play sau khi mua thành công
+ *
+ *    b) PREMIUM SUBSCRIPTION:
+ *       - Check subscription status
+ *       - Restrict nhạc nền cho non-premium
+ *       - Upsell modal integration
+ *
+ * 4. UTILITY FEATURES:
+ *    - Báo cáo chương (ReportModal)
+ *    - Mở cài đặt đọc (onSettings callback)
+ *    - TranslationControl integration (qua children)
+ *    - Theme support (dark/light/transparent)
+ *
+ * KIẾN TRÚC KỸ THUẬT:
+ * - Fixed position toolbar với responsive design
+ * - 2 HTML5 Audio elements độc lập (voice + music)
+ * - State management với React hooks
+ * - API integration với backend services
+ * - Toast notifications cho user feedback
+ * - Error boundary & retry logic
+ *
+ * INTEGRATION POINTS:
+ * - Parent: ChapterReader (nhận props và callbacks)
+ * - Children: TranslationControl (dịch thuật)
+ * - Services: chapterCatalogApi, chapterPurchaseApi
+ * - Components: ReportModal, TopUpModal
+ *
+ * BUSINESS LOGIC PHỨC TẠP:
+ * 1. Chapter Access Logic: isOwned vs isLocked vs accessType
+ * 2. Voice Ownership: Đã mua vs chưa mua (priceDias)
+ * 3. Premium Requirement: hasActiveSubscription check
+ * 4. Auto-play Strategy: Sau unlock/purchase
+ */
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -52,7 +114,7 @@ import {
   chapterCatalogApi,
   ChapterVoice,
 } from "@/services/chapterCatalogService";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"; // Helper để gộp và xử lý className Tailwind CSS một cách linh hoạt
 import {
   VoiceSettings,
   getVoiceSettings,
@@ -64,13 +126,43 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { chapterPurchaseApi } from "@/services/chapterPurchaseService";
 import { toast } from "sonner";
 import { TopUpModal } from "@/components/payment/TopUpModal";
+
+/**
+ * URL base cho Cloudflare R2 storage nơi lưu audio files
+ * Định dạng: https://<bucket>.<account>.r2.dev/
+ */
 const AUDIO_BASE_URL = "https://pub-15618311c0ec468282718f80c66bcc13.r2.dev/";
-const languageNames: Record<string, string> = {
+/**
+ * Map language code -> display name (cho hiển thị UI)
+ * Key: language code theo chuẩn BCP 47 (vi-VN, en-US, etc.)
+ * Value: Tên ngôn ngữ hiển thị (có thể có cả native name)
+ */ const languageNames: Record<string, string> = {
   "vi-VN": "Tiếng Việt",
   "ja-JP": "日本語 (Tiếng Nhật)",
   "en-US": "English (Tiếng Anh)",
   "zh-CN": "中文 (Tiếng Trung)",
 };
+
+/**
+ * Interface cho props của ReaderToolbar
+ *
+ * @property chapterNo: Số thứ tự chương hiện tại (1, 2, 3...)
+ * @property chapterTitle: Tiêu đề chương
+ * @property chapterId: ID duy nhất của chương (UUID từ backend)
+ * @property storyId: ID truyện
+ * @property chapters: Mảng tất cả chương của truyện (cho dropdown)
+ * @property isDarkTheme: Theme tối/sáng
+ * @property isTransparent: Toolbar có trong suốt không (blur effect)
+ * @property onBack: Callback khi click nút back
+ * @property onSettings: Callback mở settings
+ * @property onChapterChange: Callback khi đổi chương (nhận chapterId)
+ * @property autoPlayAfterUnlock: Tự động phát audio sau khi unlock chapter (tính năng mới)
+ * @property setShowTopUpModal: Callback mở modal nạp tiền/mua gói (truyền từ parent lên)
+ * @property mood: Thông tin mood/cảm xúc của chương (cho nhạc nền)
+ * @property moodMusicPaths: Danh sách nhạc nền cho mood này
+ * @property hasActiveSubscription: User có premium subscription không
+ * @property languageCode: Ngôn ngữ gốc của chương (cho dịch thuật)
+ */
 interface ReaderToolbarProps {
   chapterNo: number;
   chapterTitle: string;
@@ -91,6 +183,22 @@ interface ReaderToolbarProps {
   languageCode?: string;
 }
 
+/**
+ * COMPONENT CHÍNH: ReaderToolbar
+ *
+ * Là thanh công cụ fixed ở top khi đọc truyện, chứa tất cả controls:
+ * - Navigation: Chuyển chương, back
+ * - Audio Player: Play/pause giọng đọc, tua, volume, speed
+ * - Voice Selection: Chọn/mua giọng đọc
+ * - Music Player: Nhạc nền (premium feature)
+ * - Utilities: Report, settings, translation (thông qua children)
+ *
+ * State Management:
+ * - Local state cho UI (openChapterList, showVolume, etc.)
+ * - Voice settings từ localStorage (persist user preferences)
+ * - Audio state (currentTime, duration, isPlaying)
+ * - Business state (voices list, purchase flow)
+ */
 export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
   chapterNo,
   chapterTitle,
@@ -110,33 +218,105 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
   hasActiveSubscription = false,
   languageCode,
 }) => {
+  // ========== STATE DECLARATIONS ==========
+
+  /**
+   * UI State: Mở/đóng dropdown danh sách chương
+   */
   const [openChapterList, setOpenChapterList] = useState(false);
+  /**
+   * Voice settings từ localStorage (persisted user preferences)
+   * Bao gồm: volume, speed, isPlaying
+   * Được load lúc component mount
+   */
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(
     getVoiceSettings()
   );
+  /**
+   * UI State: Hiển thị popover volume control
+   */
   const [showVolume, setShowVolume] = useState(false);
 
+  /**
+   * Danh sách voices khả dụng cho chương này
+   * Mỗi voice có: voiceId, voiceName, audioUrl, owned (boolean), priceDias
+   */
   const [voices, setVoices] = useState<ChapterVoice[]>([]);
+  /**
+   * Voice đang được chọn để phát
+   * Null nếu chưa chọn hoặc chưa mua
+   */
   const [currentVoice, setCurrentVoice] = useState<ChapterVoice | null>(null);
+  /**
+   * Loading state khi fetch voices từ API
+   */
   const [isLoadingVoice, setIsLoadingVoice] = useState(false);
+  /**
+   * Thời lượng audio (seconds)
+   */
   const [audioDuration, setAudioDuration] = useState(0);
+  /**
+   * Thời gian hiện tại của audio (seconds)
+   * Update liên tục khi audio đang phát
+   */
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
-
+  /**
+   * Voice đang được xem xét mua (mở dialog confirm)
+   */
   const [voiceToBuy, setVoiceToBuy] = useState<ChapterVoice | null>(null);
+  /**
+   * Loading state khi đang xử lý mua voice
+   */
   const [isBuying, setIsBuying] = useState(false);
+  /**
+   * Đường dẫn nhạc nền đang được chọn
+   * Null = tắt nhạc
+   */
   const [activeMusicPath, setActiveMusicPath] = useState<string | null>(null);
+  /**
+   * Trạng thái phát nhạc nền
+   */
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+
+  /**
+   * Âm lượng nhạc nền (0-100)
+   */
   const [musicVolume, setMusicVolume] = useState(30);
+
+  /**
+   * UI State: Hiển thị popover volume nhạc
+   */
   const [showMusicVolume, setShowMusicVolume] = useState(false);
+
+  /**
+   * Ref đến audio element nhạc nền
+   * Dùng useRef để truy cập DOM element trực tiếp
+   */
   const bgMusicRef = useRef<HTMLAudioElement>(null);
+
+  /**
+   * Ref đến audio element giọng đọc
+   */
   const audioRef = useRef<HTMLAudioElement>(null);
+  /**
+   * UI State: Mở modal báo cáo
+   */
   const [showReportModal, setShowReportModal] = useState(false);
-  // const getFullAudioUrl = (path: string | undefined | null) => {
-  //   if (!path) return "";
-  //   if (path.startsWith("http")) return path;
-  //   const cleanPath = path.startsWith("/") ? path.slice(1) : path;
-  //   return `${AUDIO_BASE_URL}${cleanPath}`;
-  // };
+
+  // ========== UTILITY FUNCTIONS ==========
+
+  /**
+   * Hàm xử lý đường dẫn audio
+   * Chuyển relative path từ API thành full URL với CDN
+   *
+   * Logic:
+   * 1. Kiểm tra path hợp lệ (string, không rỗng)
+   * 2. Nếu đã là full URL (http/https) → trả về nguyên
+   * 3. Ngược lại → ghép với AUDIO_BASE_URL
+   *
+   * @param path - Đường dẫn từ API (có thể là relative hoặc full URL)
+   * @returns Full URL đến audio file
+   */
   const getFullAudioUrl = (path: any) => {
     // Kiểm tra nếu path không phải string hoặc rỗng thì thoát sớm
     if (typeof path !== "string" || !path) return "";
@@ -146,12 +326,27 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
     return `${AUDIO_BASE_URL}${cleanPath}`;
   };
 
+  /**
+   * Fetch danh sách voices từ API cho chapter hiện tại
+   *
+   * Flow:
+   * 1. Set loading state
+   * 2. Gọi API: chapterCatalogApi.getChapterVoices(chapterId)
+   * 3. Filter voices: Hiện tất cả (owned + unowned)
+   * 4. Xử lý auto-play nếu enabled
+   * 5. Update state: voices, currentVoice
+   *
+   * Logic autoplayAfterUnlock:
+   * - Chỉ kích hoạt khi prop autoPlayAfterUnlock = true
+   * - Tìm voice đầu tiên đã owned
+   * - Set currentVoice và play ngay
+   */
   const fetchVoices = async () => {
     setIsLoadingVoice(true);
     try {
       const data = await chapterCatalogApi.getChapterVoices(chapterId);
 
-      // SỬA TẠI ĐÂY: Ưu tiên hiện voice đã sở hữu (owned)
+      // Ưu tiên hiện voice đã sở hữu (owned)
       const visibleVoices = data.filter((v) => {
         if (v.owned) return true; // Nếu là tác giả hoặc đã mua -> Luôn hiện
         return true; // Voice chưa mua cũng hiện để bán
@@ -159,7 +354,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
 
       setVoices(visibleVoices);
 
-      // Logic autoplay giữ nguyên
+      // Logic autoplay khi unlock chapter
       if (autoPlayAfterUnlock && visibleVoices.length > 0) {
         const firstOwnedVoice = visibleVoices.find((v) => v.owned);
         if (firstOwnedVoice) {
@@ -167,6 +362,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
           setVoiceSettings((prev) => ({ ...prev, isPlaying: true }));
         }
       } else if (!currentVoice) {
+        // Nếu không có autoplay, chọn voice owned đầu tiên
         const owned = visibleVoices.find((v) => v.owned);
         if (owned) setCurrentVoice(owned);
       }
@@ -177,6 +373,18 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
     }
   };
 
+  // ========== EFFECTS FOR LIFECYCLE MANAGEMENT ==========
+
+  /**
+   * Effect chính: Reset state khi đổi chương
+   *
+   * Khi chapterId thay đổi:
+   * 1. Fetch voices mới
+   * 2. Reset audio state (pause, reset time)
+   * 3. Reset current voice
+   *
+   * Dependencies: chapterId
+   */
   useEffect(() => {
     if (chapterId) fetchVoices();
     setVoiceSettings((prev) => ({ ...prev, isPlaying: false, currentTime: 0 }));
@@ -185,7 +393,16 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
     setCurrentVoice(null);
   }, [chapterId]);
 
-  //  EFFECT: Xử lý auto play sau khi mở khóa chapter
+  /**
+   * Effect cho auto-play sau unlock
+   *
+   * Kích hoạt khi:
+   * - autoPlayAfterUnlock = true (prop từ parent)
+   * - chapterId thay đổi
+   *
+   * Thực hiện reload voices để có data mới nhất từ API
+   * (sau khi unlock, owned status thay đổi)
+   */
   useEffect(() => {
     if (autoPlayAfterUnlock && chapterId) {
       console.log("🎯 AUTO PLAY TRIGGERED, reloading voices...");
@@ -193,23 +410,45 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
     }
   }, [autoPlayAfterUnlock, chapterId]);
 
+  // ========== AUDIO EVENT HANDLERS ==========
+
+  /**
+   * Handler cho audio timeupdate event
+   * Cập nhật audioCurrentTime mỗi khi audio tiến triển
+   */
   const handleTimeUpdate = () => {
     if (audioRef.current) {
       setAudioCurrentTime(audioRef.current.currentTime);
     }
   };
-
+  /**
+   * Handler cho loadedmetadata event
+   * Lấy duration của audio khi metadata loaded
+   */
   const handleLoadedMetadata = () => {
     if (audioRef.current) {
       setAudioDuration(audioRef.current.duration);
     }
   };
 
+  /**
+   * Handler cho ended event
+   * Reset playback state khi audio kết thúc
+   */
   const handleEnded = () => {
     setVoiceSettings((prev) => ({ ...prev, isPlaying: false }));
     setAudioCurrentTime(0);
   };
 
+  /**
+   * Effect điều khiển play/pause audio element
+   *
+   * Logic:
+   * - Nếu voiceSettings.isPlaying = true và có audioUrl → play()
+   * - Ngược lại → pause()
+   *
+   * Error handling: Catch play() error (thường do autoplay policy)
+   */
   useEffect(() => {
     const audio = audioRef.current;
     if (audio) {
@@ -223,19 +462,34 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
       }
     }
   }, [voiceSettings.isPlaying, currentVoice]);
-
+  /**
+   * Effect cập nhật volume audio element
+   * Chuyển đổi từ scale 0-100 sang 0.0-1.0 của HTML5 Audio
+   */
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = voiceSettings.volume / 100;
     }
   }, [voiceSettings.volume]);
-
+  /**
+   * Effect cập nhật playback speed
+   * HTML5 Audio API cho phép thay đổi playbackRate (0.5-2.0)
+   */
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.playbackRate = voiceSettings.speed;
     }
   }, [voiceSettings.speed]);
+  // ========== AUDIO CONTROL FUNCTIONS ==========
 
+  /**
+   * Toggle play/pause audio
+   *
+   * Flow:
+   * 1. Kiểm tra có currentVoice không (nếu không → toast info)
+   * 2. Toggle isPlaying state
+   * 3. Audio element sẽ tự play/pause qua effect trên
+   */
   const togglePlay = () => {
     if (!currentVoice) {
       toast.info("Vui lòng mua hoặc chọn giọng đọc trước.");
@@ -243,20 +497,39 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
     }
     setVoiceSettings((prev) => ({ ...prev, isPlaying: !prev.isPlaying }));
   };
-
+  /**
+   * Tua audio theo số giây (+ tiến, - lùi)
+   *
+   * @param seconds - Số giây cần tua (dương: tiến, âm: lùi)
+   */
   const skipTime = (seconds: number) => {
     if (audioRef.current) {
       audioRef.current.currentTime += seconds;
     }
   };
 
+  /**
+   * Xử lý seek trên progress bar
+   *
+   * @param value - Array 1 phần tử [newTime] từ Slider component
+   */
   const handleSeek = (value: number[]) => {
     if (audioRef.current) {
       audioRef.current.currentTime = value[0];
       setAudioCurrentTime(value[0]);
     }
   };
+  // ========== VOICE SELECTION & PURCHASE FLOW ==========
 
+  /**
+   * Xử lý khi user chọn voice từ dropdown
+   *
+   * Logic phân nhánh:
+   * 1. Nếu voice đã owned → chọn và phát ngay
+   * 2. Nếu chưa owned → mở dialog xác nhận mua
+   *
+   * @param voiceId - ID của voice được chọn
+   */
   const onVoiceSelect = (voiceId: string) => {
     const selectedVoice = voices.find((v) => v.voiceId === voiceId);
     if (!selectedVoice) return;
@@ -270,14 +543,25 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
       setVoiceToBuy(selectedVoice);
     }
   };
-
+  /**
+   * Xác nhận mua voice (gọi API)
+   *
+   * Flow:
+   * 1. Set loading state (isBuying)
+   * 2. Gọi API: chapterPurchaseApi.buyVoice()
+   * 3. Xử lý kết quả:
+   *    - Success: Toast, refresh voices, play ngay
+   *    - Error: Phân loại lỗi (409, 400, etc.)
+   * 4. Reset loading và dialog
+   */
   const confirmBuyVoice = async () => {
     if (!voiceToBuy) return;
 
     setIsBuying(true);
     try {
+      // API call mua voice
       await chapterPurchaseApi.buyVoice(chapterId, [voiceToBuy.voiceId]);
-
+      // Success toast với thông tin price
       toast.success(`Đã mua giọng ${voiceToBuy.voiceName}`, {
         description: (
           <span className="flex items-center gap-1">
@@ -287,14 +571,16 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
           </span>
         ),
       });
-
+      // Refresh voices và phát ngay
       await refreshAndPlay(voiceToBuy.voiceId);
     } catch (error: any) {
+      // Error handling với phân loại HTTP status
       const errorCode = error.response?.data?.error?.code;
       const errorMessage = error.response?.data?.error?.message;
 
       //  XỬ LÝ CÁC LOẠI LỖI
       switch (true) {
+        // Conflict: Đã sở hữu (có thể từ session khác)
         case error.response?.status === 409:
           toast.success("Bạn đã sở hữu giọng đọc này!", {
             description: "Đang cập nhật lại trạng thái...",
@@ -305,6 +591,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
 
         case error.response?.status === 400 &&
           errorCode === "InsufficientBalance":
+          // Không đủ tiền: Hiện toast với nút nạp
           toast.error("Số dư không đủ", {
             description: (
               <span className="flex items-center gap-1 flex-wrap">
@@ -325,12 +612,14 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
           break;
 
         case error.response?.status === 400:
+          // Bad request khác
           toast.error("Giao dịch thất bại", {
             description: errorMessage || "Yêu cầu không hợp lệ.",
           });
           break;
 
         default:
+          // Lỗi không xác định
           const msg =
             errorMessage ||
             error.response?.data?.message ||
@@ -342,18 +631,27 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
       setVoiceToBuy(null);
     }
   };
-
+  /**
+   * Refresh voices sau khi mua và phát ngay
+   *
+   * Flow:
+   * 1. Gọi API lấy voices mới nhất
+   * 2. Tìm voice vừa mua (theo targetVoiceId)
+   * 3. Nếu đã owned → set currentVoice và play
+   *
+   * @param targetVoiceId - ID của voice vừa mua
+   */
   const refreshAndPlay = async (targetVoiceId: string) => {
     try {
       const data = await chapterCatalogApi.getChapterVoices(chapterId);
 
-      // SỬA TẠI ĐÂY: Xóa bỏ điều kiện v.status === "ready"
+      // Xóa bỏ điều kiện v.status === "ready"
       const visibleVoices = data.filter((v) => {
         return true; // Hiện tất cả để đảm bảo không bị mất voice vừa mua
       });
 
       setVoices(visibleVoices);
-
+      // Tìm voice vừa mua và play
       const newOwned = visibleVoices.find((v) => v.voiceId === targetVoiceId);
       if (newOwned && newOwned.owned) {
         setCurrentVoice(newOwned);
@@ -363,7 +661,16 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
       console.error("Reload error", e);
     }
   };
-  // 1. Reset khi đổi chương
+
+  // ========== BACKGROUND MUSIC CONTROL ==========
+
+  /**
+   * Effect reset music khi đổi chương
+   *
+   * Logic:
+   * 1. Dừng nhạc
+   * 2. Set activeMusicPath = bài đầu tiên trong list (nếu có)
+   */
   useEffect(() => {
     setIsMusicPlaying(false);
     if (moodMusicPaths && moodMusicPaths.length > 0) {
@@ -374,7 +681,14 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
     }
   }, [chapterId, moodMusicPaths]);
 
-  // 2. Điều khiển Audio Element
+  /**
+   * Effect điều khiển audio element nhạc nền
+   *
+   * Logic:
+   * - Cập nhật volume
+   * - Play/pause dựa trên isMusicPlaying và activeMusicPath
+   * - Error handling cho autoplay policy
+   */
   useEffect(() => {
     const bgAudio = bgMusicRef.current;
     if (bgAudio) {
@@ -389,7 +703,17 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
       }
     }
   }, [isMusicPlaying, activeMusicPath, musicVolume]);
-
+  /**
+   * Xử lý chọn nhạc nền
+   *
+   * Logic phân nhánh:
+   * 1. Nếu chọn "turn_off" → tắt nhạc
+   * 2. Kiểm tra premium subscription:
+   *    - Không có → toast error với upsell
+   *    - Có → set path và play
+   *
+   * @param path - Đường dẫn nhạc hoặc "turn_off"
+   */
   const handleMusicSelect = (path: string) => {
     // 1. Xử lý tắt nhạc
     if (path === "turn_off") {
@@ -425,17 +749,32 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
       icon: <Music2 className="w-4 h-4 text-pink-500" />,
     });
   };
+
+  // ========== UTILITY FUNCTIONS ==========
+
+  /**
+   * Format seconds thành MM:SS string
+   *
+   * @param seconds - Số giây cần format
+   * @returns String dạng "MM:SS" hoặc "00:00" nếu invalid
+   */
   const formatTime = (seconds: number) => {
     if (!seconds || isNaN(seconds)) return "00:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
-
+  /**
+   * Sort chapters theo số thứ tự (tăng dần)
+   */
   const sortedChapters = [...chapters].sort(
     (a, b) => a.chapterNo - b.chapterNo
   );
 
+  /**
+   * Dynamic theme classes cho responsive styling
+   * Dựa trên isDarkTheme và isTransparent props
+   */
   const themeClasses = {
     bg: isTransparent
       ? "bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-white/20"
@@ -446,15 +785,17 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
     textMuted: isDarkTheme ? "text-slate-400" : "text-slate-500",
     hover: isDarkTheme ? "hover:bg-slate-800" : "hover:bg-slate-100",
   };
-
+  // ========== JSX RENDER ==========
   return (
     <>
+      {/* MAIN TOOLBAR CONTAINER */}
       <div
         className={cn(
           "fixed top-0 left-0 right-0 z-50 h-16 flex items-center px-4 transition-all duration-300 gap-4",
           themeClasses.bg
         )}
       >
+        {/* HIDDEN AUDIO ELEMENTS */}
         {currentVoice?.audioUrl && (
           <audio
             ref={audioRef}
@@ -474,8 +815,9 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
             preload="auto"
           />
         )}
-
+        {/* LEFT SECTION: NAVIGATION */}
         <div className="flex items-center gap-2 w-1/4 min-w-[200px] shrink-0">
+          {/* LEFT SECTION: NAVIGATION */}
           <Button
             variant="ghost"
             size="icon"
@@ -488,7 +830,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-
+          {/* CHAPTER INFO & DROPDOWN */}
           <div className="flex flex-col min-w-0 overflow-hidden">
             <span
               className={cn(
@@ -498,7 +840,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
             >
               Chương {chapterNo}
             </span>
-
+            {/* CHAPTER SELECTION POPOVER */}
             <Popover open={openChapterList} onOpenChange={setOpenChapterList}>
               <PopoverTrigger asChild>
                 <Button
@@ -527,13 +869,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                 <ScrollArea className="h-[300px] overflow-y-auto">
                   {sortedChapters.map((ch) => {
                     const isReading = ch.chapterId === chapterId;
-                    // const isLocked = ch.isLocked;
-                    // const showOwnedBadge = ch.isOwned === true;
-                    // //  FIX LOGIC: Đã mua = Không bị khóa VÀ accessType là 'dias'
-                    // const isPurchased = !isLocked && ch.accessType === "dias";
-                    // const isOwnedState = ch.isOwned === true || isPurchased;
-                    // const isFree = ch.accessType === "free";
-                    // Dựa vào JSON: isLocked vẫn là true dù đã mua, nên phải check isOwned trước
+
                     const isOwned = ch.isOwned === true;
                     const isLocked = ch.isLocked && !isOwned; // Chỉ coi là locked nếu chưa owned
                     const isFree = ch.accessType === "free";
@@ -575,7 +911,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                               {ch.title}
                             </span>
                           </div>
-
+                          {/* BADGE HIỂN THỊ TRẠNG THÁI CHƯƠNG */}
                           <div className="shrink-0">
                             {isReading ? (
                               <Badge
@@ -602,7 +938,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                                 <Gem className="h-4 w-4 text-blue-500 fill-blue-500 opacity-80" />
                               </Badge>
                             ) : (
-                              // Case 3: Free
+                              // Case 3: Free chương
                               <span className="text-xs text-muted-foreground/70">
                                 Free
                               </span>
@@ -617,8 +953,9 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
             </Popover>
           </div>
         </div>
-
+        {/* CENTER SECTION: AUDIO CONTROLS */}
         <div className="flex-1 flex items-center justify-center gap-2 md:gap-6 px-2 w-full max-w-5xl">
+          {/* REWIND 10s BUTTON (hidden on mobile) */}
           <Button
             variant="ghost"
             size="icon"
@@ -633,6 +970,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
             -10s
           </Button>
 
+          {/* PLAY/PAUSE BUTTON */}
           <Button
             size="icon"
             className="h-10 w-10 md:h-12 md:w-12 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700 text-white shrink-0 transition-transform hover:scale-105"
@@ -645,7 +983,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
               <Play className="h-5 w-5 md:h-6 md:w-6 fill-current ml-1" />
             )}
           </Button>
-
+          {/* FORWARD 10s BUTTON (hidden on mobile) */}
           <Button
             variant="ghost"
             size="icon"
@@ -659,7 +997,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
           >
             +10s
           </Button>
-
+          {/* PROGRESS BAR & TIME DISPLAY */}
           <div className="flex flex-1 items-center gap-3 min-w-[100px]">
             <span
               className={cn(
@@ -685,8 +1023,9 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
               {formatTime(audioDuration)}
             </span>
           </div>
-
+          {/* ADVANCED CONTROLS (hidden on small screens) */}
           <div className="hidden xl:flex items-center gap-2 shrink-0">
+            {/* PLAYBACK SPEED SELECT */}
             <Select
               value={voiceSettings.speed.toString()}
               onValueChange={(val) =>
@@ -704,7 +1043,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                 ))}
               </SelectContent>
             </Select>
-
+            {/* VOICE SELECTION DROPDOWN */}
             <Select
               value={currentVoice?.voiceId || ""}
               onValueChange={onVoiceSelect}
@@ -739,6 +1078,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                     </span>
                   </div>
                 ) : (
+                  // Voices list
                   voices.map((v) => (
                     <SelectItem key={v.voiceId} value={v.voiceId}>
                       <div className="flex items-center justify-between w-full min-w-[140px] gap-2">
@@ -759,6 +1099,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
                 )}
               </SelectContent>
             </Select>
+            {/* BACKGROUND MUSIC SELECTION */}
             <div className="flex items-center">
               <Select
                 value={activeMusicPath || ""}
@@ -877,8 +1218,9 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
             </div>
           </div>
         </div>
-
+        {/* RIGHT SECTION: UTILITIES */}
         <div className="flex items-center justify-end gap-1 w-fit shrink-0">
+          {/* REPORT BUTTON */}
           <Button
             variant="ghost"
             size="icon"
@@ -913,6 +1255,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
               </PopoverContent>
             </Popover>
           )}
+          {/* VOICE VOLUME POPOVER */}
           <Popover open={showVolume} onOpenChange={setShowVolume}>
             <PopoverTrigger asChild>
               <Button
@@ -942,9 +1285,9 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
               />
             </PopoverContent>
           </Popover>
-
+          {/* TRANSLATION CONTROL (passed as children) */}
           {children}
-
+          {/* SETTINGS BUTTON */}
           <Button
             variant="ghost"
             size="icon"
@@ -959,6 +1302,10 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* MODALS & DIALOGS */}
+
+      {/* REPORT MODAL */}
       <ReportModal
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}
@@ -966,6 +1313,7 @@ export const ReaderToolbar: React.FC<ReaderToolbarProps> = ({
         targetId={chapterId}
         targetTitle={`Chương ${chapterNo}: ${chapterTitle}`}
       />
+      {/* VOICE PURCHASE CONFIRMATION DIALOG */}
       <Dialog
         open={!!voiceToBuy}
         onOpenChange={(open) => !open && setVoiceToBuy(null)}

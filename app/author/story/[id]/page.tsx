@@ -1,4 +1,50 @@
 //app/story/[id]/page.tsx
+
+/**
+ * MỤC ĐÍCH:
+ * - Hiển thị toàn bộ thông tin chi tiết của một truyện cho tác giả
+ * - Cung cấp giao diện xem thông tin, trạng thái kiểm duyệt và quản lý chương
+ * - Cho phép tác giả theo dõi tình trạng duyệt (AI + ContentMod)
+ *
+ * CHỨC NĂNG CHÍNH:
+ * 1. Hiển thị thông tin chi tiết truyện:
+ *    - Cover image, tiêu đề, mô tả, thể loại
+ *    - Trạng thái (draft, pending, published, hidden, rejected, completed)
+ *    - Metadata: ngày tạo, cập nhật, độ dài dự kiến, ngôn ngữ
+ *
+ * 2. Hiển thị kết quả kiểm duyệt:
+ *    - Điểm AI và kết quả AI (approved/rejected)
+ *    - Trạng thái duyệt thủ công từ ContentMod
+ *    - Ghi chú từ moderator
+ *    - Báo cáo kiểm duyệt AI chi tiết với các vi phạm phân loại
+ *
+ * 3. Quản lý chương:
+ *    - Hiển thị danh sách chương theo trạng thái truyện
+ *    - Filter: published/completed chỉ hiện chương đã xuất bản
+ *    - Hiển thị trạng thái và ngày xuất bản từng chương
+ *
+ * 4. Hỗ trợ đa trạng thái:
+ *    - DRAFT: Cho phép chỉnh sửa thông tin
+ *    - PENDING: Hiển thị thông báo chờ duyệt
+ *    - REJECTED: Hiển thị feedback từ AI/ContentMod
+ *    - HIDDEN: Chỉ tác giả có thể xem
+ *    - PUBLISHED/COMPLETED: Hiển thị cho độc giả
+ *
+ * ĐẶC ĐIỂM NỔI BẬT:
+ * - Xử lý feedback đa ngôn ngữ (trích xuất feedback tiếng Việt)
+ * - Phân loại vi phạm với icon và màu sắc riêng (8 loại vi phạm)
+ * - Tích hợp component AiModerationReport để hiển thị vi phạm chi tiết
+ * - Navigation thông minh giữa các trang quản lý
+ * - Responsive design với grid layout
+ * - Xử lý lỗi API thống nhất với helper function
+ *
+ * COMPONENTS TÍCH HỢP:
+ * - AiModerationReport: Hiển thị báo cáo kiểm duyệt AI
+ * - ImageWithFallback: Hiển thị ảnh với fallback khi lỗi
+ * - Alert: Hiển thị thông báo theo trạng thái
+ * - Badge: Hiển thị trạng thái với styling phù hợp
+ */
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -44,6 +90,25 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ImageWithFallback } from "@/components/ui/ImageWithFallback";
 import { toast } from "sonner";
 import { AiModerationReport } from "@/components/AiModerationReport";
+
+/**
+ * HÀM TRÍCH XUẤT FEEDBACK TIẾNG VIỆT TỪ FEEDBACK STRING
+ *
+ * VẤN ĐỀ GIẢI QUYẾT:
+ * - AI feedback có thể chứa cả tiếng Anh và tiếng Việt
+ * - Format: "English feedback... Tiếng Việt: [feedback tiếng Việt]"
+ * - Cần extract phần tiếng Việt để hiển thị cho user
+ *
+ * LOGIC XỬ LÝ:
+ * 1. Dùng regex tìm cụm "Tiếng Việt:" (không phân biệt hoa thường)
+ * 2. Nếu tìm thấy -> lấy phần sau cụm đó
+ * 3. Nếu không tìm thấy -> trả về toàn bộ feedback
+ *
+ * TẠI SAO CẦN HÀM NÀY:
+ * - Người dùng Việt Nam dễ hiểu feedback tiếng Việt hơn
+ * - AI có thể trả về feedback 2 ngôn ngữ
+ * - Ưu tiên hiển thị ngôn ngữ phù hợp với user
+ */
 const extractVietnameseFeedback = (
   feedback: string | null | undefined
 ): string | null => {
@@ -63,6 +128,30 @@ const extractVietnameseFeedback = (
   // ta ưu tiên trả về chính nó nhưng đây là phương án dự phòng.
   return feedback.trim();
 };
+
+/**
+ * HÀM TRẢ VỀ STYLE CHO CÁC LOẠI VI PHẠM KHÁC NHAU
+ *
+ * MỤC ĐÍCH:
+ * - Mỗi loại vi phạm có icon, màu sắc và label riêng
+ * - Tạo visual distinction giữa các loại vi phạm
+ * - Giúp user dễ nhận biết loại vấn đề
+ *
+ * CẤU TRÚC DỮ LIỆU:
+ * - labelVn: Label tiếng Việt cho loại vi phạm
+ * - icon: React component icon từ lucide-react
+ * - color: Tailwind CSS classes cho styling
+ *
+ * 8 LOẠI VI PHẠM ĐƯỢC HỖ TRỢ:
+ * 1. wrong_language: Ngôn ngữ không hợp lệ
+ * 2. sexual_explicit: Nội dung nhạy cảm/NSFW
+ * 3. violent_gore: Bạo lực & Máu me
+ * 4. spam_repetition: Spam & Lặp từ ngữ
+ * 5. url_redirect: Liên kết ngoài/Quảng cáo
+ * 6. grammar_spelling: Lỗi trình bày/Chính tả
+ * 7. weak_prose: Văn phong cần cải thiện
+ * 8. inconsistent_content: Nội dung không đồng nhất
+ */
 const getViolationStyle = (label: string) => {
   const styles: Record<string, { labelVn: string; icon: any; color: string }> =
     {
@@ -123,11 +212,26 @@ export default function StoryDetailPage() {
   const params = useParams();
   const router = useRouter();
   const storyId = params.id as string;
-
+  // State quản lý dữ liệu
   const [story, setStory] = useState<Story | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isChaptersLoading, setIsChaptersLoading] = useState(false);
+
+  /**
+   * HELPER FUNCTION XỬ LÝ LỖI API - GIỐNG CÁC FILE KHÁC
+   *
+   * LOGIC XỬ LÝ:
+   * 1. Kiểm tra lỗi validation từ backend (details)
+   * 2. Nếu có validation errors -> hiển thị lỗi đầu tiên
+   * 3. Nếu có message từ backend -> hiển thị message đó
+   * 4. Fallback: dùng message mặc định hoặc từ response
+   *
+   * ƯU ĐIỂM CỦA CÁCH TIẾP CẬN NÀY:
+   * - Xử lý được nhiều error format khác nhau
+   * - Ưu tiên hiển thị lỗi chi tiết nhất
+   * - Giảm code duplicate trong các components
+   */
   const handleApiError = (error: any, defaultMessage: string) => {
     // 1. Check lỗi Validation/Logic từ Backend
     if (error.response && error.response.data && error.response.data.error) {
@@ -156,23 +260,36 @@ export default function StoryDetailPage() {
     toast.error(fallbackMsg);
   };
   // -------------------
+
+  /**
+   * LOAD THÔNG TIN TRUYỆN KHI COMPONENT MOUNT
+   *
+   * FLOW XỬ LÝ:
+   * 1. Set isLoading = true để hiển thị loading
+   * 2. Gọi API getStoryDetails để lấy thông tin đầy đủ
+   * 3. Lưu story vào state
+   * 4. Gọi loadChapters để lấy danh sách chương
+   * 5. Xử lý lỗi nếu có
+   * 6. Set isLoading = false để hiển thị content
+   *
+   * TẠI SAO LOAD CHAPTERS TRONG HÀM NÀY:
+   * - Story và chapters có quan hệ 1-n
+   * - Cần hiển thị cả story info và chapters list
+   * - Tránh gọi API nhiều lần không cần thiết
+   */
   useEffect(() => {
     loadStory();
-  }, [storyId]);
+  }, [storyId]); // Chỉ chạy lại khi storyId thay đổi
 
   const loadStory = async () => {
     setIsLoading(true);
     try {
+      // 1. Load thông tin truyện từ API
       const data = await storyService.getStoryDetails(storyId);
       setStory(data);
 
-      // Load chapters cho tất cả trạng thái, không chỉ published
+      // 2. Load chapters cho tất cả trạng thái
       await loadChapters(data.storyId);
-      // } catch (error) {
-      //   console.error("Error loading story:", error);
-      // } finally {
-      //   setIsLoading(false);
-      // }
     } catch (error: any) {
       // --- DÙNG HELPER ---
       handleApiError(error, "Không thể tải thông tin truyện.");
@@ -181,20 +298,29 @@ export default function StoryDetailPage() {
     }
   };
 
+  /**
+   * LOAD DANH SÁCH CHAPTERS
+   *
+   * FLOW XỬ LÝ:
+   * 1. Set isChaptersLoading = true
+   * 2. Gọi API getAllChapters (load tất cả chapters, không filter)
+   * 3. Lưu chapters vào state
+   * 4. Xử lý lỗi và reset chapters về [] nếu có lỗi
+   * 5. Set isChaptersLoading = false
+   *
+   * TẠI SAO LOAD TẤT CẢ CHAPTERS (KHÔNG FILTER):
+   * - Tác giả cần xem tất cả chapters (kể cả draft, pending)
+   * - Chỉ filter khi hiển thị (trong getDisplayChapters)
+   * - Tránh phải gọi API nhiều lần cho các filter khác nhau
+   */
   const loadChapters = async (storyId: string) => {
     setIsChaptersLoading(true);
     try {
       // Load tất cả chapters, không filter theo status
       const data = await chapterService.getAllChapters(storyId);
       setChapters(data);
-      // } catch (error) {
-      //   console.error("Error loading chapters:", error);
-      //   setChapters([]);
-      // } finally {
-      //   setIsChaptersLoading(false);
-      // }
     } catch (error: any) {
-      setChapters([]); // Giữ nguyên logic reset mảng rỗng để tránh lỗi UI
+      setChapters([]); // Reset về mảng rỗng để tránh lỗi UI
       // --- DÙNG HELPER ---
       handleApiError(error, "Không thể tải danh sách chương.");
     } finally {
@@ -202,6 +328,18 @@ export default function StoryDetailPage() {
     }
   };
 
+  /**
+   * HELPER FUNCTION ĐỂ NAVIGATE ĐẾN CÁC TRANG KHÁC
+   *
+   * MỤC ĐÍCH:
+   * - Centralize navigation logic
+   * - Tránh hardcode URLs trong nhiều nơi
+   * - Dễ thay đổi route structure sau này
+   *
+   * CẤU TRÚC:
+   * - routes object map page key -> route string
+   * - Có thể truyền params qua navParams
+   */
   const handleNavigate = (page: string, navParams?: any) => {
     const routes: Record<string, string> = {
       home: "/",
@@ -223,7 +361,7 @@ export default function StoryDetailPage() {
   const handleReadChapter = (chapterId: string) => {
     handleNavigate("read-chapter", { storyId, chapterId });
   };
-
+  // Hiển thị loading spinner khi đang tải dữ liệu
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -231,7 +369,7 @@ export default function StoryDetailPage() {
       </div>
     );
   }
-
+  // Hiển thị thông báo nếu không tìm thấy truyện
   if (!story) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
@@ -244,6 +382,22 @@ export default function StoryDetailPage() {
     );
   }
 
+  /**
+   * HÀM TRẢ VỀ THÔNG TIN BADGE CHO TỪNG TRẠNG THÁI TRUYỆN
+   *
+   * MỤC ĐÍCH:
+   * - Mỗi trạng thái có label, variant, icon và className riêng
+   * - Tạo visual consistency trong toàn ứng dụng
+   * - Dễ thêm/sửa trạng thái mới
+   *
+   * 6 TRẠNG THÁI ĐƯỢC HỖ TRỢ:
+   * 1. draft: Bản nháp (chưa gửi AI)
+   * 2. pending: Chờ duyệt (đã gửi AI, chờ ContentMod)
+   * 3. published: Đã xuất bản
+   * 4. hidden: Đã ẩn (chỉ tác giả thấy)
+   * 5. rejected: Bị từ chối
+   * 6. completed: Đã hoàn thành
+   */
   const getStatusBadge = (status: Story["status"]) => {
     switch (status) {
       case "draft":
@@ -298,7 +452,19 @@ export default function StoryDetailPage() {
   const statusInfo = getStatusBadge(story.status);
   const StatusIcon = statusInfo.icon;
 
-  // Hiển thị thông báo đặc biệt cho các trạng thái
+  /**
+   * HÀM TRẢ VỀ ALERT THÔNG BÁO ĐẶC BIỆT CHO TỪNG TRẠNG THÁI
+   *
+   * MỤC ĐÍCH:
+   * - Cung cấp hướng dẫn/feedback theo trạng thái
+   * - Mỗi trạng thái có message và styling riêng
+   * - Giúp user hiểu được trạng thái hiện tại và hành động tiếp theo
+   *
+   * LOGIC XỬ LÝ:
+   * - Switch case dựa trên story.status
+   * - Mỗi case trả về Alert component với styling phù hợp
+   * - rejected status có xử lý đặc biệt: extract Vietnamese feedback
+   */
   const getStatusAlert = () => {
     switch (story.status) {
       case "draft":
@@ -331,7 +497,7 @@ export default function StoryDetailPage() {
           </Alert>
         );
       case "rejected":
-        // Gọi hàm extract đã cập nhật ở trên
+        // Gọi hàm extract để lấy feedback tiếng Việt
         const rawFeedback = extractVietnameseFeedback(story.aiFeedback);
 
         // Logic hiển thị: Nếu có feedback thì hiện, không thì hiện thông báo mặc định
@@ -362,7 +528,18 @@ export default function StoryDetailPage() {
     }
   };
 
-  // Filter chapters theo status để hiển thị
+  /**
+   * FILTER CHAPTERS THEO STATUS ĐỂ HIỂN THỊ
+   *
+   * BUSINESS LOGIC:
+   * - Published/completed stories: chỉ hiện published chapters (cho độc giả)
+   * - Các status khác: hiện tất cả chapters (cho tác giả quản lý)
+   *
+   * TẠI SAO CÓ LOGIC NÀY:
+   * - Published story: độc giả chỉ nên xem chapters đã xuất bản
+   * - Draft/pending story: tác giả cần xem tất cả để quản lý
+   * - Hidden story: tác giả vẫn cần xem tất cả để chỉnh sửa
+   */
   const getDisplayChapters = () => {
     if (story.status === "published" || story.status === "completed") {
       return chapters.filter((ch) => ch.status === "published");
@@ -374,10 +551,10 @@ export default function StoryDetailPage() {
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Status Alert */}
+      {/* Status Alert - Hiển thị alert theo trạng thái */}
       {getStatusAlert()}
 
-      {/* Story Info Card */}
+      {/* Story Info Card - Card chính hiển thị thông tin truyện */}
       <Card>
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row gap-6">
@@ -491,7 +668,7 @@ export default function StoryDetailPage() {
                     </div>
                   </div>
                 )}
-
+                {/* Ngôn ngữ */}
                 <div className="flex flex-col">
                   <p className="text-xs text-muted-foreground mb-1.5 font-bold">
                     Ngôn ngữ
@@ -601,20 +778,6 @@ export default function StoryDetailPage() {
                 </Alert>
               )}
 
-              {/* AI Feedback */}
-              {/* {story.aiFeedback && (
-                <div className="pt-2">
-                  <p className="text-xs text-muted-foreground mb-1 font-bold">
-                    Phản hồi AI:
-                  </p>
-                  <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
-                    <AlertDescription className="text-sm whitespace-pre-wrap">
-                      {extractVietnameseFeedback(story.aiFeedback) ||
-                        story.aiFeedback}
-                    </AlertDescription>
-                  </Alert>
-                </div>
-              )} */}
               {/* Section: Kết quả kiểm duyệt AI chi tiết */}
               <AiModerationReport
                 aiFeedback={story.aiFeedback}
@@ -692,25 +855,12 @@ export default function StoryDetailPage() {
                   </Card>
                 </div>
               )}
-
-              {/* Action Buttons */}
-              {/* <div className="flex gap-2 pt-4">
-                {story.status === "draft" && (
-                  <Button
-                    onClick={() => router.push(`/author/story/${storyId}/edit`)}
-                    className="ml-3"
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Chỉnh sửa thông tin
-                  </Button>
-                )}
-              </div> */}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Chapters Section - Hiển thị cho tất cả trạng thái */}
+      {/* Chapters Section - Hiển thị cho tất cả trạng thái (trừ rejected) */}
       {story.status !== "rejected" && (
         <Card>
           <CardHeader>
@@ -787,6 +937,7 @@ export default function StoryDetailPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {/* Read button chỉ hiện cho published chapters trong published/hidden/completed stories */}
                       {(story.status === "published" ||
                         story.status === "completed" ||
                         story.status === "hidden") &&
