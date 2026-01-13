@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, ShieldAlert, LogOut, Banknote } from "lucide-react";
+import { Users, ShieldAlert, LogOut, Banknote, LayoutDashboard } from "lucide-react";
 
 import {
   Sidebar,
@@ -23,6 +23,7 @@ import { useAuth } from "@/context/AuthContext";
 // 🧭 Danh sách menu chính cho Admin
 const data = {
   navMain: [
+    { title: "Tổng quan hệ thống", url: "/Admin/dashboard", icon: LayoutDashboard }, 
     { title: "Quản lý Tài khoản", url: "/Admin", icon: Users },
     { title: "Quản lý Biểu phí", url: "/Admin/pricing", icon: Banknote },
   ],

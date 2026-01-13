@@ -17,7 +17,7 @@ export interface Account {
 export interface AdminStatsResponse {
   items: Account[];
   total: number;
-  page: number;
+  page: number; 
   pageSize: number;
 }
 
@@ -57,6 +57,28 @@ export interface SubscriptionPlan {
   price_vnd: number;
   daily_dias: number;
 }
+
+// --- System Status Types ---
+export interface UptimeResponse {
+  startedAtUtc: string;
+  uptimeSeconds: number;
+}
+
+export interface HealthResponse {
+  status: string; // "Healthy" | "Degraded" | "Unhealthy"
+  checkedAtUtc: string;
+  components: {
+    api: boolean;
+    database: boolean;
+    redis: boolean;
+    openAiConfigured: boolean;
+    cloudflareR2Configured: boolean;
+    cloudinaryConfigured: boolean;
+    [key: string]: boolean; // Để hỗ trợ các component bổ sung sau này
+  };
+}
+
+
 
 // --- API Functions ---
 
@@ -106,6 +128,11 @@ export async function updateAccountStatus(accountId: string, status: "banned" | 
   }
 }
 
+// --- System Status APIs ---
+export const systemApi = {
+  getUptime: () => apiClient.get<UptimeResponse>("/api/Admin/uptime"),
+  getHealth: () => apiClient.get<HealthResponse>("/api/Admin/health"),
+};
 // --- Pricing APIs ---
 
 export const pricingApi = {
