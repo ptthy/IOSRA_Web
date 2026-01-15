@@ -1,11 +1,11 @@
 /**
  * @page StatisticsPage
- * @description Trang báo cáo số liệu bằng biểu đồ.
- * Sử dụng thư viện Recharts để hiển thị xu hướng kiểm duyệt và phân loại vi phạm.
+ * @description Trang báo cáo số liệu tổng hợp.
+ * Kết hợp Traffic Light (Sức khỏe hệ thống) và Biểu đồ chi tiết (Recharts).
  */
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -22,27 +22,155 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
-import { Download, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Download, Loader2, Activity, Calendar, BarChart3, AlertTriangle, CheckCircle2, AlertCircle } from "lucide-react";
 import { 
     getContentModStats, 
     getViolationBreakdown, 
-    exportContentModStats, // Hàm xuất file
+    exportContentModStats,
     StatSeriesResponse, 
-    ViolationStatsResponse 
+    ViolationStatsResponse,
+    ViolationStat
 } from "@/services/moderationApi";
-import { Roboto } from "next/font/google";
+import { toast } from "sonner";
+
+// ==================================================================================
+// PHẦN 1: COMPONENT CON - MODERATION HEALTH DASHBOARD (TRAFFIC LIGHT)
+// ==================================================================================
+
+// Cấu hình ngưỡng (Thresholds) cho đèn báo
+const HEALTH_RULES = {
+  stories: { warning: 20, danger: 50 },   
+  chapters: { warning: 100, danger: 200 }, 
+  reports: { warning: 20, danger: 50 },    
+  efficiency: { warning: 80, danger: 50 }, // % (Cao là tốt)
+  handling: { warning: 80, danger: 50 },   // % (Cao là tốt)
+};
+
+const getLoadStatus = (value: number, rule: { warning: number, danger: number }) => {
+  if (value > rule.danger) return "red";
+  if (value > rule.warning) return "yellow";
+  return "green";
+};
+
+const getPerformanceStatus = (value: number, rule: { warning: number, danger: number }) => {
+  if (value < rule.danger) return "red";
+  if (value < rule.warning) return "yellow";
+  return "green";
+};
+
+const StatusIndicator = ({ status, label }: { status: string, label: string }) => {
+  const styles: any = {
+    green: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
+    yellow: "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800",
+    red: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
+  };
+  const icons: any = {
+    green: <CheckCircle2 className="w-3 h-3" />,
+    yellow: <AlertTriangle className="w-3 h-3" />,
+    red: <AlertCircle className="w-3 h-3" />,
+  };
+
+  return (
+    <Badge variant="outline" className={`flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium border ${styles[status] || styles.green}`}>
+      {icons[status] || icons.green} {label}
+    </Badge>
+  );
+};
+
+function ModerationHealthDashboard({ period }: { period: Period }) {
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ stories: 0, chapters: 0, decisions: 0, reports: 0, handled: 0 });
+useEffect(() => {
+  const fetchHealth = async () => {
+    try {
+      setLoading(true);
+      const [s, c, d, r, h] = await Promise.all([
+        getContentModStats("stories", { period }),
+        getContentModStats("chapters", { period }),
+        getContentModStats("story-decisions", { period }),
+        getContentModStats("reports", { period }),
+        getContentModStats("reports/handled", { period }),
+      ]);
+      setStats({
+        stories: s.total,
+        chapters: c.total,
+        decisions: d.total,
+        reports: r.total,
+        handled: h.total,
+      });
+    } catch (e) {
+      console.error("Health Check Error:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchHealth();
+}, [period]);
+
+
+  if (loading) return <div className="h-24 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>;
+
+  const efficiencyRate = (stats.stories + stats.chapters) > 0 ? (stats.decisions / (stats.stories + stats.chapters)) * 100 : 100;
+  const handlingRate = stats.reports > 0 ? (stats.handled / stats.reports) * 100 : 100;
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+      {/* 1. Stories */}
+      <Card className="shadow-sm border-l-4 border-l-blue-500">
+        <CardHeader className="p-3 pb-1"><CardTitle className="text-xs text-muted-foreground uppercase font-semibold">Truyện chờ duyệt</CardTitle></CardHeader>
+        <CardContent className="p-3 pt-0">
+          <div className="text-2xl font-bold">{stats.stories}</div>
+          <div className="mt-2"><StatusIndicator status={getLoadStatus(stats.stories, HEALTH_RULES.stories)} label={stats.stories > 50 ? "Quá tải" : "Ổn định"} /></div>
+        </CardContent>
+      </Card>
+      {/* 2. Chapters */}
+      <Card className="shadow-sm border-l-4 border-l-indigo-500">
+        <CardHeader className="p-3 pb-1"><CardTitle className="text-xs text-muted-foreground uppercase font-semibold">Chương chờ duyệt</CardTitle></CardHeader>
+        <CardContent className="p-3 pt-0">
+          <div className="text-2xl font-bold">{stats.chapters}</div>
+          <div className="mt-2"><StatusIndicator status={getLoadStatus(stats.chapters, HEALTH_RULES.chapters)} label={stats.chapters > 200 ? "Ùn tắc" : "Bình thường"} /></div>
+        </CardContent>
+      </Card>
+      {/* 3. Reports */}
+      <Card className="shadow-sm border-l-4 border-l-orange-500">
+        <CardHeader className="p-3 pb-1"><CardTitle className="text-xs text-muted-foreground uppercase font-semibold">Báo cáo mới</CardTitle></CardHeader>
+        <CardContent className="p-3 pt-0">
+          <div className="text-2xl font-bold">{stats.reports}</div>
+          <div className="mt-2"><StatusIndicator status={getLoadStatus(stats.reports, HEALTH_RULES.reports)} label={stats.reports > 50 ? "Báo động" : "Ít vi phạm"} /></div>
+        </CardContent>
+      </Card>
+      {/* 4. Efficiency */}
+      <Card className="shadow-sm border-l-4 border-l-purple-500">
+        <CardHeader className="p-3 pb-1"><CardTitle className="text-xs text-muted-foreground uppercase font-semibold">Năng suất duyệt</CardTitle></CardHeader>
+        <CardContent className="p-3 pt-0">
+          <div className="text-2xl font-bold">{efficiencyRate.toFixed(0)}%</div>
+          <div className="mt-2"><StatusIndicator status={getPerformanceStatus(efficiencyRate, HEALTH_RULES.efficiency)} label={efficiencyRate < 50 ? "Cần đẩy nhanh" : "Tốt"} /></div>
+        </CardContent>
+      </Card>
+      {/* 5. Handling Rate */}
+      <Card className="shadow-sm border-l-4 border-l-teal-500">
+        <CardHeader className="p-3 pb-1"><CardTitle className="text-xs text-muted-foreground uppercase font-semibold">Tỷ lệ xử lý Report</CardTitle></CardHeader>
+        <CardContent className="p-3 pt-0">
+          <div className="text-2xl font-bold">{handlingRate.toFixed(0)}%</div>
+          <div className="mt-2"><StatusIndicator status={getPerformanceStatus(handlingRate, HEALTH_RULES.handling)} label="Đã xử lý" /></div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ==================================================================================
+// PHẦN 2: COMPONENT CHÍNH - STATISTICS DASHBOARD (CHỨA CẢ HEALTH VÀ CHARTS)
+// ==================================================================================
 
 type Period = "day" | "week" | "month" | "year";
 type Endpoint = "stories" | "chapters" | "story-decisions" | "reports" | "reports/handled";
 
-const roboto = Roboto({
-  subsets: ["latin", "vietnamese"],
-  weight: ["300", "400", "500", "700"],
-});
-
 const ENDPOINTS: { label: string; value: Endpoint }[] = [
-  { label: "Truyện (Đã đăng)", value: "stories" },
-  { label: "Chương (Đã đăng)", value: "chapters" },
+  { label: "Truyện (published)", value: "stories" },
+  { label: "Chương (published)", value: "chapters" },
   { label: "Quyết định (duyệt/từ chối)", value: "story-decisions" },
   { label: "Báo cáo mới", value: "reports" },
   { label: "Báo cáo đã xử lý", value: "reports/handled" },
@@ -57,291 +185,256 @@ const PERIODS: { label: string; value: Period }[] = [
 
 const PIE_COLORS = ["#8B5FBF", "#5D3FD3", "#A97FE3", "#E0D4EE", "#B6A77B", "#FF7F50", "#4682B4", "#3CB371"];
 
-export default function StatisticsPage(): JSX.Element {
-  // Lấy dữ liệu Breakdown (Biểu đồ tròn) để xem lý do vi phạm nào chiếm đa số
-  const [endpoint, setEndpoint] = useState<Endpoint>("stories");
-  const [period, setPeriod] = useState<Period>("day");
-  const [from, setFrom] = useState<string | undefined>(undefined);
-  const [to, setTo] = useState<string | undefined>(undefined);
+export default function StatisticsDashboard() {
+  const [selectedEndpoint, setSelectedEndpoint] = useState<Endpoint>("stories");
+  const [selectedPeriod, setSelectedPeriod] = useState<Period>("month");
+  
+  // State dữ liệu
+  const [seriesData, setSeriesData] = useState<StatSeriesResponse | null>(null);
+  const [violationData, setViolationData] = useState<ViolationStatsResponse | null>(null);
+  
+  const [seriesLoading, setSeriesLoading] = useState(false);
+  const [violationLoading, setViolationLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
-  const [series, setSeries] = useState<StatSeriesResponse | null>(null);
-  const [seriesLoading, setSeriesLoading] = useState<boolean>(false);
-  const [seriesError, setSeriesError] = useState<string | null>(null);
-
-  const [violation, setViolation] = useState<ViolationStatsResponse | null>(null);
-  const [violationLoading, setViolationLoading] = useState<boolean>(false);
-
-  // State hiển thị loading khi xuất file
-  const [isExporting, setIsExporting] = useState<boolean>(false);
-
-  // Fetch series (Bar Chart)
-  const fetchSeries = useCallback(async () => {
+  // --- 1. Fetch Dữ liệu Biểu đồ Cột (Trend) ---
+  const fetchSeries = async () => {
     setSeriesLoading(true);
-    setSeriesError(null);
     try {
-      const q: { period?: Period; from?: string; to?: string } = { period };
-      if (from) q.from = from;
-      if (to) q.to = to;
-      const res = await getContentModStats(endpoint, q);
-      setSeries(res);
-    } catch (err: unknown) {
-      console.error(err);
-      setSeries(null);
-      setSeriesError("Không lấy được dữ liệu biểu đồ. Thử lại sau.");
+      const data = await getContentModStats(selectedEndpoint, { period: selectedPeriod });
+      setSeriesData(data);
+    } catch (err) {
+      console.error("Lỗi fetch series:", err);
+      setSeriesData(null);
     } finally {
       setSeriesLoading(false);
     }
-  }, [endpoint, period, from, to]);
+  };
 
-  // Fetch violation breakdown (Pie Chart - Aggregated from Real Data)
-  const fetchViolation = useCallback(async () => {
+  // --- 2. Fetch Dữ liệu Biểu đồ Tròn (Violation) ---
+  const fetchViolation = async () => {
     setViolationLoading(true);
     try {
-      const res = await getViolationBreakdown();
-      setViolation(res);
+      const data = await getViolationBreakdown();
+      setViolationData(data);
     } catch (err) {
-      console.error("Lỗi violation", err);
-      setViolation(null);
+      console.error("Lỗi fetch violation:", err);
+      setViolationData(null);
     } finally {
       setViolationLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
     fetchSeries();
+  }, [selectedEndpoint, selectedPeriod]);
+
+  useEffect(() => {
     fetchViolation();
-  }, [fetchSeries, fetchViolation]);
+  }, []); // Chỉ load 1 lần khi mount
 
-  /**
-   * Hàm xuất file báo cáo (Excel/CSV).
-   * Dữ liệu nhận về là một Blob (nhị phân), sau đó tạo link ảo để trình duyệt tải về.
-   */
+  // --- 3. Xử lý xuất Excel ---
   const handleExport = async () => {
-    setIsExporting(true);
+    setExporting(true);
     try {
-      // Gọi API xuất file với các filter hiện tại
-      const blob = await exportContentModStats(endpoint, { 
-        period, 
-        from, 
-        to 
-      });
-
-      // Tạo link download ảo
+      const blob = await exportContentModStats(selectedEndpoint, { period: selectedPeriod });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      
-      // Tạo tên file: stats-{loại}-{ngày}.xlsx
-      const timestamp = new Date().toISOString().split('T')[0];
-      a.download = `stats-${endpoint}-${timestamp}.xlsx`; 
-      
+      a.download = `Statistic_${selectedEndpoint}_${selectedPeriod}_${new Date().toISOString()}.xlsx`;
       document.body.appendChild(a);
       a.click();
-      
-      // Cleanup
       window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
+      toast.success("Đã xuất báo cáo thành công!");
     } catch (error) {
-      console.error("Export failed", error);
-      alert("Xuất file thất bại. Có thể backend chưa hỗ trợ định dạng này.");
+      toast.error("Xuất báo cáo thất bại.");
     } finally {
-      setIsExporting(false);
+      setExporting(false);
     }
   };
 
   return (
-    <main className={`${roboto.className} p-8 min-h-screen bg-[var(--background)]`}>
-      <div className="mb-6 flex items-center justify-between">
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-[var(--primary)]">Thống Kê Kiểm Duyệt</h1>
-          <p className="text-[var(--muted-foreground)]">Phân tích theo khoảng thời gian</p>
+          <h1 className="text-3xl font-bold text-[var(--primary)] mb-1">Thống Kê Kiểm Duyệt</h1>
+          <p className="text-[var(--muted-foreground)]">Theo dõi sức khỏe hệ thống và phân tích dữ liệu</p>
         </div>
-        
-        {/* Nút Xuất Excel */}
-        <Button 
-            className="bg-[var(--primary)] text-[var(--primary-foreground)]" 
-            onClick={handleExport}
-            disabled={isExporting}
-        >
-          {isExporting ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <Download className="w-4 h-4 mr-2" />
-          )}
-          {isExporting ? "Đang xuất..." : "Xuất Excel"}
-        </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
-        {/* Left: Bar Chart */}
-        <div className="lg:col-span-3 space-y-4">
-          <div className="flex flex-wrap gap-3">
-            <Select value={endpoint} onValueChange={(v) => setEndpoint(v as Endpoint)}>
-              <SelectTrigger className="w-64 bg-[var(--card)] border border-[var(--border)]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-[var(--card)] border border-[var(--border)]">
-                {ENDPOINTS.map((e) => (
-                  <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      {/* SECTION 1: HEALTH MONITORING (Traffic Light) */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+           <Activity className="w-5 h-5 text-blue-600" />
+          <h2 className="text-lg font-bold text-[var(--foreground)]">
+  Sức khỏe hệ thống ({PERIODS.find(p => p.value === selectedPeriod)?.label})
+</h2>
+        </div>
+        <ModerationHealthDashboard period={selectedPeriod} />
+      </section>
 
-            <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-              <SelectTrigger className="w-40 bg-[var(--card)] border border-[var(--border)]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-[var(--card)] border border-[var(--border)]">
-                {PERIODS.map((p) => (
-                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
+      {/* SECTION 2: ANALYTICS (Charts) */}
+      <section>
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
             <div className="flex items-center gap-2">
-              <label className="text-sm text-[var(--muted-foreground)]">Từ</label>
-              <input
-                type="date"
-                className="px-3 py-2 rounded border border-[var(--border)] bg-[var(--card)] text-sm"
-                onChange={(e) => setFrom(e.target.value || undefined)}
-                value={from ?? ""}
-              />
+                <BarChart3 className="w-5 h-5 text-gray-500" />
+                <h2 className="text-lg font-bold text-[var(--foreground)]">Phân tích chi tiết</h2>
             </div>
+            
+            <div className="flex flex-wrap gap-3">
+              <Select value={selectedEndpoint} onValueChange={(val: Endpoint) => setSelectedEndpoint(val)}>
+                <SelectTrigger className="w-[200px] bg-[var(--card)] border-[var(--border)]">
+                  <SelectValue placeholder="Chọn loại dữ liệu" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ENDPOINTS.map((ep) => (
+                    <SelectItem key={ep.value} value={ep.value}>{ep.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-[var(--muted-foreground)]">Đến</label>
-              <input
-                type="date"
-                className="px-3 py-2 rounded border border-[var(--border)] bg-[var(--card)] text-sm"
-                onChange={(e) => setTo(e.target.value || undefined)}
-                value={to ?? ""}
-              />
+              <Select value={selectedPeriod} onValueChange={(val: Period) => setSelectedPeriod(val)}>
+                <SelectTrigger className="w-[150px] bg-[var(--card)] border-[var(--border)]">
+                  <SelectValue placeholder="Chọn chu kỳ" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PERIODS.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button variant="outline" onClick={handleExport} disabled={exporting}>
+                  {exporting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+                  Xuất Excel
+              </Button>
             </div>
-
-            <Button onClick={fetchSeries}>Áp dụng</Button>
-          </div>
-
-          <Card className="border border-[var(--border)] bg-[var(--card)]">
-            <CardHeader>
-              <CardTitle className="text-[var(--primary)]">
-                {ENDPOINTS.find((e) => e.value === endpoint)?.label} — Tổng: {series?.total?.toLocaleString() ?? "..."}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {seriesLoading && (
-                <div className="flex justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
-                </div>
-              )}
-
-              {seriesError && <div className="text-red-600 py-6 text-center">{seriesError}</div>}
-
-              {!seriesLoading && !seriesError && series && series.points.length > 0 && (
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={series.points} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                      <XAxis dataKey="periodLabel" stroke="var(--foreground)" />
-                      <YAxis stroke="var(--foreground)" tickFormatter={(v) => v.toLocaleString()} />
-                      <Tooltip formatter={(v: number) => v.toLocaleString()} />
-                      <Bar dataKey="value" name="Số lượng" fill="var(--primary)" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              {!seriesLoading && !seriesError && (!series || series.points.length === 0) && (
-                <div className="py-12 text-center text-[var(--muted-foreground)]">Không có dữ liệu để hiển thị.</div>
-              )}
-            </CardContent>
-          </Card>
         </div>
 
-        {/* Right: Pie Chart */}
-        <div className="h-full flex flex-col">
-          <Card className="border border-[var(--border)] bg-[var(--card)] flex flex-col h-full">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-[var(--primary)] text-lg">
-                Phân loại vi phạm
-                <span className="block mt-1 text-xs font-normal text-[var(--muted-foreground)]">
-                  (Dựa trên 100 báo cáo gần nhất)
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col">
-              {violationLoading && (
-                <div className="flex-1 flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 animate-spin" />
-                </div>
-              )}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Cột Trái: Biểu đồ Cột (Trend) */}
+            <Card className="lg:col-span-2 border border-[var(--border)] bg-[var(--card)]">
+                <CardHeader>
+                  <CardTitle className="text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    Xu hướng: {ENDPOINTS.find(e => e.value === selectedEndpoint)?.label}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {seriesLoading ? (
+                    <div className="h-[350px] flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
+                    </div>
+                  ) : !seriesData || seriesData.points.length === 0 ? (
+                    <div className="h-[350px] flex items-center justify-center text-[var(--muted-foreground)]">
+                      Không có dữ liệu trong khoảng thời gian này.
+                    </div>
+                  ) : (
+                    <div className="h-[350px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={seriesData.points} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                          <XAxis 
+                            dataKey="periodLabel" 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }} 
+                            dy={10} 
+                          />
+                          <YAxis 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }} 
+                          />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: 'var(--card)', 
+                              border: '1px solid var(--border)',
+                              borderRadius: '8px',
+                              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                            }}
+                            labelStyle={{ color: 'var(--foreground)', fontWeight: 'bold' }}
+                            formatter={(value: number) => [value.toLocaleString(), 'Số lượng']}
+                          />
+                          <Bar 
+                            dataKey="value" 
+                            fill="var(--primary)" 
+                            radius={[4, 4, 0, 0]} 
+                            maxBarSize={50} 
+                            name="Số lượng"
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </CardContent>
+            </Card>
 
-              {!violationLoading && violation && violation.breakdown.length > 0 && (
-                <>
-                  <div className="min-h-80 flex-1">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                        <Pie
-                          data={violation.breakdown}
-                          dataKey="count"
-                          nameKey="violationType"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius="80%"
-                          innerRadius="45%"
-                          paddingAngle={3}
-                          cornerRadius={8}
-                        >
-                          {violation.breakdown.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={PIE_COLORS[index % PIE_COLORS.length]}
-                              stroke="var(--card)"
-                              strokeWidth={4}
+            {/* Cột Phải: Biểu đồ Tròn (Violation Breakdown) */}
+            <Card className="border border-[var(--border)] bg-[var(--card)]">
+                <CardHeader>
+                  <CardTitle className="text-base font-semibold text-[var(--foreground)]">Phân loại lý do vi phạm</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {violationLoading ? (
+                    <div className="h-[300px] flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
+                    </div>
+                  ) : !violationData || violationData.breakdown.length === 0 ? (
+                    <div className="h-[300px] flex flex-col items-center justify-center text-[var(--muted-foreground)]">
+                      <AlertCircle className="w-8 h-8 mb-2 opacity-20" />
+                      <p>Chưa có dữ liệu vi phạm</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={violationData.breakdown}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={80}
+                              paddingAngle={2}
+                              dataKey="count"
+                              nameKey="violationType"
+                            >
+                              {violationData.breakdown.map((entry: ViolationStat, index: number) => (
+                                <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip 
+                               formatter={(value: number) => value.toLocaleString()}
+                               contentStyle={{ 
+                                  backgroundColor: 'var(--card)', 
+                                  border: '1px solid var(--border)',
+                                  borderRadius: '8px'
+                               }}
                             />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value: number) => value.toLocaleString()}
-                          contentStyle={{
-                            backgroundColor: "var(--background)",
-                            border: "1px solid var(--border)",
-                            borderRadius: "8px",
-                            fontSize: "14px",
-                          }}
-                        />
-                        <Legend
-                          layout="horizontal"
-                          verticalAlign="bottom"
-                          align="center"
-                          height={60}
-                          iconType="circle"
-                          formatter={(value) => <span className="text-sm">{value}</span>}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  <div className="mt-4 text-center">
-                    <p className="text-sm text-[var(--muted-foreground)]">
-                      Tổng số mẫu:{" "}
-                      <span className="font-semibold text-foreground">
-                        {violation.totalReports.toLocaleString()}
-                      </span>
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {!violationLoading && (!violation || violation.breakdown.length === 0) && (
-                <div className="flex-1 flex items-center justify-center text-[var(--muted-foreground)]">
-                  Không có dữ liệu phân loại vi phạm.
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                            <Legend 
+                              layout="horizontal" 
+                              verticalAlign="bottom" 
+                              align="center"
+                              iconType="circle"
+                              className="text-xs"
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="text-center mt-2">
+                        <p className="text-sm text-[var(--muted-foreground)]">
+                          Tổng mẫu phân tích: <span className="font-bold text-[var(--foreground)]">{violationData.totalReports}</span>
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+            </Card>
         </div>
-      </div>
-    </main>
+      </section>
+    </div>
   );
 }
