@@ -384,6 +384,9 @@ export function TopUpModal({
                      * So sánh tỷ lệ kim cương/giá tiền với gói cơ bản nhất
                      * Công thức: ((currentRate - baseRate) / baseRate) * 100
                      */
+                    /** * Tính toán phần trăm bonus: * So sánh tỷ lệ kim
+                        cương/giá tiền với gói cơ bản nhất * Công thức:
+                        ((currentRate - baseRate) / baseRate) * 100 */
                     const baseRate =
                       packages[0].amountVnd > 0
                         ? packages[0].diamondGranted / packages[0].amountVnd
@@ -416,9 +419,6 @@ export function TopUpModal({
                           }
                         `}
                       >
-                        /** * Tính toán phần trăm bonus: * So sánh tỷ lệ kim
-                        cương/giá tiền với gói cơ bản nhất * Công thức:
-                        ((currentRate - baseRate) / baseRate) * 100 */
                         {isPopular && (
                           <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg z-10 tracking-wide uppercase whitespace-nowrap">
                             Phổ biến nhất

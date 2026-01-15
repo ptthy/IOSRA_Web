@@ -26,11 +26,13 @@ export interface TransactionMetadata {
   generatedVoices?: string[]; // Mảng ID giọng đã tạo
   charCount?: number; // Số ký tự
   buyerId?: string; // ID người mua
+  storyId?: string; // <--- Cần trường này để gom nhóm
+  storyTitle?: string; // <--- Cần trường này để hiển thị tên truyện
 }
 
 export interface TransactionItem {
   transactionId: string;
-  type: "purchase" | string;
+  type: "purchase" | "chapter_purchase" | "voice_purchase" | string;
   amount: number;
   purchaseLogId?: string | null;
   requestId?: string | null;
@@ -44,6 +46,9 @@ export interface TransactionItem {
 
   chapterId?: string | null;
   voicePurchaseId?: string | null;
+
+  storyId?: string | null;
+  storyTitle?: string | null;
 }
 
 export interface TransactionResponse {
@@ -86,7 +91,31 @@ export interface WithdrawRequestItem {
   createdAt: string;
   reviewedAt?: string | null;
 }
+// Định nghĩa cấu trúc dữ liệu người mua để hiển thị trong bảng/modal
+export interface PurchaserItem {
+  accountId: string;
+  username: string;
+  avatarUrl: string;
+  price: number;
+  purchaseDate: string;
+  type?: "chapter" | "voice" | string;
+}
 
+// Cấu trúc dữ liệu trả về từ API doanh thu chi tiết
+export interface RevenueDetailResponse {
+  contentId: string;
+  title: string;
+  totalRevenue: number;
+  chapterRevenue?: number;
+  voiceRevenue?: number;
+  totalPurchases: number;
+  purchasers: {
+    items: PurchaserItem[];
+    total: number;
+    page: number;
+    pageSize: number;
+  };
+}
 // --- API SERVICES ---
 
 // Lấy tổng quan doanh thu
@@ -124,6 +153,35 @@ const confirmWithdraw = (requestId: string) => {
     `/api/AuthorRevenue/withdraw/${requestId}/confirm`
   );
 };
+/**
+ * Lấy chi tiết doanh thu và danh sách người mua theo ID truyện
+ * @param storyId ID của truyện (UUID)
+ */
+const getStoryRevenueDetail = (storyId: string, page = 1, pageSize = 20) => {
+  return apiClient.get<RevenueDetailResponse>(
+    `/api/AuthorRevenue/stories/${storyId}`,
+    {
+      params: { page, pageSize },
+    }
+  );
+};
+
+/**
+ * Lấy chi tiết doanh thu và danh sách người mua theo ID chương
+ * @param chapterId ID của chương (UUID)
+ */
+const getChapterRevenueDetail = (
+  chapterId: string,
+  page = 1,
+  pageSize = 20
+) => {
+  return apiClient.get<RevenueDetailResponse>(
+    `/api/AuthorRevenue/chapters/${chapterId}`,
+    {
+      params: { page, pageSize },
+    }
+  );
+};
 
 export const authorRevenueService = {
   getSummary,
@@ -131,4 +189,6 @@ export const authorRevenueService = {
   requestWithdraw,
   getWithdrawHistory,
   confirmWithdraw,
+  getStoryRevenueDetail,
+  getChapterRevenueDetail,
 };

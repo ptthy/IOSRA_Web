@@ -107,11 +107,13 @@ const APDisplay = ({
   className = "",
   iconSize = 14,
   showPlus = false,
+  showAsterisk = true, // <--- THÊM PROP NÀY (Mặc định là true để giữ nguyên ở chỗ khác)
 }: {
   value: number;
   className?: string;
   iconSize?: number;
   showPlus?: boolean;
+  showAsterisk?: boolean; // <--- KHAI BÁO TYPE
 }) => {
   const isPositive = value > 0;
   // Màu mặc định: Xanh lá nếu dương (khi showPlus), Đỏ nếu âm, hoặc theo class truyền vào
@@ -134,9 +136,12 @@ const APDisplay = ({
       {/* Icon Gem màu xanh dương */}
       <div className="relative inline-flex items-center">
         <Gem size={iconSize} className="h-4 w-4 fill-blue-500 text-blue-600" />
-        <span className="absolute -bottom-3 -right-2 text-yellow-500 text-lg font-bold leading-none">
-          *
-        </span>
+        {/* Chỉ hiển thị dấu sao nếu showAsterisk = true */}
+        {showAsterisk && (
+          <span className="absolute -bottom-3 -right-2 text-yellow-500 text-lg font-bold leading-none">
+            *
+          </span>
+        )}
       </div>
     </span>
   );
@@ -207,6 +212,23 @@ const parseNumberInput = (value: string): number => {
  * - Xử lý cả trường hợp viết hoa và viết thường để phòng backend trả về khác nhau
  */
 const LABELS_MAP: Record<string, string> = {
+  // ---  THỐNG KÊ CHI TIẾT (STORIES/CHAPTERS) ---
+  contentId: "Mã nội dung",
+  title: "Tiêu đề nội dung",
+
+  // ---CHI TIẾT NGƯỜI MUA (ITEM) ---
+  // --- BỔ SUNG: DỮ LIỆU THỐNG KÊ CHI TIẾT ---
+  totalRevenue: "Tổng doanh thu",
+  chapterRevenue: "Doanh thu từ mở chương",
+  voiceRevenue: "Doanh thu từ giọng đọc",
+  totalPurchases: "Tổng lượt mua",
+  purchasers: "Danh sách người mua",
+  purchaseDate: "Thời gian mua",
+  price: "Giá mua",
+  username: "Người mua",
+  avatarUrl: "Ảnh đại diện",
+  accountId: "ID Tài khoản",
+
   // --- TÀI CHÍNH ---
   grossAmount: "Doanh thu ban đầu ",
   priceDias: "Giá cho 1 chương nếu mất phí (Dias)",
@@ -239,6 +261,7 @@ const LABELS_MAP: Record<string, string> = {
   // --- CÁC MÃ ID ---
   transactionId: "Mã giao dịch",
   requestId: "Mã yêu cầu",
+  filterType: "Đang lọc theo",
 };
 
 /**
@@ -273,15 +296,93 @@ const DetailModal = ({
   onClose,
   data,
   type,
+  purchaserData, // <--- THÊM PROP NÀY
 }: {
   isOpen: boolean;
   onClose: () => void;
   data: any;
   type: "transaction" | "withdraw";
+  purchaserData?: any; // <--- THÊM TYPE NÀY
 }) => {
   // Early return nếu modal không mở hoặc không có data
   if (!isOpen || !data) return null;
+  // --- LOGIC XÁC ĐỊNH LOẠI MODAL (MỚI) ---
+  // --- CODE MỚI: LOGIC HIỂN THỊ THỐNG KÊ ---
+  // Dùng purchaserData làm nguồn dữ liệu chính cho thống kê
+  const isContentStats = !!purchaserData;
+  const stats = purchaserData; // Alias cho ngắn gọn
 
+  // Hàm render 4 ô thống kê (Dashboard)
+  const renderStatsDashboard = () => {
+    if (!stats) return null;
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {/* Ô 1: Tổng Doanh Thu */}
+        <div className="p-3 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-100 dark:border-green-800">
+          <div className="text-xs text-green-600 dark:text-green-400 font-medium uppercase">
+            Tổng Doanh Thu
+          </div>
+          <div className="text-xl font-bold text-green-700 dark:text-green-300 mt-1">
+            <APDisplay value={stats.totalRevenue} />
+          </div>
+        </div>
+        {/* Ô 2: DT Chương */}
+        <div className="p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800">
+          <div className="text-xs text-blue-600 dark:text-blue-400 font-medium uppercase">
+            DT Chương
+          </div>
+          <div className="text-xl font-bold text-blue-700 dark:text-blue-300 mt-1">
+            <APDisplay value={stats.chapterRevenue || 0} />
+          </div>
+        </div>
+        {/* Ô 3: DT Giọng */}
+        <div className="p-3 bg-purple-50 dark:bg-purple-900/10 rounded-lg border border-purple-100 dark:border-purple-800">
+          <div className="text-xs text-purple-600 dark:text-purple-400 font-medium uppercase">
+            DT giọng
+          </div>
+          <div className="text-xl font-bold text-purple-700 dark:text-purple-300 mt-1">
+            <APDisplay value={stats.voiceRevenue || 0} />
+          </div>
+        </div>
+        {/* Ô 4: Lượt mua */}
+        <div className="p-3 bg-orange-50 dark:bg-orange-900/10 rounded-lg border border-orange-100 dark:border-orange-800 flex flex-col justify-center">
+          <div className="text-xs text-orange-600 dark:text-orange-400 font-medium leading-tight">
+            LƯỢT MUA
+            <br />
+            <span className="text-[10px] opacity-80">(Chương & Giọng)</span>
+          </div>
+          <div className="text-xl font-bold text-orange-700 dark:text-orange-300 mt-1">
+            {stats.totalPurchases}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // 1. Xác định Tiêu đề (Title) - ĐÃ PHÂN LOẠI 3 TRƯỜNG HỢP
+  let modalTitle = "";
+  if (type === "withdraw") {
+    modalTitle = "Chi Tiết Yêu Cầu Đối Soát";
+  } else if (isContentStats) {
+    // Check loại filter được gửi trong metadata
+    const filterType = data.metadata?.filterType;
+
+    if (filterType === "chapter") {
+      modalTitle = "Chi Tiết: Doanh Thu Mở Chương";
+    } else if (filterType === "voice") {
+      modalTitle = "Chi Tiết: Doanh Thu Mua Giọng";
+    } else {
+      modalTitle = "Chi Tiết: Tổng Hợp Cả Chương & Giọng";
+    }
+  } else {
+    modalTitle = "Chi Tiết Giao Dịch";
+  }
+
+  // 2. Xác định Nhãn ID (Label) & Giá trị ID
+  const idLabel = isContentStats ? "Mã ID chương" : "Mã ID giao dịch";
+
+  // Ưu tiên hiển thị contentId nếu có (cho thống kê), ngược lại dùng transactionId/requestId
+  const displayId = data.contentId || data.transactionId || data.requestId;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative animate-in zoom-in-95 duration-200">
@@ -294,58 +395,65 @@ const DetailModal = ({
         </button>
 
         <div className="p-6 space-y-6">
-          {/* HEADER MODAL với tiêu đề và mã ID */}
+          {/* 1. HEADER MODAL (Tiêu đề & ID) */}
           <div className="border-b border-[var(--border)] pb-4">
             <h2 className="text-2xl font-bold text-[var(--primary)]">
-              {type === "transaction"
-                ? "Chi Tiết Giao Dịch"
-                : "Chi Tiết Yêu Cầu Đối Soát"}
+              {modalTitle}
             </h2>
             <p className="text-sm text-[var(--muted-foreground)] mt-1">
-              Mã ID Chính:{" "}
+              {idLabel}:{" "}
               <span className="font-mono select-all text-[var(--foreground)]">
-                {data.transactionId || data.requestId}
+                {displayId}
               </span>
             </p>
           </div>
 
-          {/* SỐ TIỀN & THỜI GIAN - hiển thị trong 2 ô card */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 bg-[var(--muted)]/30 rounded-lg border border-[var(--border)]">
-              <span className="text-sm font-medium text-[var(--muted-foreground)] flex items-center gap-1">
-                Số
-                <div className="relative inline-flex items-center">
-                  <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
-                  <span className="absolute -bottom-2 -right-2 text-yellow-500 text-lg font-bold leading-none">
-                    *
-                  </span>
-                </div>
-              </span>
-              <div
-                className={`text-2xl font-bold ${
-                  data.amount > 0 ? "text-green-600" : "text-red-600"
-                }`}
-              >
-                <APDisplay
-                  value={data.amount}
-                  className={`text-2xl ${
+          {/* 2. LOGIC HIỂN THỊ (QUAN TRỌNG) */}
+
+          {/* TRƯỜNG HỢP A: Nếu là Thống Kê chương -> Hiện 4 ô màu (Dashboard) */}
+          {isContentStats && renderStatsDashboard()}
+
+          {/* TRƯỜNG HỢP B: Nếu KHÔNG phải thống kê (Giao dịch thường) -> Hiện 2 ô xám cũ */}
+          {!isContentStats && (
+            <div className="grid grid-cols-2 gap-4">
+              {/* Card Số Tiền */}
+              <div className="p-4 bg-[var(--muted)]/30 rounded-lg border border-[var(--border)]">
+                <span className="text-sm font-medium text-[var(--muted-foreground)] flex items-center gap-1">
+                  Số{" "}
+                  <div className="relative inline-flex items-center">
+                    <Gem className="h-4 w-4 fill-blue-500 text-blue-600" />
+                    <span className="absolute -bottom-2 -right-2 text-yellow-500 text-lg font-bold leading-none">
+                      *
+                    </span>
+                  </div>
+                </span>
+                <div
+                  className={`text-2xl font-bold ${
                     data.amount > 0 ? "text-green-600" : "text-red-600"
                   }`}
-                  iconSize={20}
-                  showPlus={type === "transaction"} // Chỉ show + cho transaction (doanh thu)
-                />
+                >
+                  <APDisplay
+                    value={data.amount}
+                    className={`text-2xl ${
+                      data.amount > 0 ? "text-green-600" : "text-red-600"
+                    }`}
+                    iconSize={20}
+                    showPlus={type === "transaction"}
+                  />
+                </div>
+              </div>
+
+              {/* Card Thời Gian */}
+              <div className="p-4 bg-[var(--muted)]/30 rounded-lg border border-[var(--border)] flex flex-col justify-center">
+                <span className="text-sm font-medium text-[var(--muted-foreground)]">
+                  Thời gian
+                </span>
+                <div className="font-medium text-[var(--foreground)]">
+                  {formatDate(data.createdAt)}
+                </div>
               </div>
             </div>
-            {/* Card thời gian */}
-            <div className="p-4 bg-[var(--muted)]/30 rounded-lg border border-[var(--border)] flex flex-col justify-center">
-              <span className="text-sm font-medium text-[var(--muted-foreground)]">
-                Thời gian
-              </span>
-              <div className="font-medium text-[var(--foreground)]">
-                {formatDate(data.createdAt)}
-              </div>
-            </div>
-          </div>
+          )}
           {/* BẢNG CHI TIẾT CÁC FIELD TỪ METADATA */}
           <div className="space-y-3">
             <h3 className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
@@ -406,19 +514,28 @@ const DetailModal = ({
 
                             {/* Cột Phải: Giá trị (format tùy loại data) */}
                             <TableCell className="text-[var(--foreground)] break-all">
-                              {(key === "grossAmount" ||
-                                key.toLowerCase().includes("price") ||
-                                key.toLowerCase().includes("cost")) &&
-                              typeof value === "number" ? (
-                                // Hiển thị số tiền với APDisplay component
-                                <APDisplay value={Number(value)} />
-                              ) : Array.isArray(value) ? ( // Nếu là array -> join thành string
+                              {key === "filterType" ? (
+                                // Việt hóa giá trị của Filter
+                                <span>
+                                  {value === "chapter"
+                                    ? "Chương"
+                                    : value === "voice"
+                                    ? "Giọng đọc (Audio)"
+                                    : "Tất cả (Chương & Giọng)"}
+                                </span>
+                              ) : (key === "grossAmount" ||
+                                  key.toLowerCase().includes("price") ||
+                                  key.toLowerCase().includes("cost")) &&
+                                typeof value === "number" ? (
+                                <APDisplay
+                                  value={Number(value)}
+                                  showAsterisk={false}
+                                />
+                              ) : Array.isArray(value) ? (
                                 value.join(", ")
                               ) : typeof value === "object" ? (
-                                // Nếu là object -> stringify (hiếm)
                                 JSON.stringify(value)
                               ) : (
-                                // Các trường hợp còn lại: convert to string
                                 String(value)
                               )}
                             </TableCell>
@@ -467,6 +584,53 @@ const DetailModal = ({
               </Table>
             </div>
           </div>
+          {/* --- PHẦN 4: DANH SÁCH NGƯỜI MUA (BỔ SUNG) --- */}
+          {purchaserData && purchaserData.purchasers && (
+            <div className="space-y-3 pt-4 border-t border-[var(--border)] mt-4">
+              <h3 className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
+                <User className="w-5 h-5 text-blue-600" />
+                Người mua ({purchaserData.purchasers.total || 0})
+              </h3>
+
+              <div className="bg-[var(--background)] rounded-lg border border-[var(--border)] max-h-[250px] overflow-y-auto custom-scrollbar">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-[var(--muted)]/50">
+                      <TableHead>Người dùng</TableHead>
+                      <TableHead className="text-right">Giá</TableHead>
+                      <TableHead className="text-right">Ngày mua</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {purchaserData.purchasers.items?.map(
+                      (p: any, idx: number) => (
+                        <TableRow key={idx}>
+                          <TableCell className="flex items-center gap-2 py-3">
+                            <div className="h-6 w-6 rounded-full overflow-hidden bg-gray-200">
+                              <img
+                                src={p.avatarUrl}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                            <span className="font-medium text-sm">
+                              {p.username}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-green-600">
+                            <APDisplay value={p.price} />
+                          </TableCell>
+                          <TableCell className="text-right text-xs text-[var(--muted-foreground)]">
+                            {formatDate(p.purchaseDate)}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
           {/* NÚT ĐÓNG MODAL */}
           <div className="flex justify-end pt-4">
             <Button
@@ -529,10 +693,12 @@ export default function AuthorRevenuePage() {
    * STATE PAGINATION CHO BẢNG:
    * - txPage: Trang hiện tại của bảng transactions
    * - wdPage: Trang hiện tại của bảng withdraws
+   * - salesPage: Trang hiện tại của bảng thống kê bán hàng (MỚI THÊM)
    * - itemsPerPage: Số item mỗi trang (mặc định 10)
    */
   const [txPage, setTxPage] = useState(1);
   const [wdPage, setWdPage] = useState(1);
+  const [salesPage, setSalesPage] = useState(1);
   const itemsPerPage = 10;
 
   /**
@@ -552,10 +718,41 @@ export default function AuthorRevenuePage() {
   const [accountHolder, setAccountHolder] = useState("");
   const [commitmentText, setCommitmentText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // State lưu dữ liệu chi tiết người mua lấy từ API
+  const [purchaserDetail, setPurchaserDetail] = useState<any | null>(null);
+  // State lưu thống kê tổng của Truyện
+  const [storyStats, setStoryStats] = useState<any | null>(null);
+
+  // State loading riêng cho khi xem chi tiết (tùy chọn)
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  // --- STATE QUẢN LÝ LUỒNG THỐNG KÊ (MỚI) ---
+  // 'stories': Hiển thị danh sách truyện
+  // 'chapters': Hiển thị danh sách chương của 1 truyện cụ thể
+  const [statsView, setStatsView] = useState<"stories" | "chapters">("stories");
+
+  // Lưu ID và Title của truyện đang được chọn xem chi tiết
+  const [selectedStoryFilter, setSelectedStoryFilter] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  // State lưu trữ doanh thu thật (TotalRevenue) lấy từ API detail cho từng truyện
+  const [realStoryData, setRealStoryData] = useState<Record<string, number>>(
+    {}
+  );
+  // ---  QUẢN LÝ TAB ACTIVE ---
+  const [activeTab, setActiveTab] = useState("transactions");
+  // --- QUẢN LÝ TAB & SỐ LIỆU CHƯƠNG ---
+  // State lưu số liệu thật của từng chương (Key: ChapterID -> Value: {c: chapterRevenue, v: voiceRevenue})
+  const [realChapterData, setRealChapterData] = useState<
+    Record<string, { c: number; v: number }>
+  >({});
+
   /**
    * HELPER XỬ LÝ LỖI API (giống các file khác):
    * Xử lý error response từ backend với ưu tiên: details -> message -> fallback
    */
+
   const handleApiError = (error: any, defaultMessage: string) => {
     // 1. Check lỗi Validation/Logic từ Backend
     if (error.response && error.response.data && error.response.data.error) {
@@ -658,7 +855,36 @@ export default function AuthorRevenuePage() {
   useEffect(() => {
     fetchAllData();
   }, []);
+  // ---  TỰ ĐỘNG GỌI API LẤY DOANH THU THẬT CHO TỪNG TRUYỆN ---
+  useEffect(() => {
+    if (transactions.length === 0) return;
 
+    // 1. Lấy danh sách các ID truyện duy nhất từ giao dịch
+    const uniqueStoryIds = [
+      ...new Set(
+        transactions
+          .map((t) => t.storyId || t.metadata?.storyId)
+          .filter((id) => id && id !== "unknown")
+      ),
+    ];
+
+    // 2. Gọi API detail cho từng truyện để lấy totalRevenue "xịn"
+    uniqueStoryIds.forEach(async (id) => {
+      if (!id) return;
+      try {
+        // Gọi page=1, pageSize=1 cho nhẹ, chỉ cần lấy field totalRevenue
+        const res = await authorRevenueService.getStoryRevenueDetail(id, 1, 1);
+
+        // Lưu vào state: Key là ID truyện, Value là số tiền đúng (VD: 295)
+        setRealStoryData((prev) => ({
+          ...prev,
+          [id]: res.data.totalRevenue,
+        }));
+      } catch (error) {
+        console.error(`Lỗi lấy doanh thu thật cho truyện ${id}`, error);
+      }
+    });
+  }, [transactions]);
   // --- ACTIONS (USER INTERACTIONS) ---
 
   /**
@@ -777,7 +1003,288 @@ export default function AuthorRevenuePage() {
       setLoading(false); // Tắt loading
     }
   };
+  // --- CODE MỚI: STATE & API (Đã cập nhật đầy đủ) ---
 
+  /**
+   * HÀM XỬ LÝ: XEM CHI TIẾT TRUYỆN (Tương ứng Ảnh 1)
+   * Kích hoạt khi click vào hàng của một truyện trong danh sách.
+   * * @param storyId - ID của truyện cần xem
+   * @param storyTitle - Tên truyện (để hiển thị lên header)
+   * * LOGIC:
+   * 1. Bật loading toàn trang.
+   * 2. Gọi API getStoryRevenueDetail để lấy số liệu thống kê chính xác từ Server.
+   * 3. Lưu dữ liệu vào `storyStats` (để vẽ 4 ô màu dashboard).
+   * 4. Cập nhật `selectedStoryFilter` và chuyển `statsView` sang 'chapters'.
+   * 5. Reset phân trang về trang 1.
+   */
+  const handleViewStoryDetail = async (storyId: string, storyTitle: string) => {
+    try {
+      setLoading(true);
+      // Gọi API lấy thống kê truyện (Tổng doanh thu, DT Chương, DT Giọng...)
+      const res = await authorRevenueService.getStoryRevenueDetail(
+        storyId,
+        1,
+        20
+      );
+
+      setStoryStats(res.data); // Lưu dữ liệu thống kê vào State
+      setSelectedStoryFilter({ id: storyId, title: storyTitle });
+      setStatsView("chapters"); // Chuyển giao diện sang danh sách chương
+      setSalesPage(1); // Reset về trang 1
+      // ---  TỰ ĐỘNG CHUYỂN TAB ---
+      setActiveTab("content-stats");
+    } catch (error) {
+      toast.error("Không thể tải chi tiết truyện.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * HÀM XEM CHI TIẾT CHƯƠNG (ĐÃ FIX TÊN CHƯƠNG GỌN GÀNG)
+   * Kích hoạt khi người dùng click vào icon mắt ở bảng thống kê.
+   * * @param chapterId - ID của chương cần xem.
+   * @param filterType - Loại dữ liệu muốn xem: 'all' (tổng), 'chapter' (chỉ chương), 'voice' (chỉ giọng).
+   */
+  const handleViewChapterDetail = async (
+    chapterId: string,
+    filterType: "all" | "chapter" | "voice" = "all"
+  ) => {
+    try {
+      // BƯỚC 1: GỌI API LẤY DỮ LIỆU GỐC
+      // Gọi lên server để lấy toàn bộ thông tin chi tiết của chương (bao gồm cả chương và giọng)
+      const res = await authorRevenueService.getChapterRevenueDetail(chapterId);
+      let data = res.data;
+
+      // BƯỚC 2: CHUẨN BỊ BIẾN ĐỂ LỌC
+      // Mặc định lấy toàn bộ danh sách người mua
+      let filteredItems = data.purchasers?.items || [];
+      // Mặc định hiển thị tổng doanh thu (Chương + Giọng)
+      let displayRevenue = data.totalRevenue;
+
+      // BƯỚC 3: THỰC HIỆN LỌC THEO `filterType`
+      if (filterType === "chapter") {
+        // Trường hợp 1: Chỉ xem doanh thu Chương (Text)
+        // -> Lọc lấy người mua có type='chapter'
+        filteredItems = filteredItems.filter((p: any) => p.type === "chapter");
+        // -> Lấy số tiền riêng của mảng Chương
+        displayRevenue = data.chapterRevenue || 0;
+      } else if (filterType === "voice") {
+        // Trường hợp 2: Chỉ xem doanh thu Giọng (Audio)
+        // -> Lọc lấy người mua có type='voice'
+        filteredItems = filteredItems.filter((p: any) => p.type === "voice");
+        // -> Lấy số tiền riêng của mảng Giọng
+        displayRevenue = data.voiceRevenue || 0;
+      }
+      // (Trường hợp 'all' thì giữ nguyên mặc định ở Bước 2)
+
+      // BƯỚC 4: CẬP NHẬT DỮ LIỆU DANH SÁCH NGƯỜI MUA
+      // Tạo object mới chứa danh sách người mua đã được lọc
+      const processedData = {
+        ...data,
+        purchasers: {
+          ...data.purchasers,
+          items: filteredItems, // Gán list đã lọc
+          total: filteredItems.length, // Cập nhật tổng số lượng
+        },
+      };
+
+      // Lưu vào state để hiển thị bảng danh sách người mua bên dưới Modal
+      setPurchaserDetail(processedData);
+
+      // BƯỚC 5: KÍCH HOẠT MODAL HIỂN THỊ
+      // Tạo item giả lập để component DetailModal nhận diện và mở lên
+      setSelectedItem({
+        contentId: data.contentId,
+        transactionId: data.contentId,
+
+        // Hiển thị số tiền đúng theo loại lọc (Tổng hoặc riêng lẻ)
+        amount: displayRevenue,
+
+        createdAt: new Date().toISOString(),
+        type: "purchase",
+
+        // --- QUAN TRỌNG: Lấy tên chương gốc từ API ---
+        // Không thêm tiền tố "Người mua..." để tiêu đề gọn gàng
+        chapterTitle: data.title,
+
+        // Truyền metadata để DetailModal biết đường đổi tiêu đề và hiển thị dòng "Đang lọc theo..."
+        metadata: {
+          filterType: filterType,
+        },
+      } as any);
+
+      // Set loại modal là transaction để hiện đúng giao diện
+      setModalType("transaction");
+    } catch (error) {
+      // BƯỚC 6: XỬ LÝ LỖI
+      toast.error("Không thể tải chi tiết chương.");
+    }
+  };
+  // ----------------------------------------------------------------------
+  /**
+   * LOGIC XỬ LÝ DỮ LIỆU THỐNG KÊ (CLIENT-SIDE AGGREGATION - V2)
+   *
+   * MỤC ĐÍCH:
+   * Biến đổi danh sách giao dịch phẳng (flat list) từ API thành cấu trúc phân cấp:
+   * Level 1: Danh sách Truyện (Tổng hợp)
+   * Level 2: Danh sách Chương của 1 truyện (Chi tiết 8 cột)
+   *
+   * FLOW XỬ LÝ CHÍNH:
+   * 1. Lọc dữ liệu: Chỉ lấy các giao dịch loại 'purchase', 'chapter_purchase', 'voice_purchase'.
+   * 2. Gom nhóm Cấp 1 (Stories): Cộng dồn doanh thu của tất cả giao dịch thuộc cùng 1 StoryId.
+   * 3. Gom nhóm Cấp 2 (Chapters) - Chỉ chạy khi user chọn 1 truyện:
+   * - Lọc các giao dịch thuộc truyện đó.
+   * - Gom nhóm theo ChapterId.
+   * - QUAN TRỌNG: Phân loại transaction để cộng vào cột tương ứng:
+   * + Cột Chương: type = 'chapter_purchase' hoặc 'purchase' (data cũ)
+   * + Cột Giọng: type = 'voice_purchase'
+   * 4. Phân trang (Pagination): Cắt dữ liệu hiển thị theo trang hiện tại (10 item/trang).
+   */
+
+  // --- BƯỚC 1: LỌC DỮ LIỆU ĐẦU VÀO ---
+  // Chỉ lấy các giao dịch mua bán, bỏ qua các giao dịch rút tiền/tạo giọng
+  const allPurchases = transactions.filter((t) =>
+    ["purchase", "chapter_purchase", "voice_purchase"].includes(t.type)
+  );
+
+  // --- BƯỚC 2: GOM NHÓM THEO TRUYỆN (LEVEL 1) ---
+  // Map<StoryId, StoryData>
+  const storiesMap = new Map<
+    string,
+    { id: string; title: string; revenue: number; txCount: number }
+  >();
+
+  allPurchases.forEach((tx) => {
+    // Ưu tiên lấy storyId từ root, nếu không có thì lấy từ metadata, cuối cùng là "unknown"
+    const sId = tx.storyId || tx.metadata?.storyId || "unknown";
+    const sTitle =
+      tx.storyTitle || tx.metadata?.storyTitle || "Truyện chưa xác định";
+
+    if (!storiesMap.has(sId)) {
+      storiesMap.set(sId, { id: sId, title: sTitle, revenue: 0, txCount: 0 });
+    }
+    const story = storiesMap.get(sId)!;
+    story.revenue += tx.amount; // Cộng dồn tổng doanh thu (Chương + Giọng)
+    story.txCount += 1; // Đếm số lượng giao dịch
+  });
+  const groupedStories = Array.from(storiesMap.values());
+
+  // --- BƯỚC 3: GOM NHÓM THEO CHƯƠNG (LEVEL 2) ---
+  let groupedChapters: any[] = [];
+
+  // Logic này chỉ chạy khi người dùng đã click chọn xem chi tiết 1 truyện
+  if (selectedStoryFilter) {
+    // 3.1: Lọc lấy các giao dịch chỉ thuộc về truyện đang chọn
+    const txOfStory = allPurchases.filter(
+      (tx) =>
+        (tx.storyId || tx.metadata?.storyId || "unknown") ===
+        selectedStoryFilter.id
+    );
+
+    // 3.2: Khởi tạo Map để gom nhóm theo ChapterId
+    // Cấu trúc lưu trữ chi tiết: đếm lượt mua và doanh thu riêng cho Chương và Giọng
+    const chaptersMap = new Map<
+      string,
+      {
+        id: string;
+        title: string;
+        latestDate: string;
+        // Nhóm số liệu Mua Chương
+        chapterCount: number;
+        chapterRevenue: number;
+        // Nhóm số liệu Mua Giọng
+        voiceCount: number;
+        voiceRevenue: number;
+      }
+    >();
+
+    txOfStory.forEach((tx) => {
+      // Lấy ID chương (fallback nếu thiếu)
+      const cId = tx.chapterId || tx.metadata?.chapterId || "unknown_chapter";
+      const cTitle =
+        tx.chapterTitle || tx.metadata?.chapterTitle || "Chương không tên";
+
+      // Khởi tạo record cho chương nếu chưa tồn tại trong Map
+      if (!chaptersMap.has(cId)) {
+        chaptersMap.set(cId, {
+          id: cId,
+          title: cTitle,
+          latestDate: tx.createdAt,
+          chapterCount: 0,
+          chapterRevenue: 0,
+          voiceCount: 0,
+          voiceRevenue: 0,
+        });
+      }
+      const chap = chaptersMap.get(cId)!;
+
+      // --- LOGIC PHÂN LOẠI QUAN TRỌNG ---
+      // Case A: Mua nội dung chương (Text)
+      // Bao gồm cả type 'purchase' (cũ) để tương thích dữ liệu cũ
+      if (tx.type === "chapter_purchase" || tx.type === "purchase") {
+        chap.chapterCount += 1;
+        chap.chapterRevenue += tx.amount;
+      }
+      // Case B: Mua giọng đọc (Voice)
+      else if (tx.type === "voice_purchase") {
+        chap.voiceCount += 1;
+        chap.voiceRevenue += tx.amount;
+      }
+
+      // Cập nhật ngày giao dịch mới nhất để hiển thị "Mới nhất: dd/mm"
+      if (new Date(tx.createdAt) > new Date(chap.latestDate)) {
+        chap.latestDate = tx.createdAt;
+      }
+    });
+    // Chuyển Map thành Array để render
+    groupedChapters = Array.from(chaptersMap.values());
+  }
+
+  // --- BƯỚC 4: PHÂN TRANG HIỂN THỊ (PAGINATION) ---
+  // Xác định nguồn dữ liệu dựa trên view hiện tại (Truyện hay Chương)
+  const currentStatsData =
+    statsView === "stories"
+      ? groupedStories.slice(
+          (salesPage - 1) * itemsPerPage,
+          salesPage * itemsPerPage
+        )
+      : groupedChapters.slice(
+          (salesPage - 1) * itemsPerPage,
+          salesPage * itemsPerPage
+        );
+  // --- CODE MỚI: TỰ ĐỘNG GỌI API LẤY SỐ LIỆU THẬT CHO CHƯƠNG ---
+  useEffect(() => {
+    if (statsView !== "chapters" || !selectedStoryFilter) return;
+
+    // Lấy danh sách ID chương đang hiển thị trên trang hiện tại
+    const currentChapterIds = currentStatsData
+      .map((item) => item.id)
+      .filter((id) => id && id !== "unknown_chapter");
+
+    currentChapterIds.forEach(async (chapterId) => {
+      // Nếu đã có dữ liệu rồi thì thôi không gọi lại để đỡ lag
+      if (realChapterData[chapterId]) return;
+
+      try {
+        const res = await authorRevenueService.getChapterRevenueDetail(
+          chapterId
+        );
+        setRealChapterData((prev) => ({
+          ...prev,
+          [chapterId]: {
+            c: res.data.chapterRevenue || 0,
+            v: res.data.voiceRevenue || 0,
+          },
+        }));
+      } catch (err) {
+        console.error("Lỗi lấy data chương", chapterId);
+      }
+    });
+  }, [currentStatsData, statsView]);
+  // Tính tổng số item để component Pagination render số trang chính xác
+  const totalStatsItems =
+    statsView === "stories" ? groupedStories.length : groupedChapters.length;
   // --- PAGINATION COMPONENT (TÁI SỬ DỤNG) ---
 
   /**
@@ -897,9 +1404,21 @@ export default function AuthorRevenuePage() {
             <CheckCircle2 className="w-3 h-3 mr-1" /> Cộng vào
           </span>
         );
+      case "chapter_purchase": // MỚI
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium  bg-blue-100 text-blue-800 border border-blue-200">
+            <CheckCircle2 className="w-3 h-3 mr-1" /> Doanh thu từ mở chương
+          </span>
+        );
+      case "voice_purchase": // MỚI
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+            <Mic className="w-3 h-3 mr-1" /> Doanh thu từ mua giọng đọc
+          </span>
+        );
       case "voice_generation":
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800 border border-pink-200">
             <Mic className="w-3 h-3 mr-1" /> Tạo giọng đọc AI
           </span>
         );
@@ -964,7 +1483,17 @@ export default function AuthorRevenuePage() {
     (wdPage - 1) * itemsPerPage,
     wdPage * itemsPerPage
   );
+  // --- THÊM ĐOẠN NÀY: Lọc và Phân trang cho Tab Thống Kê Bán Hàng ---
+  // 1. Lọc ra danh sách chỉ gồm các giao dịch MUA (purchase)
+  const purchaseTransactions = transactions.filter(
+    (t) => t.type === "purchase"
+  );
 
+  // 2. Cắt dữ liệu theo trang hiện tại (salesPage)
+  const currentSales = purchaseTransactions.slice(
+    (salesPage - 1) * itemsPerPage,
+    salesPage * itemsPerPage
+  );
   // Hiển thị loading state khi đang fetch data lần đầu
   if (loading) {
     return (
@@ -981,9 +1510,13 @@ export default function AuthorRevenuePage() {
       {/* Modal chi tiết (hidden khi không có selectedItem) */}
       <DetailModal
         isOpen={!!selectedItem}
-        onClose={() => setSelectedItem(null)}
+        onClose={() => {
+          setSelectedItem(null);
+          setPurchaserDetail(null); // Reset khi đóng
+        }}
         data={selectedItem}
         type={modalType || "transaction"}
+        purchaserData={purchaserDetail} // <--- TRUYỀN STATE VÀO ĐÂY
       />
 
       {/* HEADER với tiêu đề và thông tin hạng tác giả */}
@@ -1357,14 +1890,15 @@ export default function AuthorRevenuePage() {
         </Card>
       </div>
       {/* TABLES SECTION (TABS) cho Lịch sử giao dịch và Lịch sử đối soát */}
-      <Tabs defaultValue="transactions" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-[var(--muted)] mb-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 bg-[var(--muted)] mb-6">
           <TabsTrigger value="transactions">
             Lịch Sử Giao Dịch (Chi Tiết)
           </TabsTrigger>
           <TabsTrigger value="withdraws">
             Lịch Sử Trạng Thái Đối Soát
           </TabsTrigger>
+          <TabsTrigger value="content-stats">Thống Kê Doanh Thu</TabsTrigger>
         </TabsList>
 
         {/* TRANSACTION HISTORY TAB */}
@@ -1464,7 +1998,279 @@ export default function AuthorRevenuePage() {
             </CardContent>
           </Card>
         </TabsContent>
+        {/* --- TAB MỚI: THỐNG KÊ CHI TIẾT (ĐÃ SỬA) --- */}
+        <TabsContent value="content-stats" className="space-y-4">
+          <Card className="border border-[var(--border)] bg-[var(--card)]">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div className="space-y-2.5">
+                <CardTitle className="text-[var(--primary)]">
+                  {statsView === "stories"
+                    ? "Thống Kê Theo Truyện"
+                    : `Chi Tiết: ${selectedStoryFilter?.title}`}
+                </CardTitle>
+                <CardDescription>
+                  {statsView === "stories"
+                    ? "Chọn một bộ truyện để xem chi tiết doanh thu."
+                    : "Thống kê doanh thu chi tiết chính xác."}
+                </CardDescription>
+              </div>
 
+              {statsView === "chapters" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setStatsView("stories");
+                    setSelectedStoryFilter(null);
+                    setStoryStats(null); // Reset stats
+                    setSalesPage(1);
+                  }}
+                  className="gap-1"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Quay lại
+                </Button>
+              )}
+            </CardHeader>
+
+            <CardContent>
+              {/* --- CODE MỚI: DASHBOARD THỐNG KÊ (HIỆN KHI XEM CHI TIẾT) --- */}
+              {statsView === "chapters" && storyStats && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 animate-in slide-in-from-top-2">
+                  <div className="p-4 rounded-xl border bg-green-50/50 border-green-100 dark:bg-green-900/20 dark:border-green-800">
+                    <div className="text-xs font-semibold uppercase text-green-600 dark:text-green-400 mb-1">
+                      Tổng Doanh Thu
+                    </div>
+                    <div className="text-2xl font-bold text-green-700 dark:text-green-300">
+                      <APDisplay value={storyStats.totalRevenue} />
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-xl border bg-blue-50/50 border-blue-100 dark:bg-blue-900/20 dark:border-blue-800">
+                    <div className="text-xs font-semibold uppercase text-blue-600 dark:text-blue-400 mb-1">
+                      DT Chương
+                    </div>
+                    <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                      <APDisplay value={storyStats.chapterRevenue || 0} />
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-xl border bg-purple-50/50 border-purple-100 dark:bg-purple-900/20 dark:border-purple-800">
+                    <div className="text-xs font-semibold uppercase text-purple-600 dark:text-purple-400 mb-1">
+                      DT Giọng
+                    </div>
+                    <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">
+                      <APDisplay value={storyStats.voiceRevenue || 0} />
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-xl border bg-orange-50/50 border-orange-100 dark:bg-orange-900/20 dark:border-orange-800">
+                    <div className="text-xs font-semibold uppercase text-orange-600 dark:text-orange-400 mb-1">
+                      Tổng Lượt Mua (Chương&Giọng)
+                    </div>
+                    <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">
+                      {storyStats.totalPurchases}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-[var(--muted)]/50">
+                      <TableHead className="min-w-[200px]">
+                        {statsView === "stories" ? "Tên Truyện" : "Tên Chương"}
+                      </TableHead>
+
+                      {statsView === "stories" ? (
+                        <>
+                          <TableHead className="text-center w-[150px]">
+                            Số Giao Dịch
+                          </TableHead>
+                          <TableHead className="text-right w-[180px]">
+                            Tổng Doanh Thu
+                          </TableHead>
+                          <TableHead className="w-[80px] text-center">
+                            Chi tiết
+                          </TableHead>
+                        </>
+                      ) : (
+                        // --- HEADER MỚI: VIỆT HÓA & CỘT ĐÚNG YÊU CẦU ---
+                        <>
+                          <TableHead className="text-center">Lượt Mở</TableHead>
+                          <TableHead className="text-right">
+                            DT Chương
+                          </TableHead>
+                          <TableHead className="text-center">
+                            Lượt Giọng
+                          </TableHead>
+                          <TableHead className="text-right">DT Giọng</TableHead>
+                          <TableHead className="text-right font-bold text-green-600">
+                            Tổng
+                          </TableHead>
+                          <TableHead className="w-[50px]">Chi tiết</TableHead>
+                        </>
+                      )}
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {currentStatsData.length > 0 ? (
+                      currentStatsData.map((item: any, index) => (
+                        <TableRow
+                          key={index}
+                          className="hover:bg-[var(--muted)]/20 cursor-pointer border-b border-[var(--border)]"
+                          onClick={() => {
+                            if (statsView === "stories") {
+                              // GỌI HÀM MỚI KHI CLICK TRUYỆN
+                              handleViewStoryDetail(item.id, item.title);
+                            }
+                          }}
+                        >
+                          <TableCell className="font-medium">
+                            {item.title || "Không tên"}
+                            {statsView === "chapters" && (
+                              <div className="text-[10px] text-muted-foreground">
+                                Cập nhật: {formatShortDate(item.latestDate)}
+                              </div>
+                            )}
+                          </TableCell>
+
+                          {statsView === "stories" ? (
+                            <>
+                              <TableCell className="text-center">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary text-secondary-foreground">
+                                  {item.txCount} GD
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right font-bold text-green-600 text-base">
+                                {/* Nếu có số liệu thật từ API (realStoryData) thì hiện, không thì hiện số cộng tay */}
+                                <APDisplay
+                                  value={
+                                    realStoryData[item.id] !== undefined
+                                      ? realStoryData[item.id]
+                                      : item.revenue
+                                  }
+                                  showPlus
+                                />
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Button variant="ghost" size="icon">
+                                  <ChevronRight className="w-5 h-5" />
+                                </Button>
+                              </TableCell>
+                            </>
+                          ) : (
+                            // --- ROW DATA MỚI CHO CHƯƠNG ---
+                            <>
+                              <TableCell className="text-center text-sm">
+                                {item.chapterCount || "-"}
+                              </TableCell>
+
+                              {/* CỘT DT CHƯƠNG: Dùng số liệu thật (realChapterData) + Icon Mắt */}
+                              <TableCell className="text-right font-medium text-blue-600">
+                                <div className="flex items-center justify-end gap-2">
+                                  {/* Hiển thị số: Ưu tiên realData.c */}
+                                  <APDisplay
+                                    value={
+                                      realChapterData[item.id]
+                                        ? realChapterData[item.id].c
+                                        : item.chapterRevenue
+                                    }
+                                  />
+                                  {/* Nút Mắt nhỏ cho Chương */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleViewChapterDetail(
+                                        item.id,
+                                        "chapter"
+                                      );
+                                    }}
+                                    className="p-1 hover:bg-blue-100 rounded-full text-blue-400 transition-colors"
+                                    title="Xem người mua chương"
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </TableCell>
+
+                              <TableCell className="text-center text-sm">
+                                {item.voiceCount || "-"}
+                              </TableCell>
+
+                              {/* CỘT DT GIỌNG: Dùng số liệu thật (realChapterData) + Icon Mắt */}
+                              <TableCell className="text-right font-medium text-purple-600">
+                                <div className="flex items-center justify-end gap-2">
+                                  {/* Hiển thị số: Ưu tiên realData.v */}
+                                  <APDisplay
+                                    value={
+                                      realChapterData[item.id]
+                                        ? realChapterData[item.id].v
+                                        : item.voiceRevenue
+                                    }
+                                  />
+                                  {/* Nút Mắt nhỏ cho Giọng */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleViewChapterDetail(item.id, "voice");
+                                    }}
+                                    className="p-1 hover:bg-purple-100 rounded-full text-purple-400 transition-colors"
+                                    title="Xem người mua giọng"
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </TableCell>
+
+                              {/* CỘT TỔNG: Cộng 2 số thực lại */}
+                              <TableCell className="text-right font-bold text-green-600">
+                                <APDisplay
+                                  value={
+                                    (realChapterData[item.id]
+                                      ? realChapterData[item.id].c
+                                      : item.chapterRevenue) +
+                                    (realChapterData[item.id]
+                                      ? realChapterData[item.id].v
+                                      : item.voiceRevenue)
+                                  }
+                                  showPlus
+                                />
+                              </TableCell>
+
+                              <TableCell>
+                                {/* NÚT MẮT TO (Xem Tất Cả) */}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-gray-500 hover:text-gray-700"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewChapterDetail(item.id, "all");
+                                  }}
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                              </TableCell>
+                            </>
+                          )}
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={6}
+                          className="text-center py-8 text-muted-foreground"
+                        >
+                          Chưa có dữ liệu.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              {renderPagination(salesPage, setSalesPage, totalStatsItems)}
+            </CardContent>
+          </Card>
+        </TabsContent>
         {/* WITHDRAW HISTORY TAB */}
         <TabsContent value="withdraws" className="space-y-4">
           <Card className="border border-[var(--border)] bg-[var(--card)]">
