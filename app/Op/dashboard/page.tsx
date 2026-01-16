@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-// Import Layout chính của hệ thống Admin/Mod
+// Import Layout chính
 import OpLayout from "@/components/OpLayout";
 
-// Import các thành phần UI (Card, Select, Tabs, Button...)
+// Import UI Components
 import {
   Card,
   CardContent,
@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-// Import thư viện biểu đồ Recharts
+// Import Recharts
 import {
   BarChart,
   Bar,
@@ -38,7 +38,7 @@ import {
   Cell,
 } from "recharts";
 
-// Import Icon
+// Import Icons (Đã thêm Eye)
 import {
   Users,
   DollarSign,
@@ -56,66 +56,56 @@ import {
   CalendarDays,
   BarChart3,
   Download,
+  Eye,
 } from "lucide-react";
 
-// Import API Service (Bao gồm cả API cũ và mới)
+// Import API
 import {
   getTrafficUsers,
   getTrafficEngagement,
   getTrendingStories,
   getTopTags,
-  getSystemRevenue, // API Cũ
-  getRequestStats, // API Cũ
-  exportSystemRevenue, // API Cũ
+  getSystemRevenue,
+  getRequestStats,
+  exportSystemRevenue,
 } from "@/services/operationModStatService";
 
-// Định nghĩa kiểu dữ liệu cho Tab con bên phần Vận hành
 type ActiveSubTab = "revenue" | "author" | "rank" | "withdraw";
 
 export default function DashboardAnalytics() {
-  // --- 1. QUẢN LÝ TRẠNG THÁI (STATE) ---
-  const [loading, setLoading] = useState(true); // Trạng thái đang tải
-  const [period, setPeriod] = useState("day"); // Bộ lọc thời gian: day, week, month, year
-  // Controlled main tab để tránh Tabs bị reset khi period thay đổi.
-// Nếu dùng defaultValue thì mỗi lần re-render do setPeriod() sẽ quay về tab "traffic".
-  const [mainTab, setMainTab] = useState<"traffic" | "operation">("traffic");
-  
+  // --- 1. STATE ---
+  const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState("day");
+  const [activeMainTab, setActiveMainTab] = useState("traffic");
 
-  // State cho Tab 1: Traffic & Hành vi
+  // State Traffic
   const [trafficData, setTrafficData] = useState<any>(null);
   const [engagementData, setEngagementData] = useState<any>(null);
   const [trendingStories, setTrendingStories] = useState<any[]>([]);
   const [topTags, setTopTags] = useState<any[]>([]);
 
-  // State cho Tab 2: Vận hành & Doanh thu
+  // State Operation
   const [isExporting, setIsExporting] = useState(false);
-  // Tab con của Vận hành được giữ nguyên khi đổi period
-// để UX không bị nhảy về "Doanh thu" mỗi lần đổi thời gian
-  const [activeSubTab, setActiveSubTab] = useState<ActiveSubTab>("revenue"); // Tab con đang chọn
+  const [activeSubTab, setActiveSubTab] = useState<ActiveSubTab>("revenue");
   const [opStats, setOpStats] = useState({
     currentRevenue: 0,
     becomeAuthorRequests: 0,
     rankUpRequests: 0,
     withdrawRequests: 0,
-    revenueTrend: [] as any[], // Dữ liệu biểu đồ doanh thu
-    authorTrend: [] as any[], // Dữ liệu biểu đồ tác giả
-    rankUpTrend: [] as any[], // Dữ liệu biểu đồ nâng hạng
-    withdrawTrend: [] as any[], // Dữ liệu biểu đồ rút tiền
+    revenueTrend: [] as any[],
+    authorTrend: [] as any[],
+    rankUpTrend: [] as any[],
+    withdrawTrend: [] as any[],
   });
 
-  // --- 2. CÁC HÀM XỬ LÝ LOGIC (HELPER) ---
-
-  /** Lấy giá trị hiện tại từ API (cho phần Card số liệu cũ) */
+  // --- 2. HELPERS ---
   const getCurrentValue = (data: any) => {
     if (!Array.isArray(data?.points) || data.points.length === 0) return 0;
     return data.points[data.points.length - 1]?.value || 0;
   };
 
-  /** Xử lý dữ liệu biểu đồ xu hướng (cho phần Grid chi tiết cũ) */
   const processTrendData = (data: any) => {
     if (!Array.isArray(data?.points)) return [];
- // API trả về dữ liệu theo thứ tự thời gian cũ → mới
-// Reverse lại để hiển thị từ gần nhất → xa hơn cho UI dashboard
     return [...data.points].reverse().map((p: any) => ({
       name: p.periodLabel,
       value: p.value,
@@ -123,7 +113,6 @@ export default function DashboardAnalytics() {
     }));
   };
 
-  /** Chuyển đổi key thời gian sang Tiếng Việt hiển thị */
   const getPeriodLabel = () => {
     switch (period) {
       case "day":
@@ -139,72 +128,81 @@ export default function DashboardAnalytics() {
     }
   };
 
-  /** Tính toán "Sức khỏe" chỉ số (Tăng/Giảm/Ổn định) - Dùng cho Tab Traffic */
+  /*
+    So sánh kỳ đầu và kỳ cuối
+    để biết đang:
+      - tăng
+      - giảm
+      - hay đứng yên
+      ((Giá trị mới - Giá trị cũ) / Giá trị cũ) * 100%
+*/
   const calculateHealth = (dataArray: any[], key: string) => {
+    // Nếu không có dữ liệu hoặc chỉ có 1 điểm dữ liệu -> Không thể so sánh xu hướng -> Trung lập
     if (!dataArray || dataArray.length < 2) return "neutral";
-    const first = dataArray[0][key] || 0;
-    const last = dataArray[dataArray.length - 1][key] || 0;
+
+    const first = dataArray[0][key] || 0; // Giá trị ở thời điểm bắt đầu chu kỳ
+    const last = dataArray[dataArray.length - 1][key] || 0; // Giá trị ở thời điểm mới nhất
+
+    // Từ 0 lên >0 → hệ thống bắt đầu hoạt động → tốt
     if (first === 0 && last > 0) return "good";
+
+    // Không có gì thay đổi
     if (first === 0 && last === 0) return "neutral";
-// So sánh điểm đầu và cuối để đánh giá xu hướng (tăng/giảm/ổn định)
-// Không dùng trung bình để tránh nhiễu do spike
+
+    // Tính tỷ lệ tăng trưởng
     const growth = (last - first) / first;
-    if (growth > 0.05) return "good"; // Tăng > 5%
-    if (growth < -0.05) return "bad"; // Giảm > 5%
-    return "neutral";
+
+    // Đây là ngưỡng 5%. Nếu thay đổi dưới 5% thì coi như là "ổn định" (đi ngang).
+    if (growth > 0.05) return "good"; // Tăng trưởng hơn 5% -> Tốt
+    if (growth < -0.05) return "bad"; // Sụt giảm hơn 5% -> Xấu
+
+    return "neutral"; // Thay đổi rất ít (-5% đến +5%) -> Bình thường
   };
 
-  /** Render Badge trạng thái (Tốt/Cảnh báo/Ổn định) bằng Tiếng Việt */
   const renderTrendBadge = (status: string) => {
     if (status === "good")
       return (
-        <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">
+        <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200">
           <TrendingUp className="w-3 h-3 mr-1" /> Tốt
         </Badge>
       );
     if (status === "bad")
       return (
-        <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100">
+        <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-red-200">
           <TrendingDown className="w-3 h-3 mr-1" /> Cảnh báo
         </Badge>
       );
     return (
-      <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-100">
+      <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-yellow-200">
         <Minus className="w-3 h-3 mr-1" /> Ổn định
       </Badge>
     );
   };
 
-  // --- 3. FETCH DỮ LIỆU TỪ API ---
+  // --- 3. API CALLS ---
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Gọi song song 8 API để lấy toàn bộ dữ liệu cho cả 2 Tab
         const results = await Promise.allSettled([
-          // -- Nhóm Traffic (Tab 1) --
           getTrafficUsers(period),
           getTrafficEngagement(period),
           getTrendingStories(period, 5),
           getTopTags(period, 5),
-          // -- Nhóm Vận hành (Tab 2) --
           getSystemRevenue(period),
           getRequestStats("become_author", period),
           getRequestStats("rank_up", period),
           getRequestStats("withdraw", period),
         ]);
 
-        // Hàm giải nén kết quả
         const unwrap = (r: PromiseSettledResult<any>) =>
           r.status === "fulfilled" ? r.value : null;
 
-        // Gán dữ liệu vào State Traffic
         setTrafficData(unwrap(results[0]));
         setEngagementData(unwrap(results[1]));
         setTrendingStories(unwrap(results[2]));
         setTopTags(unwrap(results[3]));
 
-        // Gán dữ liệu vào State Vận hành
         const revenueRes = unwrap(results[4]);
         const authorRes = unwrap(results[5]);
         const rankRes = unwrap(results[6]);
@@ -221,18 +219,17 @@ export default function DashboardAnalytics() {
           withdrawTrend: processTrendData(withdrawRes),
         });
       } catch (error) {
-        console.error("Lỗi tải Dashboard:", error);
+        console.error("Error fetching data", error);
       } finally {
         setLoading(false);
       }
     };
-
     fetchData();
   }, [period]);
 
-  // --- 4. CHUẨN BỊ DỮ LIỆU HIỂN THỊ ---
+  // --- 4. CALCULATIONS (PHẦN BẠN BỊ THIẾU) ---
 
-  // Logic hiển thị chi tiết cho Tab Vận hành (khi click vào Card)
+  // Logic hiển thị chi tiết cho Tab Vận hành
   const getActiveTrendData = () => {
     switch (activeSubTab) {
       case "author":
@@ -276,13 +273,41 @@ export default function DashboardAnalytics() {
   const activeData = getActiveTrendData();
   const TrendIcon = activeData.icon;
 
-  // Logic dữ liệu biểu đồ Traffic
+  /** * Lấy danh sách dữ liệu biểu đồ từ API.
+   * Sử dụng ?. (optional chaining) và || [] (fallback) để đảm bảo
+   * nếu API lỗi hoặc chưa có dữ liệu thì biến vẫn là một mảng rỗng,
+   * giúp tránh lỗi "undefined" khi thực hiện các hàm map/reduce ở dưới.
+   */
   const userChartData = trafficData?.data || [];
   const engageChartData = engagementData?.chartData || [];
+  /**
+   * TÍNH TỔNG NGƯỜI DÙNG MỚI:
+   * Duyệt qua mảng dữ liệu từng ngày (userChartData) và cộng dồn trường 'totalNew'.
+   * - acc (accumulator): Biến tích lũy, giữ tổng số điểm sau mỗi vòng lặp.
+   * - curr (current): Phần tử của ngày hiện tại đang xét.
+   * - 0: Giá trị khởi tạo cho tổng.
+   */
+  const totalNewUsers = userChartData.reduce(
+    (acc: number, curr: any) => acc + (curr.totalNew || 0),
+    0
+  );
+  /**
+   * TÍNH TỔNG TƯƠNG TÁC:
+   */
+  const totalEngagement =
+    (engagementData?.totalNewFollows || 0) +
+    (engagementData?.totalNewComments || 0);
+  /**
+   * Đưa mảng dữ liệu vào hàm calculateHealth để so sánh ngày đầu và ngày cuối.
+   */
   const userGrowthHealth = calculateHealth(userChartData, "totalNew");
+
+  /**
+   * Kiểm tra xem lượng tương tác (Follow/Comment) đang tăng hay giảm
+   * so với thời điểm bắt đầu chu kỳ.
+   */
   const engagementHealth = calculateHealth(engageChartData, "newFollows");
 
-  // Hàm xử lý xuất Excel
   const handleExport = async () => {
     try {
       setIsExporting(true);
@@ -290,21 +315,21 @@ export default function DashboardAnalytics() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Bao_Cao_Doanh_Thu_${period}.xlsx`; // Tên file tiếng Việt
+      a.download = `Bao_Cao_${period}.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-    } catch (error) {
-      alert("Xuất file thất bại. Vui lòng thử lại.");
+    } catch {
+      alert("Lỗi xuất file");
     } finally {
       setIsExporting(false);
     }
   };
 
-  // --- 5. GIAO DIỆN CHÍNH (RENDER) ---
+  // --- 5. RENDER ---
   return (
     <main className="p-4 md:p-6 space-y-6 w-full max-w-[1600px] mx-auto pb-10">
-      {/* --- HEADER & BỘ LỌC --- */}
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-background p-1 rounded-lg">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-[var(--primary)]">
@@ -317,16 +342,14 @@ export default function DashboardAnalytics() {
             </span>
           </p>
         </div>
-
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md border text-sm text-muted-foreground">
             <Calendar className="w-4 h-4" />
             <span>Thời gian:</span>
           </div>
-
           <Select value={period} onValueChange={setPeriod}>
             <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Chọn thời gian" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="day">Theo Ngày</SelectItem>
@@ -335,10 +358,8 @@ export default function DashboardAnalytics() {
               <SelectItem value="year">Theo Năm</SelectItem>
             </SelectContent>
           </Select>
-
           <Button
             variant="outline"
-            size="default"
             onClick={handleExport}
             disabled={isExporting}
           >
@@ -346,7 +367,7 @@ export default function DashboardAnalytics() {
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : (
               <Download className="w-4 h-4 mr-2" />
-            )}
+            )}{" "}
             Xuất Excel
           </Button>
         </div>
@@ -358,10 +379,9 @@ export default function DashboardAnalytics() {
           <p className="text-muted-foreground">Đang tải dữ liệu...</p>
         </div>
       ) : (
-        /* SỬ DỤNG TABS ĐỂ CHIA GIAO DIỆN LÀM 2 PHẦN RÕ RÀNG */
         <Tabs
-          value={mainTab}
-          onValueChange={(v) => setMainTab(v as "traffic" | "operation")}
+          value={activeMainTab}
+          onValueChange={setActiveMainTab}
           className="w-full"
         >
           <TabsList className="grid w-full grid-cols-2 lg:w-[500px] mb-6">
@@ -369,11 +389,11 @@ export default function DashboardAnalytics() {
             <TabsTrigger value="operation">Vận hành & Doanh thu</TabsTrigger>
           </TabsList>
 
-          {/* --- TAB 1: TRAFFIC & HÀNH VI (CODE MỚI) --- */}
+          {/* TAB 1: TRAFFIC */}
           <TabsContent value="traffic" className="space-y-6">
-            {/* Cards KPI Traffic */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Card: Người dùng mới */}
+            {/* Grid 3 cột: User - Views - Engagement */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Card 1: Người dùng mới */}
               <Card className="shadow-sm border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -385,12 +405,7 @@ export default function DashboardAnalytics() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-blue-700">
-                    {userChartData
-                      .reduce(
-                        (acc: number, curr: any) => acc + curr.totalNew,
-                        0
-                      )
-                      .toLocaleString()}
+                    {totalNewUsers.toLocaleString()}
                   </div>
                   <div className="mt-2 flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">
@@ -401,7 +416,35 @@ export default function DashboardAnalytics() {
                 </CardContent>
               </Card>
 
-              {/* Card: Tương tác */}
+              {/* Card 2: Tổng lượt xem (Mới thêm) */}
+              <Card className="shadow-sm border-l-4 border-l-orange-500 hover:shadow-md transition-shadow">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Lượt đọc truyện
+                  </CardTitle>
+                  <div className="p-2 bg-orange-50 rounded-full">
+                    <Eye className="w-4 h-4 text-orange-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-orange-700">
+                    {(engagementData?.totalViews || 0).toLocaleString()}
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      Lượt xem toàn trang
+                    </p>
+                    <Badge
+                      variant="outline"
+                      className="text-xs bg-orange-50 text-orange-700 border-orange-200"
+                    >
+                      Mức tiêu thụ
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Card 3: Tương tác */}
               <Card className="shadow-sm border-l-4 border-l-purple-500 hover:shadow-md transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -413,10 +456,7 @@ export default function DashboardAnalytics() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-purple-700">
-                    {(
-                      (engagementData?.totalNewFollows || 0) +
-                      (engagementData?.totalNewComments || 0)
-                    ).toLocaleString()}
+                    {totalEngagement.toLocaleString()}
                   </div>
                   <div className="mt-2 flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">
@@ -428,22 +468,16 @@ export default function DashboardAnalytics() {
               </Card>
             </div>
 
-            {/* Charts Traffic - Fix chiều cao cố định để không vỡ layout */}
+            {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Chart 1: Tăng trưởng User */}
               <Card className="shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Users className="w-5 h-5 text-blue-500" /> Tăng trưởng
                     Người dùng
                   </CardTitle>
-                  <CardDescription>
-                    So sánh lượng Độc giả mới và Tác giả mới
-                  </CardDescription>
                 </CardHeader>
                 <CardContent className="h-[350px]">
-                  {/* Recharts cần container có height cố định,
-      nếu không biểu đồ sẽ không render hoặc vỡ layout */}
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={userChartData}>
                       <CartesianGrid
@@ -464,26 +498,20 @@ export default function DashboardAnalytics() {
                       <YAxis fontSize={12} />
                       <Tooltip
                         labelFormatter={(l) =>
-                          `Ngày: ${new Date(l).toLocaleDateString("vi-VN")}`
-                        }
-                        formatter={(value: number, name: string) => [
-                          value,
-                          name === "newReaders" ? "Độc giả mới" : "Tác giả mới",
-                        ]}
-                      />
-                      <Legend
-                        formatter={(value) =>
-                          value === "newReaders" ? "Độc giả mới" : "Tác giả mới"
+                          new Date(l).toLocaleDateString("vi-VN")
                         }
                       />
+                      <Legend />
                       <Bar
                         dataKey="newReaders"
+                        name="Độc giả"
                         stackId="a"
                         fill="#3b82f6"
                         radius={[0, 0, 4, 4]}
                       />
                       <Bar
                         dataKey="newAuthors"
+                        name="Tác giả"
                         stackId="a"
                         fill="#10b981"
                         radius={[4, 4, 0, 0]}
@@ -493,16 +521,12 @@ export default function DashboardAnalytics() {
                 </CardContent>
               </Card>
 
-              {/* Chart 2: Xu hướng Tương tác */}
               <Card className="shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <MessageSquare className="w-5 h-5 text-orange-500" /> Xu
                     hướng Tương tác
                   </CardTitle>
-                  <CardDescription>
-                    Biến động bình luận và lượt theo dõi
-                  </CardDescription>
                 </CardHeader>
                 <CardContent className="h-[350px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -563,23 +587,14 @@ export default function DashboardAnalytics() {
                       <YAxis fontSize={12} />
                       <Tooltip
                         labelFormatter={(l) =>
-                          `Ngày: ${new Date(l).toLocaleDateString("vi-VN")}`
-                        }
-                        formatter={(value: number, name: string) => [
-                          value,
-                          name === "newComments" ? "Bình luận" : "Theo dõi",
-                        ]}
-                      />
-                      <Legend
-                        formatter={(value) =>
-                          value === "newComments"
-                            ? "Bình luận mới"
-                            : "Theo dõi mới"
+                          new Date(l).toLocaleDateString("vi-VN")
                         }
                       />
+                      <Legend />
                       <Area
                         type="monotone"
                         dataKey="newComments"
+                        name="Bình luận"
                         stroke="#f97316"
                         fillOpacity={1}
                         fill="url(#colorCom)"
@@ -587,6 +602,7 @@ export default function DashboardAnalytics() {
                       <Area
                         type="monotone"
                         dataKey="newFollows"
+                        name="Theo dõi"
                         stroke="#8b5cf6"
                         fillOpacity={1}
                         fill="url(#colorFol)"
@@ -597,18 +613,14 @@ export default function DashboardAnalytics() {
               </Card>
             </div>
 
-            {/* Lists (Top Stories & Tags) */}
+            {/* Lists */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Danh sách truyện Hot */}
               <Card className="shadow-sm h-[400px] flex flex-col">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <BookOpen className="w-5 h-5 text-pink-500" /> Truyện Nổi
                     bật
                   </CardTitle>
-                  <CardDescription>
-                    Top tác phẩm có lượt xem cao nhất
-                  </CardDescription>
                 </CardHeader>
                 <CardContent className="flex-1 overflow-auto pr-2">
                   <div className="space-y-3">
@@ -618,7 +630,6 @@ export default function DashboardAnalytics() {
                         className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
                       >
                         <div className="relative w-10 h-14 bg-muted flex-shrink-0">
-                          {/* Dùng img thay vì Image để tránh lỗi config domain */}
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={story.coverUrl}
@@ -644,29 +655,20 @@ export default function DashboardAnalytics() {
                           variant="secondary"
                           className="whitespace-nowrap ml-2"
                         >
-                          {story.totalViewsInPeriod.toLocaleString()} lượt xem
+                          {story.totalViewsInPeriod.toLocaleString()} views
                         </Badge>
                       </div>
                     ))}
-                    {trendingStories.length === 0 && (
-                      <p className="text-center text-muted-foreground pt-10">
-                        Chưa có dữ liệu
-                      </p>
-                    )}
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Biểu đồ Tags */}
               <Card className="shadow-sm h-[400px] flex flex-col">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Tag className="w-5 h-5 text-indigo-500" /> Thể loại Quan
                     tâm
                   </CardTitle>
-                  <CardDescription>
-                    Top thể loại được đọc nhiều nhất
-                  </CardDescription>
                 </CardHeader>
                 <CardContent className="flex-1 min-h-0">
                   <ResponsiveContainer width="100%" height="100%">
@@ -675,12 +677,6 @@ export default function DashboardAnalytics() {
                       data={topTags}
                       margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
                     >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        horizontal={true}
-                        vertical={false}
-                        opacity={0.2}
-                      />
                       <XAxis type="number" hide />
                       <YAxis
                         dataKey="tagName"
@@ -688,10 +684,41 @@ export default function DashboardAnalytics() {
                         width={100}
                         tick={{ fontSize: 12, fill: "var(--foreground)" }}
                       />
+
+                      {/* --- 👇 SỬA Ở ĐÂY (Thay thế <Tooltip /> cũ bằng đoạn này) 👇 --- */}
                       <Tooltip
-                        formatter={(value: number) => [value, "Lượt xem"]}
                         cursor={{ fill: "var(--muted)", opacity: 0.3 }}
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-popover border border-border text-popover-foreground shadow-md rounded-lg p-3 text-sm">
+                                <p className="font-bold mb-2 text-[var(--primary)]">
+                                  {data.tagName}
+                                </p>
+                                <div className="flex justify-between gap-8 mb-1">
+                                  <span className="text-muted-foreground">
+                                    Tổng lượt xem:
+                                  </span>
+                                  <span className="font-semibold">
+                                    {data.totalViews.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between gap-8">
+                                  <span className="text-muted-foreground">
+                                    Số lượng truyện:
+                                  </span>
+                                  <span className="font-semibold">
+                                    {data.storyCount}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
                       />
+
                       <Bar
                         dataKey="totalViews"
                         fill="#6366f1"
@@ -713,11 +740,9 @@ export default function DashboardAnalytics() {
             </div>
           </TabsContent>
 
-          {/* --- TAB 2: VẬN HÀNH & DOANH THU (CODE CŨ GIỮ NGUYÊN) --- */}
+          {/* TAB 2: OPERATION */}
           <TabsContent value="operation" className="space-y-6">
-            {/* 4 Cards click được để xem chi tiết */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* 1. Doanh thu */}
               <div
                 onClick={() => setActiveSubTab("revenue")}
                 className="cursor-pointer group"
@@ -742,8 +767,6 @@ export default function DashboardAnalytics() {
                   </CardContent>
                 </Card>
               </div>
-
-              {/* 2. Yêu cầu lên Tác giả */}
               <div
                 onClick={() => setActiveSubTab("author")}
                 className="cursor-pointer group"
@@ -768,8 +791,6 @@ export default function DashboardAnalytics() {
                   </CardContent>
                 </Card>
               </div>
-
-              {/* 3. Yêu cầu Nâng hạng */}
               <div
                 onClick={() => setActiveSubTab("rank")}
                 className="cursor-pointer group"
@@ -794,8 +815,6 @@ export default function DashboardAnalytics() {
                   </CardContent>
                 </Card>
               </div>
-
-              {/* 4. Yêu cầu Rút tiền */}
               <div
                 onClick={() => setActiveSubTab("withdraw")}
                 className="cursor-pointer group"
@@ -822,11 +841,10 @@ export default function DashboardAnalytics() {
               </div>
             </div>
 
-            {/* Grid chi tiết bên dưới (Dữ liệu thay đổi theo Card được chọn) */}
             <Card className="shadow-sm border border-[var(--border)]">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  <TrendingUp className={`w-5 h-5 ${activeData.iconText}`} />
+                  <TrendingUp className={`w-5 h-5 ${activeData.iconText}`} />{" "}
                   Chi tiết:{" "}
                   <span className={activeData.iconText}>
                     {activeData.label}
@@ -848,7 +866,6 @@ export default function DashboardAnalytics() {
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <CalendarDays className="w-4 h-4" />
                             <span>
-                              {/* Format ngày tháng hiển thị */}
                               {period === "day" || period === "week"
                                 ? new Date(item.name).toLocaleDateString(
                                     "vi-VN"
