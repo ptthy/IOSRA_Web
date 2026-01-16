@@ -49,8 +49,8 @@ const STATUS_MAP: Record<string, { label: string; className: string }> = {
     label: "Chờ xử lý",
     className: "bg-yellow-100 text-yellow-700 border-yellow-200",
   },
-  approved: {
-    label: "Đã duyệt",
+  resolved: {
+    label: "Đã xử lý ",
     className: "bg-green-100 text-green-700 border-green-200",
   },
   rejected: {
@@ -187,7 +187,7 @@ export default function AllReportPage() {
             ) : reports.length > 0 ? (
               <div className="space-y-3">
                 {/* Header Row (Optional, giống table header) */}
-                <div className="hidden md:flex px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <div className="hidden md:flex px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider md:gap-4">
                   <div className="w-[120px]">Lý do</div>
                   <div className="w-[100px]">Trạng thái</div>
                   <div className="w-[80px]">Loại</div>
