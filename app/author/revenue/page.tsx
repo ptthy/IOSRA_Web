@@ -2281,7 +2281,7 @@ currentChapterIds.forEach(async (chapterId) => {
                                   className="h-8 w-8 text-gray-500 hover:text-gray-700"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleViewChapterDetail(item.id, "all");
+                                   handleViewChapterDetail(item.chapterId, "all");
                                   }}
                                 >
                                   <Eye className="w-4 h-4" />
