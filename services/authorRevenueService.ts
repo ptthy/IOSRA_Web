@@ -109,6 +109,8 @@ export interface RevenueDetailResponse {
   chapterRevenue?: number;
   voiceRevenue?: number;
   totalPurchases: number;
+  totalChapterPurchaseCount?: number; 
+  totalVoicePurchaseCount?: number;
   purchasers: {
     items: PurchaserItem[];
     total: number;
