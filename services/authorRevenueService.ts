@@ -100,7 +100,22 @@ export interface PurchaserItem {
   purchaseDate: string;
   type?: "chapter" | "voice" | string;
 }
-
+// interface cho từng chương trong danh sách trả về
+export interface RevenueChapterItem {
+  chapterId: string;
+  chapterNo: number;
+  title: string;
+  
+  // Các field thống kê đã được BE tính sẵn
+  totalRevenue: number;
+  chapterRevenue: number;
+  voiceRevenue: number;
+  
+  totalPurchases: number;
+  totalPurchaseCount: number;
+  totalChapterPurchaseCount: number; 
+  totalVoicePurchaseCount: number;  
+}
 // Cấu trúc dữ liệu trả về từ API doanh thu chi tiết
 export interface RevenueDetailResponse {
   contentId: string;
@@ -111,6 +126,7 @@ export interface RevenueDetailResponse {
   totalPurchases: number;
   totalChapterPurchaseCount?: number; 
   totalVoicePurchaseCount?: number;
+  chapters?: RevenueChapterItem[];
   purchasers: {
     items: PurchaserItem[];
     total: number;
