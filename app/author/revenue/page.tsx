@@ -742,12 +742,15 @@ export default function AuthorRevenuePage() {
   );
   // ---  QUẢN LÝ TAB ACTIVE ---
   const [activeTab, setActiveTab] = useState("transactions");
-  // --- QUẢN LÝ TAB & SỐ LIỆU CHƯƠNG ---
-  // State lưu số liệu thật của từng chương (Key: ChapterID -> Value: {c: chapterRevenue, v: voiceRevenue})
-  // SỬA: Thêm cCount (lượt chương) và vCount (lượt giọng) vào type
+  // // --- QUẢN LÝ TAB & SỐ LIỆU CHƯƠNG ---
+  // // State lưu số liệu thật của từng chương (Key: ChapterID -> Value: {c: chapterRevenue, v: voiceRevenue})
+  // // SỬA: Thêm cCount (lượt chương) và vCount (lượt giọng) vào type
   const [realChapterData, setRealChapterData] = useState<
     Record<string, { c: number; v: number; cCount: number; vCount: number }>
   >({});
+  // --- THÊM STATE NÀY ---
+  // Lưu danh sách chương lấy trực tiếp từ API (đã có đủ số liệu)
+  const [storyChapters, setStoryChapters] = useState<any[]>([]);
 
   /**
    * HELPER XỬ LÝ LỖI API (giống các file khác):
@@ -797,57 +800,91 @@ export default function AuthorRevenuePage() {
    * - Tính tổng revenue cho mỗi ngày
    * - Sort theo thời gian tăng dần
    */
-  const fetchAllData = async () => {
+const fetchAllData = async () => {
     try {
-      setLoading(true); // Bắt đầu loading
+      setLoading(true);
+
       // 1. Lấy tổng quan doanh thu
       const summaryRes = await authorRevenueService.getSummary();
       setSummary(summaryRes.data);
-      // 2. Lấy lịch sử giao dịch (lấy nhiều item để tính biểu đồ)
-      const transRes = await authorRevenueService.getTransactions({
-        PageSize: 200, // Tăng lên để lấy được toàn bộ lịch sử mua chương cũ
-      });
-      setTransactions(transRes.data.items);
-      // 3. Tính toán dữ liệu biểu đồ từ transactions
-      const chartMap = new Map<string, number>(); // Map: dateString -> totalRevenue
-      // Sort transactions theo thời gian tăng dần (cũ -> mới)
-      const sortedTrans = [...transRes.data.items].sort(
+
+      // 2. Lấy TOÀN BỘ lịch sử giao dịch (Loop fetching)
+      // GIẢI PHÁP: Gọi vòng lặp lấy từng trang 200 item cho đến khi hết
+      let allTransactions: TransactionItem[] = [];
+      let currentPage = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        // Luôn gọi với PageSize = 200 (mức tối đa BE cho phép)
+        const transRes = await authorRevenueService.getTransactions({
+          PageSize: 200, 
+          Page: currentPage,
+        });
+
+        const { items, total } = transRes.data;
+        
+        // Nếu không có item nào trả về thì dừng ngay
+        if (!items || items.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        // Gộp data mới lấy được vào danh sách tổng
+        allTransactions = [...allTransactions, ...items];
+
+        // Kiểm tra điều kiện dừng:
+        // Nếu tổng số đã lấy >= tổng số bản ghi có trong database (total) => Đã lấy hết
+        if (allTransactions.length >= total) {
+          hasMore = false;
+        } else {
+          currentPage++; // Tăng page để lấy trang tiếp theo trong vòng lặp tới
+        }
+      }
+      
+      // Sau khi loop xong, lưu danh sách ĐẦY ĐỦ vào state
+      // Lúc này chương "Trạm B-12" dù nằm ở giao dịch thứ 1000 cũng sẽ xuất hiện
+      setTransactions(allTransactions);
+
+      // 3. Tính toán dữ liệu biểu đồ từ allTransactions (đã đầy đủ)
+      const chartMap = new Map<string, number>();
+      
+      // Sort cũ -> mới để vẽ biểu đồ
+      const sortedTrans = [...allTransactions].sort(
         (a, b) =>
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       );
-      // Duyệt qua từng transaction
+
       sortedTrans.forEach((item) => {
         if (item.amount > 0) {
-          // Chỉ tính doanh thu (amount > 0), không tính chi
-          const dateKey = formatShortDate(item.createdAt); // "dd/mm"
+          const dateKey = formatShortDate(item.createdAt);
           const currentVal = chartMap.get(dateKey) || 0;
-          chartMap.set(dateKey, currentVal + item.amount); // Cộng dồn theo ngày
+          chartMap.set(dateKey, currentVal + item.amount);
         }
       });
-      // Convert Map thành array cho Recharts
+
       setChartData(
         Array.from(chartMap.entries()).map(([date, revenue]) => ({
           date,
           revenue,
         }))
       );
+
       // 4. Lấy lịch sử yêu cầu đối soát
       const withdrawRes = await authorRevenueService.getWithdrawHistory();
-      // Sort withdraw history mới -> cũ (theo createdAt giảm dần)
       setWithdrawHistory(
         withdrawRes.data.sort(
           (a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
       );
+
     } catch (error: any) {
       console.error("Lỗi tải dữ liệu doanh thu:", error);
-      // --- DÙNG HELPER ---
       handleApiError(error, "Không thể tải dữ liệu.");
     } finally {
-      setLoading(false); // Luôn tắt loading
+      setLoading(false);
     }
-  };
+  }
   /**
    * EFFECT FETCH DATA KHI COMPONENT MOUNT:
    * Chạy 1 lần khi component được mount lần đầu tiên
@@ -1018,21 +1055,28 @@ export default function AuthorRevenuePage() {
    * 4. Cập nhật `selectedStoryFilter` và chuyển `statsView` sang 'chapters'.
    * 5. Reset phân trang về trang 1.
    */
-  const handleViewStoryDetail = async (storyId: string, storyTitle: string) => {
+const handleViewStoryDetail = async (storyId: string, storyTitle: string) => {
     try {
       setLoading(true);
-      // Gọi API lấy thống kê truyện (Tổng doanh thu, DT Chương, DT Giọng...)
       const res = await authorRevenueService.getStoryRevenueDetail(
         storyId,
         1,
-        20
+        1000 
       );
 
-      setStoryStats(res.data); // Lưu dữ liệu thống kê vào State
+      setStoryStats(res.data);
+      
+      // --- SỬA: LẤY DATA VÀ SẮP XẾP THEO CHAPTER NO ---
+      const chapters = res.data.chapters || [];
+      // Sắp xếp tăng dần theo chapterNo
+      chapters.sort((a: any, b: any) => (a.chapterNo || 0) - (b.chapterNo || 0));
+      
+      setStoryChapters(chapters); 
+      // ------------------------------------------------
+
       setSelectedStoryFilter({ id: storyId, title: storyTitle });
-      setStatsView("chapters"); // Chuyển giao diện sang danh sách chương
-      setSalesPage(1); // Reset về trang 1
-      // ---  TỰ ĐỘNG CHUYỂN TAB ---
+      setStatsView("chapters");
+      setSalesPage(1);
       setActiveTab("content-stats");
     } catch (error) {
       toast.error("Không thể tải chi tiết truyện.");
@@ -1250,7 +1294,7 @@ export default function AuthorRevenuePage() {
           (salesPage - 1) * itemsPerPage,
           salesPage * itemsPerPage
         )
-      : groupedChapters.slice(
+    : storyChapters.slice( // <-- SỬA: Dùng trực tiếp storyChapters từ API
           (salesPage - 1) * itemsPerPage,
           salesPage * itemsPerPage
         );
@@ -1293,8 +1337,8 @@ currentChapterIds.forEach(async (chapterId) => {
     });
   }, [currentStatsData, statsView]);
   // Tính tổng số item để component Pagination render số trang chính xác
-  const totalStatsItems =
-    statsView === "stories" ? groupedStories.length : groupedChapters.length;
+ const totalStatsItems =
+    statsView === "stories" ? groupedStories.length : storyChapters.length;
   // --- PAGINATION COMPONENT (TÁI SỬ DỤNG) ---
 
   /**
@@ -2134,15 +2178,27 @@ currentChapterIds.forEach(async (chapterId) => {
                             }
                           }}
                         >
-                          <TableCell className="font-medium">
-                            {item.title || "Không tên"}
-                            {statsView === "chapters" && (
-                              <div className="text-[10px] text-muted-foreground">
-                                Cập nhật: {formatShortDate(item.latestDate)}
-                              </div>
-                            )}
-                          </TableCell>
-
+                        
+ <TableCell className="font-medium">
+  {/* LOGIC HIỂN THỊ MỚI: */}
+  {statsView === "chapters" ? (
+    // Nếu là view Chương: Hiển thị "Chương X: Tên..."
+    <div className="flex flex-col">
+      <span className="text-[var(--foreground)]">
+        {item.chapterNo ? (
+          <span className="font-bold text-[var(--primary)] mr-1">
+            Ch{item.chapterNo}:
+          </span>
+        ) : null}
+        {item.title || "Không tên"}
+      </span>
+      {/*  BỎ DÒNG CẬP NHẬT NGÀY (Invalid Date) */}
+    </div>
+  ) : (
+    // Nếu là view Truyện: Giữ nguyên
+    item.title || "Không tên"
+  )}
+</TableCell>
                           {statsView === "stories" ? (
                             <>
                               <TableCell className="text-center">
@@ -2170,79 +2226,52 @@ currentChapterIds.forEach(async (chapterId) => {
                           ) : (
                           // --- ROW DATA MỚI CHO CHƯƠNG ---
 <>
-  {/* 1. CỘT LƯỢT MỞ (Chapter Count) - Dùng số thật cCount */}
-  <TableCell className="text-center text-sm">
-    {realChapterData[item.id] !== undefined
-      ? realChapterData[item.id].cCount
-      : item.chapterCount || "-"}
-  </TableCell>
+{/* 1. CỘT LƯỢT MỞ (Text) */}
+<TableCell className="text-center text-sm font-bold">
+  {item.totalChapterPurchaseCount} {/* Field mới từ API */}
+</TableCell>
 
-  {/* 2. CỘT DT CHƯƠNG - Dùng số thật c */}
-  <TableCell className="text-right font-medium text-blue-600">
-    <div className="flex items-center justify-end gap-2">
-      <APDisplay
-        value={
-          realChapterData[item.id]
-            ? realChapterData[item.id].c
-            : item.chapterRevenue
-        }
-      />
-      {/* Nút Mắt nhỏ cho Chương */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          handleViewChapterDetail(item.id, "chapter");
-        }}
-        className="p-1 hover:bg-blue-100 rounded-full text-blue-400 transition-colors"
-        title="Xem người mua chương"
-      >
-        <Eye className="w-3 h-3" />
-      </button>
-    </div>
-  </TableCell>
+{/* 2. CỘT DT CHƯƠNG (Text) */}
+<TableCell className="text-right font-medium text-blue-600">
+  <div className="flex items-center justify-end gap-2">
+    <APDisplay value={item.chapterRevenue} /> {/* Field mới từ API */}
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        handleViewChapterDetail(item.chapterId, "chapter"); // Lưu ý: item.chapterId
+      }}
+      className="p-1 hover:bg-blue-100 rounded-full text-blue-400 transition-colors"
+    >
+      <Eye className="w-3 h-3" />
+    </button>
+  </div>
+</TableCell>
 
-  {/* 3. CỘT LƯỢT GIỌNG (Voice Count) - Dùng số thật vCount */}
-  <TableCell className="text-center text-sm">
-    {realChapterData[item.id] !== undefined
-      ? realChapterData[item.id].vCount
-      : item.voiceCount || "-"}
-  </TableCell>
+{/* 3. CỘT LƯỢT GIỌNG (Voice) */}
+<TableCell className="text-center text-sm font-bold">
+  {item.totalVoicePurchaseCount} {/* Field mới từ API */}
+</TableCell>
 
-  {/* 4. CỘT DT GIỌNG - Dùng số thật v */}
-  <TableCell className="text-right font-medium text-purple-600">
-    <div className="flex items-center justify-end gap-2">
-      <APDisplay
-        value={
-          realChapterData[item.id]
-            ? realChapterData[item.id].v
-            : item.voiceRevenue
-        }
-      />
-      {/* Nút Mắt nhỏ cho Giọng */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          handleViewChapterDetail(item.id, "voice");
-        }}
-        className="p-1 hover:bg-purple-100 rounded-full text-purple-400 transition-colors"
-        title="Xem người mua giọng"
-      >
-        <Eye className="w-3 h-3" />
-      </button>
-    </div>
-  </TableCell>
+{/* 4. CỘT DT GIỌNG (Voice) */}
+<TableCell className="text-right font-medium text-purple-600">
+  <div className="flex items-center justify-end gap-2">
+    <APDisplay value={item.voiceRevenue} /> {/* Field mới từ API */}
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        handleViewChapterDetail(item.chapterId, "voice");
+      }}
+      className="p-1 hover:bg-purple-100 rounded-full text-purple-400 transition-colors"
+    >
+      <Eye className="w-3 h-3" />
+    </button>
+  </div>
+</TableCell>
 
-  {/* 5. CỘT TỔNG - Cộng 2 số thật (c + v) */}
-  <TableCell className="text-right font-bold text-green-600">
-    <APDisplay
-      value={
-        realChapterData[item.id]
-          ? realChapterData[item.id].c + realChapterData[item.id].v
-          : item.chapterRevenue + item.voiceRevenue
-      }
-      showPlus
-    />
-  </TableCell>
+{/* 5. CỘT TỔNG */}
+<TableCell className="text-right font-bold text-green-600">
+  <APDisplay value={item.totalRevenue} showPlus />
+</TableCell>
 
                               <TableCell>
                                 {/* NÚT MẮT TO (Xem Tất Cả) */}
