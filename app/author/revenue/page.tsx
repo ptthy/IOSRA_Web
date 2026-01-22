@@ -744,8 +744,9 @@ export default function AuthorRevenuePage() {
   const [activeTab, setActiveTab] = useState("transactions");
   // --- QUẢN LÝ TAB & SỐ LIỆU CHƯƠNG ---
   // State lưu số liệu thật của từng chương (Key: ChapterID -> Value: {c: chapterRevenue, v: voiceRevenue})
+  // SỬA: Thêm cCount (lượt chương) và vCount (lượt giọng) vào type
   const [realChapterData, setRealChapterData] = useState<
-    Record<string, { c: number; v: number }>
+    Record<string, { c: number; v: number; cCount: number; vCount: number }>
   >({});
 
   /**
@@ -804,7 +805,7 @@ export default function AuthorRevenuePage() {
       setSummary(summaryRes.data);
       // 2. Lấy lịch sử giao dịch (lấy nhiều item để tính biểu đồ)
       const transRes = await authorRevenueService.getTransactions({
-        PageSize: 200, // Lấy 200 item để đủ data cho chart
+        PageSize: 200, // Tăng lên để lấy được toàn bộ lịch sử mua chương cũ
       });
       setTransactions(transRes.data.items);
       // 3. Tính toán dữ liệu biểu đồ từ transactions
@@ -1253,28 +1254,37 @@ export default function AuthorRevenuePage() {
           (salesPage - 1) * itemsPerPage,
           salesPage * itemsPerPage
         );
-  // --- CODE MỚI: TỰ ĐỘNG GỌI API LẤY SỐ LIỆU THẬT CHO CHƯƠNG ---
+// --- CODE MỚI: TỰ ĐỘNG GỌI API LẤY SỐ LIỆU THẬT CHO CHƯƠNG ---
   useEffect(() => {
     if (statsView !== "chapters" || !selectedStoryFilter) return;
 
-    // Lấy danh sách ID chương đang hiển thị trên trang hiện tại
     const currentChapterIds = currentStatsData
       .map((item) => item.id)
       .filter((id) => id && id !== "unknown_chapter");
 
-    currentChapterIds.forEach(async (chapterId) => {
-      // Nếu đã có dữ liệu rồi thì thôi không gọi lại để đỡ lag
+currentChapterIds.forEach(async (chapterId) => {
+      // Nếu đã có dữ liệu rồi thì bỏ qua
       if (realChapterData[chapterId]) return;
 
       try {
+        // SỬA 1: Giảm pageSize xuống 1 cho nhẹ server (vì đã có số tổng rồi, không cần đếm list nữa)
         const res = await authorRevenueService.getChapterRevenueDetail(
-          chapterId
+          chapterId,
+          1, 
+          1
         );
+        
+        // SỬA 2: Lấy trực tiếp số đếm từ BE trả về
+        const realCCount = res.data.totalChapterPurchaseCount || 0;
+        const realVCount = res.data.totalVoicePurchaseCount || 0;
+
         setRealChapterData((prev) => ({
           ...prev,
           [chapterId]: {
             c: res.data.chapterRevenue || 0,
             v: res.data.voiceRevenue || 0,
+            cCount: realCCount,  // <--- Gán số chuẩn từ BE vào đây
+            vCount: realVCount,  // <--- Gán số chuẩn từ BE vào đây
           },
         }));
       } catch (err) {
@@ -2158,83 +2168,81 @@ export default function AuthorRevenuePage() {
                               </TableCell>
                             </>
                           ) : (
-                            // --- ROW DATA MỚI CHO CHƯƠNG ---
-                            <>
-                              <TableCell className="text-center text-sm">
-                                {item.chapterCount || "-"}
-                              </TableCell>
+                          // --- ROW DATA MỚI CHO CHƯƠNG ---
+<>
+  {/* 1. CỘT LƯỢT MỞ (Chapter Count) - Dùng số thật cCount */}
+  <TableCell className="text-center text-sm">
+    {realChapterData[item.id] !== undefined
+      ? realChapterData[item.id].cCount
+      : item.chapterCount || "-"}
+  </TableCell>
 
-                              {/* CỘT DT CHƯƠNG: Dùng số liệu thật (realChapterData) + Icon Mắt */}
-                              <TableCell className="text-right font-medium text-blue-600">
-                                <div className="flex items-center justify-end gap-2">
-                                  {/* Hiển thị số: Ưu tiên realData.c */}
-                                  <APDisplay
-                                    value={
-                                      realChapterData[item.id]
-                                        ? realChapterData[item.id].c
-                                        : item.chapterRevenue
-                                    }
-                                  />
-                                  {/* Nút Mắt nhỏ cho Chương */}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleViewChapterDetail(
-                                        item.id,
-                                        "chapter"
-                                      );
-                                    }}
-                                    className="p-1 hover:bg-blue-100 rounded-full text-blue-400 transition-colors"
-                                    title="Xem người mua chương"
-                                  >
-                                    <Eye className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              </TableCell>
+  {/* 2. CỘT DT CHƯƠNG - Dùng số thật c */}
+  <TableCell className="text-right font-medium text-blue-600">
+    <div className="flex items-center justify-end gap-2">
+      <APDisplay
+        value={
+          realChapterData[item.id]
+            ? realChapterData[item.id].c
+            : item.chapterRevenue
+        }
+      />
+      {/* Nút Mắt nhỏ cho Chương */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleViewChapterDetail(item.id, "chapter");
+        }}
+        className="p-1 hover:bg-blue-100 rounded-full text-blue-400 transition-colors"
+        title="Xem người mua chương"
+      >
+        <Eye className="w-3 h-3" />
+      </button>
+    </div>
+  </TableCell>
 
-                              <TableCell className="text-center text-sm">
-                                {item.voiceCount || "-"}
-                              </TableCell>
+  {/* 3. CỘT LƯỢT GIỌNG (Voice Count) - Dùng số thật vCount */}
+  <TableCell className="text-center text-sm">
+    {realChapterData[item.id] !== undefined
+      ? realChapterData[item.id].vCount
+      : item.voiceCount || "-"}
+  </TableCell>
 
-                              {/* CỘT DT GIỌNG: Dùng số liệu thật (realChapterData) + Icon Mắt */}
-                              <TableCell className="text-right font-medium text-purple-600">
-                                <div className="flex items-center justify-end gap-2">
-                                  {/* Hiển thị số: Ưu tiên realData.v */}
-                                  <APDisplay
-                                    value={
-                                      realChapterData[item.id]
-                                        ? realChapterData[item.id].v
-                                        : item.voiceRevenue
-                                    }
-                                  />
-                                  {/* Nút Mắt nhỏ cho Giọng */}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleViewChapterDetail(item.id, "voice");
-                                    }}
-                                    className="p-1 hover:bg-purple-100 rounded-full text-purple-400 transition-colors"
-                                    title="Xem người mua giọng"
-                                  >
-                                    <Eye className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              </TableCell>
+  {/* 4. CỘT DT GIỌNG - Dùng số thật v */}
+  <TableCell className="text-right font-medium text-purple-600">
+    <div className="flex items-center justify-end gap-2">
+      <APDisplay
+        value={
+          realChapterData[item.id]
+            ? realChapterData[item.id].v
+            : item.voiceRevenue
+        }
+      />
+      {/* Nút Mắt nhỏ cho Giọng */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleViewChapterDetail(item.id, "voice");
+        }}
+        className="p-1 hover:bg-purple-100 rounded-full text-purple-400 transition-colors"
+        title="Xem người mua giọng"
+      >
+        <Eye className="w-3 h-3" />
+      </button>
+    </div>
+  </TableCell>
 
-                              {/* CỘT TỔNG: Cộng 2 số thực lại */}
-                              <TableCell className="text-right font-bold text-green-600">
-                                <APDisplay
-                                  value={
-                                    (realChapterData[item.id]
-                                      ? realChapterData[item.id].c
-                                      : item.chapterRevenue) +
-                                    (realChapterData[item.id]
-                                      ? realChapterData[item.id].v
-                                      : item.voiceRevenue)
-                                  }
-                                  showPlus
-                                />
-                              </TableCell>
+  {/* 5. CỘT TỔNG - Cộng 2 số thật (c + v) */}
+  <TableCell className="text-right font-bold text-green-600">
+    <APDisplay
+      value={
+        realChapterData[item.id]
+          ? realChapterData[item.id].c + realChapterData[item.id].v
+          : item.chapterRevenue + item.voiceRevenue
+      }
+      showPlus
+    />
+  </TableCell>
 
                               <TableCell>
                                 {/* NÚT MẮT TO (Xem Tất Cả) */}
