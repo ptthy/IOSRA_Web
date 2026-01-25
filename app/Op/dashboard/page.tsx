@@ -867,7 +867,7 @@ export default function DashboardAnalytics() {
                             <CalendarDays className="w-4 h-4" />
                             <span>
                               {period === "day" || period === "week"
-                                ? new Date(item.name).toLocaleDateString(
+                                ? new Date(item.fullDate).toLocaleDateString(
                                     "vi-VN"
                                   )
                                 : item.name}
